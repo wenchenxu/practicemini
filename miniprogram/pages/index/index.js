@@ -1,20 +1,10 @@
 // index.js
-const db = wx.cloud.database({
-    env:"cloudbase-9gvp1n95af42e30d"
-})
+const { CITIES } = require('../../utils/constants.js');
 
 Page({
-  data: {
-
-  },
-  onLoad(options){
-    db.collection("user").get({
-        success:function(res){
-            console.log(res.data);
-        },
-        fail(err) {
-            console.error(err);
-        }
-    })
-  }
+    data: { cities: CITIES },
+    goCity(e) {
+      const city = e.currentTarget.dataset.city;
+      wx.navigateTo({ url: `/pages/city/index?city=${encodeURIComponent(city)}` });
+    }
 })

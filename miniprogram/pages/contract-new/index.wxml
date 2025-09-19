@@ -1,0 +1,62 @@
+<view class="container">
+  <view class="header">
+    <text class="city">{{city}}</text>
+    <text class="mode" wx:if="{{mode === 'view'}}">（查看）</text>
+    <text class="mode" wx:if="{{mode === 'edit'}}">（编辑）</text>
+  </view>
+
+  <form bindsubmit="onSubmit">
+    <block wx:for="{{fields}}" wx:key="name">
+      <view class="form-item">
+        <label class="label">
+          <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
+          <text class="tip" wx:if="{{item.help}}">（{{item.help}}）</text>
+        </label>
+
+        <!-- string -->
+        <input
+          wx:if="{{item.type==='string'}}"
+          class="input"
+          placeholder="请输入{{item.label}}"
+          value="{{form[item.name] || ''}}"
+          bindinput="onInput"
+          data-name="{{item.name}}"
+          disabled="{{mode==='view'}}"
+          maxlength="{{item.maxLength || -1}}"
+        />
+
+        <!-- number -->
+        <input
+          wx:elif="{{item.type==='number'}}"
+          class="input"
+          type="number"
+          placeholder="请输入{{item.label}}"
+          value="{{form[item.name] !== undefined ? form[item.name] : ''}}"
+          bindinput="onInputNumber"
+          data-name="{{item.name}}"
+          disabled="{{mode==='view'}}"
+        />
+
+        <!-- date -->
+        <picker
+          wx:elif="{{item.type==='date'}}"
+          mode="date"
+          value="{{form[item.name] || ''}}"
+          bindchange="onDateChange"
+          data-name="{{item.name}}"
+          disabled="{{mode==='view'}}"
+        >
+          <view class="picker">{{form[item.name] || ('请选择' + item.label)}}</view>
+        </picker>
+      </view>
+    </block>
+
+    <view class="btn-row" wx:if="{{mode!=='view'}}">
+      <button formType="submit" type="primary" class="btn">保存</button>
+    </view>
+  </form>
+
+  <view class="btn-row" wx:if="{{mode==='view'}}">
+    <button type="default" class="btn" bindtap="toEdit">修改</button>
+  </view>
+</view>

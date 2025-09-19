@@ -1,3 +1,8 @@
-<view>
-学习云开发
+<view class="container">
+  <view class="title">请选择城市</view>
+  <view class="grid">
+    <block wx:for="{{cities}}" wx:key="*this">
+      <button class="city-btn" bindtap="goCity" data-city="{{item}}">{{item}}</button>
+    </block>
+  </view>
 </view>

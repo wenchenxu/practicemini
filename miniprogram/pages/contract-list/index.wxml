@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="header">
+    <text class="title">{{city}} - 合同历史</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{list.length === 0}}" class="empty">暂无合同</view>
+
+  <block wx:for="{{list}}" wx:key="_id">
+    <view class="row">
+      <view class="meta">
+        <view class="primary">
+          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
+        </view>
+        <view class="sub">
+          编号：{{item.fields.contractSerialNumber || '—'}} ｜ 签约：{{item.fields.contractDate || '—'}}
+        </view>
+      </view>
+      <view class="ops">
+        <button size="mini" class="op" bindtap="viewOne" data-id="{{item._id}}">查看</button>
+        <button size="mini" class="op" bindtap="editOne" data-id="{{item._id}}">修改</button>
+        <button size="mini" class="op danger" bindtap="delOne" data-id="{{item._id}}">删除</button>
+      </view>
+    </view>
+  </block>
+
+  <view class="load-more" wx:if="{{hasMore}}">
+    <button size="mini" bindtap="loadMore">加载更多</button>
+  </view>
+</view>
