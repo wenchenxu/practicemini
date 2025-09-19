@@ -29,7 +29,8 @@ const FIELDS = [
   { name:'carRentalCity', label:'租赁城市', type:'string', required:true, maxLength:20 },
 
   // ---- Contract / Rent ----
-  { name:'contractValidPeriod', label:'合同生效日期', type:'date', required:true },
+  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:true },
+  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:true },
   { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:120 },
   { name:'rentMonthly', label:'月租（数字）', type:'number', required:true, min:0 },
   { name:'rentMonthlyFormal', label:'月租（大写/中文）', type:'string', required:false, maxLength:50 },
