@@ -15,13 +15,13 @@
 
         <!-- string -->
         <input
-          wx:if="{{item.type==='string' && item.disabled}}"
+          wx:if="{{item.type==='string'}}"
           class="input"
           placeholder="请输入{{item.label}}"
           value="{{form[item.name] || ''}}"
           bindinput="onInput"
           data-name="{{item.name}}"
-          disabled="{{mode==='view'}}"
+          disabled="{{item.disabled || mode==='view'}}"
           maxlength="{{item.maxLength || -1}}"
         />
 
@@ -34,7 +34,7 @@
           value="{{form[item.name] !== undefined ? form[item.name] : ''}}"
           bindinput="onInputNumber"
           data-name="{{item.name}}"
-          disabled="{{mode==='view'}}"
+          disabled="{{item.disabled || mode==='view'}}"
         />
 
         <!-- date -->
@@ -44,7 +44,7 @@
           value="{{form[item.name] || ''}}"
           bindchange="onDateChange"
           data-name="{{item.name}}"
-          disabled="{{mode==='view'}}"
+          disabled="{{item.disabled || mode==='view'}}"
         >
           <view class="picker">{{form[item.name] || ('请选择' + item.label)}}</view>
         </picker>
