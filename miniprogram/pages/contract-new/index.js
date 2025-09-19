@@ -33,23 +33,53 @@ const FIELDS = [
   { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:true },
   { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:120 },
   { name:'rentMonthly', label:'月租（数字）', type:'number', required:true, min:0 },
-  { name:'rentMonthlyFormal', label:'月租（大写/中文）', type:'string', required:false, maxLength:50 },
+  { name:'rentMonthlyFormal', label:'月租（大写/中文）', type:'string', required:false, disabled:true},
   { name:'rentToday', label:'首日支付（数字）', type:'number', required:true, min:0 },
-  { name:'rentTodayFormal', label:'首日支付（大写/中文）', type:'string', required:false, maxLength:50 },
+  { name:'rentTodayFormal', label:'首日支付（大写/中文）', type:'string', required:false, disabled:true },
   { name:'rentPaybyDayInMonth', label:'每月支付日（1-31）', type:'number', required:true, min:1, max:31 },
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', required:true, min:0 },
   { name:'depositInitial', label:'押金首付', type:'number', required:true, min:0 },
-  { name:'depositFormal', label:'押金总额（大写/中文）', type:'string', required:false, maxLength:50 },
+  { name:'depositFormal', label:'押金总额（大写/中文）', type:'string', required:false, disabled:true },
   { name:'depositServiceFee', label:'服务费', type:'number', required:true, min:0 },
-  { name:'depositServiceFeeFormal', label:'服务费（大写/中文）', type:'string', required:false, maxLength:50 },
+  { name:'depositServiceFeeFormal', label:'服务费（大写/中文）', type:'string', required:false, disabled:true },
 
   // ---- Dates / Serial ----
   { name:'contractDate', label:'签约日期', type:'date', required:true },
   { name:'contractSerialNumber', label:'合同流水号', type:'number', required:true, min:0, strLenMin:1, strLenMax:20 },
 ];
 
+// 将数字自动换成中文大写
+function numberToCN(n) {
+    if (n === null || n === undefined || n === '') return '';
+    const units = '仟佰拾亿仟佰拾万仟佰拾元角分';
+    const chars = '零壹贰叁肆伍陆柒捌玖';
+    let s = (Math.round(Number(n) * 100)).toString(); // 分为单位
+    if (!/^\d+$/.test(s)) return '';
+    if (s === '0') return '零元整';
+    units.slice(-s.length); // 只是为了 linter
+    let u = units.slice(units.length - s.length);
+    let str = '';
+    for (let i = 0; i < s.length; i++) {
+      const num = Number(s[i]);
+      str += chars[num] + u[i];
+    }
+    // 处理零与单位
+    str = str
+      .replace(/零角零分$/, '整')
+      .replace(/零分$/, '整')
+      .replace(/零角/g, '零')
+      .replace(/零仟|零佰|零拾/g, '零')
+      .replace(/零{2,}/g, '零')
+      .replace(/零亿/g, '亿')
+      .replace(/零万/g, '万')
+      .replace(/零元/g, '元')
+      .replace(/亿万/g, '亿')
+      .replace(/零整$/, '整');
+    return str;
+  }
+  
 Page({
   data: {
     city: '',
@@ -91,7 +121,18 @@ Page({
   onInputNumber(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value; // 先保留字符串
-    this.setData({ [`form.${name}`]: value });
+    const patch = { [`form.${name}`]: value };
+
+    const map = {
+        rentMonthly: 'rentMonthlyFormal',
+        rentToday: 'rentTodayFormal',
+        deposit: 'depositFormal',
+        depositServiceFee: 'depositServiceFeeFormal'
+    };
+    if (map[name]) {
+        patch[`form.${map[name]}`] = numberToCN(value);
+    }
+    this.setData(patch);
   },
 
   // 日期

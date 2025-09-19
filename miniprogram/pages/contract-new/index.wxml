@@ -15,7 +15,7 @@
 
         <!-- string -->
         <input
-          wx:if="{{item.type==='string'}}"
+          wx:if="{{item.type==='string' && item.disabled}}"
           class="input"
           placeholder="请输入{{item.label}}"
           value="{{form[item.name] || ''}}"
