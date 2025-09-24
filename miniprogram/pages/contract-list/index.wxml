@@ -21,9 +21,6 @@
         </view>
       </view>
       <view class="ops">
-        <view class="icon-btn" hover-class="icon-btn--hover" bindtap="viewOne" data-id="{{item._id}}">
-            <image class="icon" src="/assets/icons/view.png" mode="widthFix" />
-        </view>
         <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
             <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
         </view>
