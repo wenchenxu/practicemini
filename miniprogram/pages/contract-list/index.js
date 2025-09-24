@@ -109,6 +109,7 @@ Page({
           }
         });
         wx.showToast({ title: '已删除' });
+        this.refresh(); // ← 直接刷新而不是只 splice 本地
     
         // 从列表移除即可
         const idx = this.data.list.findIndex(i => i._id === id);
@@ -153,6 +154,11 @@ Page({
     } finally {
       wx.hideLoading();
     }
+  },
+
+  onShow() {
+    // 从别的页（比如编辑/新建）返回时，强制刷新
+    this.refresh();
   },
 
   //下拉刷新

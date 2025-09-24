@@ -21,9 +21,15 @@
         </view>
       </view>
       <view class="ops">
-        <button size="mini" class="op" bindtap="viewOne" data-id="{{item._id}}">查看</button>
-        <button size="mini" class="op" bindtap="editOne" data-id="{{item._id}}">修改</button>
-        <button size="mini" class="op danger" bindtap="delOne" data-id="{{item._id}}">删除</button>
+        <view class="icon-btn" hover-class="icon-btn--hover" bindtap="viewOne" data-id="{{item._id}}">
+            <image class="icon" src="/assets/icons/view.png" mode="widthFix" />
+        </view>
+        <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
+            <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
+        </view>
+        <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
+            <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
+        </view>
       </view>
     </view>
   </block>
