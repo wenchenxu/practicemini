@@ -6,49 +6,51 @@
   </view>
 
   <form bindsubmit="onSubmit">
-    <block wx:for="{{fields}}" wx:key="name">
-      <view class="form-item">
-        <label class="label">
-          <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
-          <text class="tip" wx:if="{{item.help}}">（{{item.help}}）</text>
-        </label>
+    <block wx:for="{{visibleFields}}" wx:key="name">
+      <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
+        <view class="form-item">
+          <label class="label">
+            <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
+            <text class="tip" wx:if="{{item.help}}">（{{item.help}}）</text>
+          </label>
 
-        <!-- string -->
-        <input
-          wx:if="{{item.type==='string'}}"
-          class="input"
-          placeholder="请输入{{item.label}}"
-          value="{{form[item.name] || ''}}"
-          bindinput="onInput"
-          data-name="{{item.name}}"
-          disabled="{{item.disabled || mode==='view'}}"
-          maxlength="{{item.maxLength || -1}}"
-        />
+          <!-- string -->
+          <input
+            wx:if="{{item.type==='string'}}"
+            class="input"
+            placeholder="请输入{{item.label}}"
+            value="{{form[item.name] || ''}}"
+            bindinput="onInput"
+            data-name="{{item.name}}"
+            disabled="{{item.disabled || mode==='view'}}"
+            maxlength="{{item.maxLength || -1}}"
+          />
 
-        <!-- number -->
-        <input
-          wx:elif="{{item.type==='number'}}"
-          class="input"
-          type="number"
-          placeholder="请输入{{item.label}}"
-          value="{{form[item.name] !== undefined ? form[item.name] : ''}}"
-          bindinput="onInputNumber"
-          data-name="{{item.name}}"
-          disabled="{{item.disabled || mode==='view'}}"
-        />
+          <!-- number -->
+          <input
+            wx:elif="{{item.type==='number'}}"
+            class="input"
+            type="number"
+            placeholder="请输入{{item.label}}"
+            value="{{form[item.name] !== undefined ? form[item.name] : ''}}"
+            bindinput="onInputNumber"
+            data-name="{{item.name}}"
+            disabled="{{item.disabled || mode==='view'}}"
+          />
 
-        <!-- date -->
-        <picker
-          wx:elif="{{item.type==='date'}}"
-          mode="date"
-          value="{{form[item.name] || ''}}"
-          bindchange="onDateChange"
-          data-name="{{item.name}}"
-          disabled="{{item.disabled || mode==='view'}}"
-        >
-          <view class="picker">{{form[item.name] || ('请选择' + item.label)}}</view>
-        </picker>
-      </view>
+          <!-- date -->
+          <picker
+            wx:elif="{{item.type==='date'}}"
+            mode="date"
+            value="{{form[item.name] || ''}}"
+            bindchange="onDateChange"
+            data-name="{{item.name}}"
+            disabled="{{item.disabled || mode==='view'}}"
+          >
+            <view class="picker">{{form[item.name] || ('请选择' + item.label)}}</view>
+          </picker>
+        </view>
+      </block>
     </block>
 
     <view class="btn-row" wx:if="{{mode!=='view'}}">

@@ -4,50 +4,50 @@ const COL = db.collection('contracts');
 
 const FIELDS = [
   // ---- Branch ----
-  { name:'branchName', label:'门店名称', type:'string', required:true,  maxLength:50 },
-  { name:'branchAddress', label:'门店地址', type:'string', required:true, maxLength:200 },
-  { name:'branchManagerName', label:'门店负责人姓名', type:'string', required:true, maxLength:50 },
-  { name:'branchLicense', label:'门店营业执照号', type:'string', required:false, maxLength:100 },
-  { name:'branchPhone', label:'门店电话', type:'number', required:true, min:0, strLenMin:5, strLenMax:20, help:'5-20位' },
-  { name:'branchBankAccount', label:'门店银行账号', type:'number', required:true, min:0, strLenMin:6, strLenMax:30, help:'6-30位' },
-  { name:'branchBankName', label:'开户行名称', type:'string', required:true, maxLength:100 },
-  { name:'branchCityCode', label:'城市编码', type:'string', required:true, maxLength:10 },
+  { name:'branchName', label:'门店名称', type:'string', required:false,  maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
+  { name:'branchAddress', label:'门店地址', type:'string', required:false, maxLength:200, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchManagerName', label:'门店负责人姓名', type:'string', required:false, maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchLicense', label:'门店营业执照号', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchPhone', label:'门店电话', type:'number', required:false, strLenMin:11, strLenMax:11, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchBankAccount', label:'门店银行账号', type:'number', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
+  { name:'branchBankName', label:'开户行名称', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchCityCode', label:'城市编码', type:'string', required:false, maxLength:10, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Client ----
-  { name:'clientName', label:'客户姓名', type:'string', required:true, maxLength:50 },
-  { name:'clientId', label:'客户身份证号', type:'number', required:true, min:0, strLenMin:6, strLenMax:30 },
-  { name:'clientPhone', label:'客户电话', type:'number', required:true, min:0, strLenMin:5, strLenMax:20, help:'5-20位' },
-  { name:'clientAddress', label:'客户地址', type:'string', required:true, maxLength:200 },
-  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:true, maxLength:50 },
-  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'number', required:true, min:0, strLenMin:5, strLenMax:20, help:'5-20位' },
+  { name:'clientName', label:'客户姓名', type:'string', required:true, maxLength:12 },
+  { name:'clientId', label:'客户身份证号', type:'string', required:false, minLength: 18, maxLength:18},
+  { name:'clientPhone', label:'客户电话', type:'number', required:false, min:0, strLenMin:11, strLenMax:11},
+  { name:'clientAddress', label:'客户地址', type:'string', required:false, maxLength:60 },
+  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:false, maxLength:12 },
+  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'number', required:false, min:0, strLenMin:11, strLenMax:11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', required:true, maxLength:50 },
-  { name:'carColor', label:'车身颜色', type:'string', required:true, maxLength:20 },
-  { name:'carPlate', label:'车牌号', type:'string', required:true, maxLength:15 },
-  { name:'carVin', label:'车架号', type:'string', required:true, minLength:17, maxLength:17, help:'必须17位' },
-  { name:'carRentalCity', label:'租赁城市', type:'string', required:true, maxLength:20 },
+  { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
+  { name:'carColor', label:'车身颜色', type:'string', required:false, maxLength:20 },
+  { name:'carPlate', label:'车牌号', type:'string', required:false, minLength: 8, maxLength:8 },
+  { name:'carVin', label:'车架号', type:'string', required:false, minLength:14, maxLength:14, help:'必须14位' },
+  { name:'carRentalCity', label:'租赁城市', type:'string', required:false, maxLength:20 },
 
   // ---- Contract / Rent ----
-  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:true },
-  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:true },
-  { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:120 },
-  { name:'rentMonthly', label:'月租金', type:'number', required:true, min:0 },
+  { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:60 },
+  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:false },
+  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:false },
+  { name:'rentMonthly', label:'月租金', type:'number', required:false, min:0 },
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', required:false, disabled:true},
-  { name:'rentToday', label:'首日支付金', type:'number', required:true, min:0 },
+  { name:'rentToday', label:'首日支付金', type:'number', required:false, min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
-  { name:'rentPaybyDayInMonth', label:'每月支付日（1-31日）', type:'number', required:true, min:1, max:31 },
+  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:false, help: '1-31号', min:1, max:31 },
 
   // ---- Deposit ----
-  { name:'deposit', label:'押金总额', type:'number', required:true, min:0 },
-  { name:'depositInitial', label:'押金首付', type:'number', required:true, min:0 },
+  { name:'deposit', label:'押金总额', type:'number', required:false, min:0 },
+  { name:'depositInitial', label:'押金首付', type:'number', required:false, min:0 },
   { name:'depositFormal', label:'押金总额（大写）', type:'string', required:false, disabled:true },
-  { name:'depositServiceFee', label:'服务费', type:'number', required:true, min:0 },
+  { name:'depositServiceFee', label:'服务费', type:'number', required:false, min:0 },
   { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', required:false, disabled:true },
 
   // ---- Dates / Serial ----
-  { name:'contractDate', label:'签约日期', type:'date', required:true },
-  { name:'contractSerialNumber', label:'合同流水号', type:'number', required:false, disabled:true },
+  { name:'contractDate', label:'签约日期', type:'date', required:false },
+  { name:'contractSerialNumber', label:'合同流水号', type:'number', required:false, disabled:true, hideOnCreate: true },
 ];
 
 // 将数字自动换成中文大写
@@ -78,8 +78,8 @@ function numberToCN(n) {
       .replace(/亿万/g, '亿')
       .replace(/零整$/, '整');
     return str;
-  }
-  
+  };
+
 Page({
   data: {
     city: '',
@@ -89,13 +89,27 @@ Page({
     form: {}
   },
 
+  initVisibleFields(mode) {
+    const all = this.data.fields || [];
+    const visible = all.filter(f => {
+      if (mode === 'create') return !f.hideOnCreate;
+      if (mode === 'edit')   return !f.hideOnEdit;
+      if (mode === 'view')   return !f.hideOnView;
+      return true;
+    });
+    this.setData({ visibleFields: visible });
+  },
+
   onLoad(query) {
+    const cityCode = decodeURIComponent(query.cityCode || '');
     const city = decodeURIComponent(query.city || '');
     const mode = (query.mode || 'create');
     const id = query.id || '';
-    this.setData({ city, mode, id, fields: FIELDS });
+    this.setData({ cityCode, city, mode });
+    this.initVisibleFields(mode);
     wx.setNavigationBarTitle({ title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}` });
     if (id) this.fetchDetail(id);
+    if (mode==='creat') this.autofillBranch();
   },
 
   async fetchDetail(id) {
@@ -182,8 +196,8 @@ Page({
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${f.label}格式不正确`;
       }
     }
-    // 额外强约束：VIN 17位
-    if ((form.carVin || '').length !== 17) return 'VIN 必须为 17 位';
+    // 额外强约束：VIN 14位
+    if ((form.carVin || '').length !== 14) return 'VIN 必须为 14 位';
     // 每月支付日 1-31（上面已校验 min/max，这里冗余保护）
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
@@ -205,7 +219,7 @@ Page({
   },
 
   async onSubmit() {
-    const { city, mode, id } = this.data;
+    const { cityCode, city, mode, id } = this.data;
 
     const err = this.validate();
     if (err) {
@@ -213,29 +227,68 @@ Page({
       return;
     }
 
-    const fields = this.toPersistObject();
+    const payload = this.toPersistObject();
+
+    // 防重复提交
+    if (this.submitting)return;
+    this.submitting = true;
 
     try {
-      if (mode === 'create') {
-        await COL.add({
-          data: {
-            city,
-            fields,
-            createdAt: db.serverDate(),
-            updatedAt: db.serverDate()
-          }
-        });
-        wx.showToast({ title: '已保存' });
-      } else if (mode === 'edit' && id) {
-        await COL.doc(id).update({
-          data: { fields, updatedAt: db.serverDate() }
-        });
-        wx.showToast({ title: '已更新' });
-      }
-      setTimeout(() => { wx.navigateBack({ delta: 1 }); }, 300);
+        if (mode === 'create') {
+            const res = await wx.cloud.callFunction({
+                name: 'createContract',
+                data: {cityCode, cityName: city, payload}
+            });
+
+            const { fileID } = res.result || {};
+            wx.showToast({ title: '合同已生成', icon: 'success' });
+
+            // 立即预览（DOCX在多数机型可用；若不行就提供“保存到本地”）
+            if (fileID) {
+                // 立即预览 DOCX
+                const dres = await wx.cloud.downloadFile({ fileID });
+                await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+            } else {
+                // 合同已经写库，但文档没生成
+                wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none' });
+            }
+        } else if (mode === 'edit' && id) {
+            // 编辑逻辑可以保留本地更新；如要严格，也可走云函数做字段白名单与复算
+            await COL.doc(id).update({
+                data: { fields: payload, updatedAt: db.serverDate() }
+            });
+            wx.showToast({ title: '已更新' });
+        }
+
+        // 返回上一页
+        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
     } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '保存失败', icon: 'none' });
+        console.error(e);
+        wx.showToast({ title: '保存失败', icon: 'none' });
+    } finally {
+        this.submitting = false;
+    }
+  },    
+
+  async autofillBranch(){
+    const db = wx.cloud.database();
+    const res = await db.collection('branches').where({ city: this.data.city }).limit(1).get();
+    if (res.data.length) {
+      const b = res.data[0];
+      this.setData({
+        form: {
+          ...this.data.form,
+          branchName: b.branchName,
+          branchAddress: b.branchAddress,
+          branchManagerName: b.branchManagerName,
+          branchPhone: String(b.branchPhone || ''),
+          branchBankAccount: String(b.branchBankAccount || ''),
+          branchBankName: b.branchBankName,
+          branchCityCode: b.branchCityCode
+        }
+      });
+    } else {
+      wx.showToast({ title: '未找到门店资料', icon: 'none' });
     }
   },
 

@@ -1,10 +1,12 @@
-// index.js
-const { CITIES } = require('../../utils/constants.js');
+import { CITY_CODE_MAP } from '../../utils/cities';
 
 Page({
-    data: { cities: CITIES },
-    goCity(e) {
-      const city = e.currentTarget.dataset.city;
-      wx.navigateTo({ url: `/pages/city/index?city=${encodeURIComponent(city)}` });
-    }
-})
+  data: {},
+  goCity(e) {
+    const code = e.currentTarget.dataset.code; // 如 "guangzhou"
+    const name = CITY_CODE_MAP[code];
+    wx.navigateTo({
+      url: `/pages/city/index?cityCode=${encodeURIComponent(code)}&city=${encodeURIComponent(name)}`
+    });
+  }
+});

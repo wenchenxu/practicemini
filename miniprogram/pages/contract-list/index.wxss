@@ -12,3 +12,5 @@
 .op { border-radius: 10rpx; }
 .op.danger { color: #e5484d; border: 1px solid #e5484d; }
 .load-more { text-align: center; margin-top: 20rpx; }
+.primary.clickable { text-decoration: underline; }
+.primary.disabled { opacity: 0.7; }

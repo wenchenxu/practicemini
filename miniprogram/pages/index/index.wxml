@@ -1,8 +1,15 @@
 <view class="container">
   <view class="title">请选择城市</view>
   <view class="grid">
-    <block wx:for="{{cities}}" wx:key="*this">
-      <button class="city-btn" bindtap="goCity" data-city="{{item}}">{{item}}</button>
+    <block wx:key="*this">
+      <button class="city" bindtap="goCity" data-code="guangzhou">广州</button>
+      <button class="city" bindtap="goCity" data-code="foshan">佛山</button>
+      <button class="city" bindtap="goCity" data-code="huizhou">惠州</button>
+      <button class="city" bindtap="goCity" data-code="jiaxing">嘉兴</button>
+      <button class="city" bindtap="goCity" data-code="shaoxing">绍兴</button>
+      <button class="city" bindtap="goCity" data-code="changzhou">常州</button>
+      <button class="city" bindtap="goCity" data-code="nantong">南通</button>
+      <button class="city" bindtap="goCity" data-code="suzhou">苏州</button>
     </block>
   </view>
 </view>

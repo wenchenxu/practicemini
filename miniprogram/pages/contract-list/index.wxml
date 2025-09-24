@@ -9,11 +9,15 @@
   <block wx:for="{{list}}" wx:key="_id">
     <view class="row">
       <view class="meta">
-        <view class="primary">
+        <view
+            class="primary {{item.file && item.file.docxFileID ? 'clickable' : 'disabled'}}"
+            bindtap="openDocFromRow"
+            data-id="{{item._id}}"
+        >
           {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
         <view class="sub">
-          编号：{{item.fields.contractSerialNumber || '—'}} ｜ 签约：{{item.fields.contractDate || '—'}}
+          签约：{{item.fields.contractDate || '—'}}
         </view>
       </view>
       <view class="ops">
