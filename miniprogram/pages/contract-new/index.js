@@ -25,18 +25,18 @@ const FIELDS = [
   { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
   { name:'carColor', label:'车身颜色', type:'string', required:false, maxLength:20 },
   { name:'carPlate', label:'车牌号', type:'string', required:false, minLength: 8, maxLength:8 },
-  { name:'carVin', label:'车架号', type:'string', required:false, minLength:14, maxLength:14, help:'必须14位' },
+  { name:'carVin', label:'车架号', type:'string', required:true, minLength:14, maxLength:14, help:'必须14位' },
   { name:'carRentalCity', label:'租赁城市', type:'string', required:false, maxLength:20 },
 
   // ---- Contract / Rent ----
   { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:60 },
   { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:false },
   { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:false },
-  { name:'rentMonthly', label:'月租金', type:'number', required:false, min:0 },
+  { name:'rentMonthly', label:'月租金', type:'number', required:true, min:0 },
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', required:false, disabled:true},
   { name:'rentToday', label:'首日支付金', type:'number', required:false, min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
-  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:false, help: '1-31号', min:1, max:31 },
+  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:true, help: '1-31号', min:1, max:31 },
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', required:false, min:0 },
