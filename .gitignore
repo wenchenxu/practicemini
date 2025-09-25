@@ -2,6 +2,8 @@
 [Dd]esktop.ini
 Thumbs.db
 $RECYCLE.BIN/
+.env
+cloudfunctions/*/.env
 
 # macOS
 .DS_Store
