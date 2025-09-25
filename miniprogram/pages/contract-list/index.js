@@ -96,34 +96,33 @@ Page({
 
   async delOne(e) {
     const id = e.currentTarget.dataset.id;
-    const confirm = await wx.showModal({ title: '删除确认', content: '确定删除该合同吗？', confirmText: '删除' });
-    if (!confirm.confirm) return;
-
+    if (!id) return wx.showToast({ title: '缺少ID', icon: 'none' });
+  
+    const { confirm } = await wx.showModal({
+      title: '删除确认',
+      content: '确定删除该合同吗？',
+      confirmText: '删除'
+    });
+    if (!confirm) return;
+  
     try {
-        await COL.doc(id).update({
-          data: {
-            deleted: true,
-            deletedAt: db.serverDate(),
-            // 可选：记录操作人
-            // deletedBy: this.data.meOpenId || null
-          }
-        });
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'delete', id }
+      });
+      console.log('contractOps.delete result:', res.result);
+      if (res.result?.ok && res.result.updated === 1) {
         wx.showToast({ title: '已删除' });
-        this.refresh(); // ← 直接刷新而不是只 splice 本地
-    
-        // 从列表移除即可
-        const idx = this.data.list.findIndex(i => i._id === id);
-        if (idx > -1) {
-          const list = this.data.list.slice();
-          list.splice(idx, 1);
-          this.setData({ list });
-        }
-    } catch (e2) {
-      console.error(e2);
+        await this.refresh(); // 删除后强制刷新列表
+      } else {
+        wx.showToast({ title: res.result?.error || '删除失败', icon: 'none' });
+      }
+    } catch (err) {
+      console.error(err);
       wx.showToast({ title: '删除失败', icon: 'none' });
     }
   },
-
+  
   formatTime(serverDate) {
     if (!serverDate) return '';
     try {

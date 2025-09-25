@@ -253,11 +253,16 @@ Page({
                 wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none' });
             }
         } else if (mode === 'edit' && id) {
-            // 编辑逻辑可以保留本地更新；如要严格，也可走云函数做字段白名单与复算
-            await COL.doc(id).update({
-                data: { fields: payload, updatedAt: db.serverDate() }
+            // 走云函数做字段白名单与复算
+            const res = await wx.cloud.callFunction({
+                name: 'contractOps',
+                data: { action: 'update', id, fields: payload }
             });
-            wx.showToast({ title: '已更新' });
+            if (res.result?.ok && res.result.updated === 1) {
+                wx.showToast({ title: '已更新' });
+            } else {
+                wx.showToast({ title: '更新失败', icon: 'none' });
+            }
         }
 
         // 返回上一页
