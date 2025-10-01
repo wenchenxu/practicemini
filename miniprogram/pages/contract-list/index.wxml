@@ -17,7 +17,10 @@
           {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
         <view class="sub">
-          签约：{{item.fields.contractDate || '—'}}
+          编号：{{item.fields.contractSerialNumberFormatted || '—'}} ｜签约：{{item.fields.contractDate || '—'}}
+        </view>
+        <view class="sub">
+            {{item.branchName || '—'}} ｜ {{item.contractTypeName || '—'}}
         </view>
       </view>
       <view class="ops">

@@ -1,6 +1,6 @@
-// pages/contract-new/index.js
 const db = wx.cloud.database();
 const COL = db.collection('contracts');
+import { BRANCH_OPTIONS_BY_CITY, TYPE_OPTIONS_BY_CITY } from '../../utils/config';
 
 const FIELDS = [
   // ---- Branch ----
@@ -82,9 +82,23 @@ function numberToCN(n) {
 
 Page({
   data: {
+    cityCode: '',
     city: '',
     mode: 'create', // create | view | edit
     id: '',
+    // 新增：分公司/类型选择状态
+    showBranchPicker: false,
+    branchOptions: [],
+    branchIndex: -1,          // 选中下标
+    selectedBranchCode: '',   // 选中的 code
+    selectedBranchName: '',
+
+    showTypePicker: false,
+    typeOptions: [],
+    typeIndex: -1,
+    selectedTypeCode: '',
+    selectedTypeName: '',
+
     fields: FIELDS,
     form: {}
   },
@@ -108,8 +122,50 @@ Page({
     this.setData({ cityCode, city, mode });
     this.initVisibleFields(mode);
     wx.setNavigationBarTitle({ title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}` });
+    
+    // 分公司选项（仅广州）
+    const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
+    const showBranchPicker = branchOptions.length > 0;
+
+    // 合同类型选项（广州佛山多条、其他城市default一条）
+    const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
+    const showTypePicker = typeOptions.length > 1; // 多于1才展示
+
+    // 如果只有一个类型，自动选中
+    const typeIndex = typeOptions.length === 1 ? 0 : -1;
+    const selectedTypeCode = typeIndex>=0 ? typeOptions[typeIndex].code : '';
+    const selectedTypeName = typeIndex>=0 ? typeOptions[typeIndex].name : '';
+
+    this.setData({
+      branchOptions, showBranchPicker,
+      typeOptions, showTypePicker,
+      typeIndex, selectedTypeCode, selectedTypeName,
+    });
+
     if (id) this.fetchDetail(id);
     if (mode==='creat') this.autofillBranch();
+  },
+
+  // 分公司选择
+  onPickBranch(e) {
+    const idx = Number(e.detail.value);
+    const opt = this.data.branchOptions[idx];
+    this.setData({
+        branchIndex: idx,
+        selectedBranchCode: opt.code,
+        selectedBranchName: opt.name,
+    });
+  },
+    
+  // 合同类型选择
+  onPickType(e) {
+    const idx = Number(e.detail.value);
+    const opt = this.data.typeOptions[idx];
+    this.setData({
+        typeIndex: idx,
+        selectedTypeCode: opt.code,
+        selectedTypeName: opt.name,
+    });
   },
 
   async fetchDetail(id) {
@@ -197,10 +253,17 @@ Page({
       }
     }
     // 额外强约束：VIN 14位
-    if ((form.carVin || '').length !== 14) return 'VIN 必须为 14 位';
+    if ((form.carVin || '').length !== 14) return '车架号必须为 14 位';
     // 每月支付日 1-31（上面已校验 min/max，这里冗余保护）
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
+
+    if (this.data.showBranchPicker && !this.data.selectedBranchCode) {
+        return '请选择分公司';
+    }
+    if (!this.data.selectedTypeCode) {
+        return '请选择合同类型';
+    }
     return ''; // 通过
   },
 
@@ -219,15 +282,81 @@ Page({
   },
 
   async onSubmit() {
-    const { cityCode, city, mode, id } = this.data;
-
+    const data = this.data || {};
+    const cityCode = data.cityCode;
+    const city = data.city;
+    const mode = data.mode;
+    const id = data.id;
+    const selectedBranchCode = data.selectedBranchCode;
+    const selectedBranchName = data.selectedBranchName;
+    const selectedTypeCode = data.selectedTypeCode;
+    const selectedTypeName = data.selectedTypeName;
+  
     const err = this.validate();
-    if (err) {
-      wx.showToast({ title: err, icon: 'none' });
-      return;
+    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
+  
+    const payload = this.toPersistObject();
+  
+    if (this.submitting) return;
+    this.submitting = true;
+  
+    try {
+      if (mode === 'create') {
+        const res = await wx.cloud.callFunction({
+          name: 'createContract',
+          data: {
+            cityCode: cityCode,
+            cityName: city,
+            branchCode: selectedBranchCode || null,
+            branchName: selectedBranchName || null,
+            contractType: selectedTypeCode,
+            contractTypeName: selectedTypeName,
+            payload: payload
+          }
+        });
+  
+        const result = (res && res.result) ? res.result : {};
+        const fileID = result.fileID || '';
+  
+        wx.showToast({ title: '合同已生成', icon: 'success' });
+  
+        if (fileID) {
+          const dres = await wx.cloud.downloadFile({ fileID: fileID });
+          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+        } else {
+          wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none' });
+        }
+      } else if (mode === 'edit' && id) {
+        const res2 = await wx.cloud.callFunction({
+          name: 'contractOps',
+          data: { action: 'update', id: id, fields: payload }
+        });
+        const r2 = (res2 && res2.result) ? res2.result : {};
+        if (r2.ok && r2.updated === 1) {
+          wx.showToast({ title: '已更新' });
+        } else {
+          wx.showToast({ title: r2.error || '更新失败', icon: 'none' });
+        }
+      }
+  
+      setTimeout(function () { wx.navigateBack({ delta: 1 }); }, 300);
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: '保存失败', icon: 'none' });
+    } finally {
+      this.submitting = false;
     }
+  }, // ← 注意：如果这是最后一个属性，这里不要再加逗号！
+  
+  /*
+  async onSubmit() {
+    console.log('[onSubmit enter]');
+    const { cityCode, city, mode, id, selectedBranchCode, selectedBranchName, selectedTypeCode, selectedTypeName} = this.data;
+    const err = this.validate();
+    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
 
     const payload = this.toPersistObject();
+
 
     // 防重复提交
     if (this.submitting)return;
@@ -237,7 +366,14 @@ Page({
         if (mode === 'create') {
             const res = await wx.cloud.callFunction({
                 name: 'createContract',
-                data: {cityCode, cityName: city, payload}
+                data: {
+                    cityCode, cityName: city, 
+                    branchCode: selectedBranchCode || null,
+                    branchName: selectedBranchName || null,
+                    contractType: selectedTypeCode,
+                    contractTypeName: selectedTypeName,
+                    payload
+                }
             });
 
             const { fileID } = res.result || {};
@@ -273,7 +409,8 @@ Page({
     } finally {
         this.submitting = false;
     }
-  },    
+  },
+  */
 
   async autofillBranch(){
     const db = wx.cloud.database();
