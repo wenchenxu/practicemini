@@ -346,71 +346,7 @@ Page({
     } finally {
       this.submitting = false;
     }
-  }, // ← 注意：如果这是最后一个属性，这里不要再加逗号！
-  
-  /*
-  async onSubmit() {
-    console.log('[onSubmit enter]');
-    const { cityCode, city, mode, id, selectedBranchCode, selectedBranchName, selectedTypeCode, selectedTypeName} = this.data;
-    const err = this.validate();
-    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
-
-    const payload = this.toPersistObject();
-
-
-    // 防重复提交
-    if (this.submitting)return;
-    this.submitting = true;
-
-    try {
-        if (mode === 'create') {
-            const res = await wx.cloud.callFunction({
-                name: 'createContract',
-                data: {
-                    cityCode, cityName: city, 
-                    branchCode: selectedBranchCode || null,
-                    branchName: selectedBranchName || null,
-                    contractType: selectedTypeCode,
-                    contractTypeName: selectedTypeName,
-                    payload
-                }
-            });
-
-            const { fileID } = res.result || {};
-            wx.showToast({ title: '合同已生成', icon: 'success' });
-
-            // 立即预览（DOCX在多数机型可用；若不行就提供“保存到本地”）
-            if (fileID) {
-                // 立即预览 DOCX
-                const dres = await wx.cloud.downloadFile({ fileID });
-                await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
-            } else {
-                // 合同已经写库，但文档没生成
-                wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none' });
-            }
-        } else if (mode === 'edit' && id) {
-            // 走云函数做字段白名单与复算
-            const res = await wx.cloud.callFunction({
-                name: 'contractOps',
-                data: { action: 'update', id, fields: payload }
-            });
-            if (res.result?.ok && res.result.updated === 1) {
-                wx.showToast({ title: '已更新' });
-            } else {
-                wx.showToast({ title: '更新失败', icon: 'none' });
-            }
-        }
-
-        // 返回上一页
-        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
-    } catch (e) {
-        console.error(e);
-        wx.showToast({ title: '保存失败', icon: 'none' });
-    } finally {
-        this.submitting = false;
-    }
   },
-  */
 
   async autofillBranch(){
     const db = wx.cloud.database();

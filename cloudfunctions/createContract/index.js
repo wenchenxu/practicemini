@@ -53,44 +53,29 @@ const TPL_DIR = {
     def:     'contractTemplate/defaults/default.docx' // 最终兜底
   };
 
-  // 顺序尝试下载模板：分公司+类型 → 城市+类型 → 类型 → 默认
-async function resolveTemplateFileId(params) {
-    var cityCode = params.cityCode;
-    var branchCode = params.branchCode;
-    var contractType = params.contractType;
+// 顺序尝试下载模板：分公司+类型 → 城市+类型 → 类型 → 默认
+async function pickTemplateBuffer(opts) {
+    const { cityCode, branchCode, contractType } = opts;
 
-    var candidates = [];
-    if (branchCode) {
-      candidates.push(`${ENV_BASE}/${TPL_DIR.branch}/${branchCode}/${contractType}.docx`);
-    }
-    candidates.push(`${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${contractType}.docx`);
-    candidates.push(`${ENV_BASE}/${TPL_DIR.type}/${contractType}.docx`);
-    candidates.push(`${ENV_BASE}/${TPL_DIR.def}`);
+  // 按你的环境前缀与目录约定来（请确保 ENV_BASE 正确）
+  const candidates = [];
+  if (branchCode) {
+    candidates.push(`${ENV_BASE}/${TPL_DIR.branch}/${branchCode}/${contractType}.docx`);
+  }
+  candidates.push(`${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${contractType}.docx`);
+  candidates.push(`${ENV_BASE}/${TPL_DIR.type}/${contractType}.docx`);
+  candidates.push(`${ENV_BASE}/${TPL_DIR.def}`);
 
-    /*
-    for (const fileID of candidates) {
-      try {
-        // 仅做“可用性”探测：能下载即命中，下载的 buffer 丢弃（真正渲染前会再次下载）
-        await cloud.downloadFile({ fileID });
-        console.log('[tpl] hit', fileID);
-        return fileID;
-      } catch (e) {
-        console.log('[tpl] miss', fileID);
-      }
+  for (const fileID of candidates) {
+    try {
+      const res = await cloud.downloadFile({ fileID });
+      console.log('[tpl] use', fileID);
+      return { fileID, buffer: res.fileContent }; // 命中后直接带回 buffer
+    } catch (e) {
+      console.log('[tpl] miss', fileID);
     }
-    throw new Error('no template available'); // 正常不会到这里
-    */
-    for (var i = 0; i < candidates.length; i++) {
-        var f = candidates[i];
-        try {
-        await cloud.downloadFile({ fileID: f });
-        console.log('[tpl] hit', f);
-        return f;
-        } catch (e) {
-        console.log('[tpl] miss', f);
-        }
-    }
-    throw new Error('no template available');
+  }
+  throw new Error('no template available');
 }
 
 exports.main = async function (event, context) {
@@ -110,9 +95,6 @@ exports.main = async function (event, context) {
     var yyyy = now.getFullYear();
     var mm = pad(now.getMonth() + 1);
     var dd = pad(now.getDate());
-    // const mm = String(now.getMonth() + 1).padStart(2, '0');
-    // const dd = String(now.getDate()).padStart(2, '0');
-    // const dateStr = `${yyyy}${mm}${dd}`;
     var dateStr = '' + yyyy + mm + dd;
 
     // === 编号 aa 与流水作用域 ===
@@ -120,163 +102,7 @@ exports.main = async function (event, context) {
     var AA_DEFAULT_PER_CITY = { guangzhou:'GZ', foshan:'FS', huizhou: 'HZ', jiaxing: 'JX', shaoxing: 'SX', changzhou: 'CZ', nantong: 'NT', suzhou: 'SZ'};
     var aa = (branchCode && AA_BY_BRANCH[branchCode]) || AA_DEFAULT_PER_CITY[cityCode] || 'XX';
     var scopeKey = branchCode || cityCode; // 分公司优先，否则用城市
-    // var serialKey = `SERIAL#${scopeKey}#${dateStr}`;
     var serialKey = 'SERIAL#' + scopeKey + '#' + dateStr;
-
-    // 事务，生成每日流水，写库
-    /*
-    const resRun = await db.runTransaction(async tx => {
-        const serialCol = tx.collection('serials');
-        const doc = await serialCol.doc(serialKey).get().catch(() => null);
-
-        let seq = 1;
-        if (!doc || !doc.data) await serialCol.doc(serialKey).set({ data:{ seq:1 } });
-        else { seq = doc.data.seq + 1; await serialCol.doc(serialKey).update({ data:{ seq } }); }
-
-        const seqStr = pad(seq, 3);
-        const serialFormatted = `TSFZX-${aa}-${dateStr}-${seqStr}`;
-
-        // 服务器端最终字段组装（以 DB 门店为准；formal 由服务端生成）
-        // 门店信息这期“写死”注入；也可以完全不存，只用于渲染
-        const fields = {
-            ...payload,
-            ...(branch ? {
-                branchName: branch.branchName,
-                branchAddress: branch.branchAddress,
-                branchManagerName: branch.branchManagerName,
-                branchPhone: branch.branchPhone,
-                branchBankAccount: branch.branchBankAccount,
-                branchBankName: branch.branchBankName,
-                branchCityCode: aa,
-            } : {}),
-
-            // formal 金额（覆盖前端送来的）
-            rentMonthlyFormal: numberToCN(payload.rentMonthly ?? 0),
-            rentTodayFormal: numberToCN(payload.rentToday ?? 0),
-            depositFormal: numberToCN(payload.deposit ?? 0),
-            depositServiceFeeFormal: numberToCN(payload.depositServiceFee ?? 0),
-    
-            // 合同号（数值型 contractSerialNumber 可继续保留；也可只保留格式化字符串）
-            contractSerialNumber: seq, // 需要数字流水
-            contractSerialNumberFormatted: serialFormatted,
-        };
-
-        const addRes = await tx.collection('contracts').add({
-            data: { 
-                cityCode,
-                cityName,
-                branchCode, 
-                branchName,
-                contractType, 
-                contractTypeName,
-                fields,
-                deleted: false,     // 软删除标记（默认 false）
-                createdAt: db.serverDate(), 
-                updatedAt: db.serverDate() 
-            }
-        });
-        console.log('contracts.add ok:', addRes._id, serialFormatted);
-        return { _id: addRes._id, serialFormatted, fields };
-    });
-
-    const { _id: contractId, serialFormatted, fields: finalFields } = resRun;
-
-    // 模板选择优先级
-    const TEMPLATE_FILE_ID = await resolveTemplateFileId({
-        cityCode,
-        branchCode: branchCode || null,      // 其他城市可能没有分公司
-        contractType: contractType || 'rent_std'
-      });
-    console.log('[tpl] use', TEMPLATE_FILE_ID);
-
-    // 下载模板，渲染
-    const tplBufRes = await cloud.downloadFile({ fileID: TEMPLATE_FILE_ID });
-    const zip = new PizZip(tplBufRes.fileContent);
-    const doc = new Docxtemplater(zip, { 
-        paragraphLoop: true, 
-        linebreaks: true,
-        delimiters: { start: '[[', end: ']]' }   // ← 关键：改定界符
-    });
-
-    // 可用变量：把需要的字段都展开（示例）
-    const dataForDocx = {
-        contractNo: serialFormatted,
-        contractDate: finalFields.contractDate || `${yyyy}-${mm}-${dd}`,
-        cityName,
-        branchName: branchName || '',
-        contractTypeName,
-
-        // 门店 (直接用 branch 常量；如果 branch 可能为 null，加个判断）
-        ...(branch ? {
-        branchName: branch.branchName,
-        branchAddress: branch.branchAddress,
-        branchManagerName: branch.branchManagerName,
-        branchPhone: branch.branchPhone,
-        branchBankAccount: branch.branchBankAccount,
-        branchBankName: branch.branchBankName,
-        } : {}),
-
-        // 客户/车辆/租期/金额
-        clientName: finalFields.clientName,
-        clientId: finalFields.clientId,
-        clientPhone: finalFields.clientPhone,
-        clientAddress: finalFields.clientAddress,
-        clientEmergencyContact: finalFields.clientEmergencyContact,
-        clientEmergencyPhone: finalFields.clientEmergencyPhone,
-
-        carModel: finalFields.carModel,
-        carColor: finalFields.carColor,
-        carPlate: finalFields.carPlate,
-        carVin: finalFields.carVin,
-        carRentalCity: finalFields.carRentalCity,
-
-        contractValidPeriodStart: finalFields.contractValidPeriodStart,
-        contractValidPeriodEnd: finalFields.contractValidPeriodEnd,
-        rentDurationMonth: finalFields.rentDurationMonth,
-
-        rentMonthly: finalFields.rentMonthly,
-        rentMonthlyFormal: finalFields.rentMonthlyFormal,
-        rentToday: finalFields.rentToday,
-        rentTodayFormal: finalFields.rentTodayFormal,
-        rentPaybyDayInMonth: finalFields.rentPaybyDayInMonth,
-
-        deposit: finalFields.deposit,
-        depositFormal: finalFields.depositFormal,
-        depositInitial: finalFields.depositInitial,
-        depositServiceFee: finalFields.depositServiceFee,
-        depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
-    };
-
-    try { doc.setData(dataForDocx); doc.render(); }
-    catch (e) {
-        console.error('DOCX render error:', e)
-        return { _id: contractId, contractSerialNumberFormatted: serialFormatted, fileID: '' };
-    }
-
-    const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
-
-    // 上传渲染结果到云存储
-    // 用当前城市作为目录（你也可以直接写死，比如 const folder = 'NT';）
-    const folderBranch = branchCode || 'default';
-    const folderType   = contractType || 'default';
-    const uploadRes = await cloud.uploadFile({
-        cloudPath: `contracts/${cityCode}/${folderBranch}/${folderType}/${serialFormatted}.docx`,
-        fileContent: outBuf,
-    });
-    console.log('upload ok:', uploadRes.fileID);
-
-    // 把文件 fileID 记到合同文档里（方便列表里“查看/下载”）
-    await db.collection('contracts').doc(contractId).update({
-
-        data: { file: { docxFileID: uploadRes.fileID } }
-    });
-
-    return { 
-        _id: contractId,
-        contractSerialNumberFormatted: serialFormatted, 
-        fileID: uploadRes.fileID 
-    };
-    */
 
     // —— 事务里生成 seq + 写入 contracts（贴回你的事务体）——
     // 事务返回 { _id, serialFormatted, fields }
@@ -323,17 +149,17 @@ exports.main = async function (event, context) {
       var finalFields = runRes.fields;
   
       // —— 选择模板（命名约定）——
-      var TEMPLATE_FILE_ID = await resolveTemplateFileId({
-        cityCode: cityCode,
-        branchCode: branchCode,
-        contractType: contractType
+      const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({
+        cityCode, branchCode, contractType
       });
-      console.log('[tpl] use', TEMPLATE_FILE_ID);
-  
+
       // —— 渲染 —— 
-      var tplBufRes = await cloud.downloadFile({ fileID: TEMPLATE_FILE_ID });
-      var zip = new PizZip(tplBufRes.fileContent);
-      var doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: '[[', end: ']]' } });
+      const zip = new PizZip(content);
+      const doc = new Docxtemplater(zip, { 
+          paragraphLoop: true, 
+          linebreaks: true, 
+          delimiters: { start: '[[', end: ']]' },
+      });
   
       var dataForDocx = {
         contractNo: serialFormatted,
@@ -372,8 +198,7 @@ exports.main = async function (event, context) {
       };
   
       try {
-        doc.setData(dataForDocx);
-        doc.render();
+        doc.render(dataForDocx);
       } catch (e) {
         console.error('DOCX render error:', e);
         return { _id: contractId, contractSerialNumberFormatted: serialFormatted, fileID: '' };
