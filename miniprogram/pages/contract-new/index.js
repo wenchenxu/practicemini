@@ -324,7 +324,7 @@ Page({
           const dres = await wx.cloud.downloadFile({ fileID: fileID });
           await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
         } else {
-          wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none', duration: 5000 });
+          wx.showToast({ title: '提示', content: '合同已保存，但文档未生成，可稍后重试', showCancel: false, confirmText: '知道了' });
         }
       } else if (mode === 'edit' && id) {
         const res2 = await wx.cloud.callFunction({
