@@ -8,7 +8,7 @@ const FIELDS = [
   { name:'branchAddress', label:'门店地址', type:'string', required:false, maxLength:200, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'branchManagerName', label:'门店负责人姓名', type:'string', required:false, maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'branchLicense', label:'门店营业执照号', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchPhone', label:'门店电话', type:'number', required:false, strLenMin:11, strLenMax:11, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchPhone', label:'门店电话', type:'string', required:false, minLength: 11, maxLength:11, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'branchBankAccount', label:'门店银行账号', type:'number', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
   { name:'branchBankName', label:'开户行名称', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'branchCityCode', label:'城市编码', type:'string', required:false, maxLength:10, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
@@ -16,10 +16,10 @@ const FIELDS = [
   // ---- Client ----
   { name:'clientName', label:'客户姓名', type:'string', required:true, maxLength:12 },
   { name:'clientId', label:'客户身份证号', type:'string', required:false, minLength: 18, maxLength:18},
-  { name:'clientPhone', label:'客户电话', type:'number', required:false, min:0, strLenMin:11, strLenMax:11},
+  { name:'clientPhone', label:'客户电话', type:'string', required:false, min:0, minLength: 11, maxLength:11},
   { name:'clientAddress', label:'客户地址', type:'string', required:false, maxLength:60 },
   { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:false, maxLength:12 },
-  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'number', required:false, min:0, strLenMin:11, strLenMax:11},
+  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:false, min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
   { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
