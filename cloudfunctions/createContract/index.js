@@ -30,17 +30,11 @@ function numberToCN(n) {
     return str;
 }
 
-const AA_BY_BRANCH = { gzh_a: 'GZ1', gzh_b: 'GZ2'};
-const AA_DEFAULT_PER_CITY = { 
-    guangzhou:'GZ', 
-    foshan:'FS', 
-    huizhou:'HZ', 
-    jiaxing:'JX', 
-    shaoxing:'SX', 
-    nantong:'NT', 
-    changzhou:'CZ', 
-    suzhou:'SUZ' 
-};
+function toNum(x) {
+    // 支持字符串/空值，返回数字，非法则为 0
+    const n = Number(x);
+    return isFinite(n) ? n : 0;
+}
 
 // 模板映射 
 const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
@@ -109,7 +103,10 @@ exports.main = async function (event, context) {
     var runRes = await db.runTransaction(async function (tx) {
         const serialCol = tx.collection('serials');
         const doc = await serialCol.doc(serialKey).get().catch(() => null);
+        const rentMonthlyNum = toNum(payload.rentMonthly);
+        const depositInitialNum = toNum(payload.depositInitial);
 
+        // 合同序列号
         let seq = 1;
         if (!doc || !doc.data) await serialCol.doc(serialKey).set({ data:{ seq:1 } });
         else { seq = doc.data.seq + 1; await serialCol.doc(serialKey).update({ data:{ seq } }); }
@@ -117,13 +114,21 @@ exports.main = async function (event, context) {
         var seqStr = pad(seq, 3);
         var serialFormatted = `TSFZX-${aa}-${dateStr}-${seqStr}`;
   
+        // 计算零租金的剩余应补押金
+        const depositRemaining = rentMonthlyNum - depositInitialNum;
+
         var fields = Object.assign({}, payload, {
+          // 金额自动大写转换
           rentMonthlyFormal: numberToCN(payload.rentMonthly || 0),
           rentTodayFormal: numberToCN(payload.rentToday || 0),
           depositFormal: numberToCN(payload.deposit || 0),
           depositServiceFeeFormal: numberToCN(payload.depositServiceFee || 0),
+
+          // 剩余押金（数值）
+          depositRemaining: depositRemaining,
+
           contractSerialNumber: seq,
-          contractSerialNumberFormatted: serialFormatted
+          contractSerialNumberFormatted: serialFormatted,
         });
   
         var addRes = await tx.collection('contracts').add({
@@ -166,7 +171,7 @@ exports.main = async function (event, context) {
         contractDate: yyyy + '-' + mm + '-' + dd,
         cityName: cityName,
         branchName: branchName || '',
-        contractTypeName: contractTypeName,
+        contractTypeName: contractTypeName, 
         
         clientName: finalFields.clientName,
         clientId: finalFields.clientId,
@@ -195,6 +200,8 @@ exports.main = async function (event, context) {
         depositInitial: finalFields.depositInitial,
         depositServiceFee: finalFields.depositServiceFee,
         depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
+        
+        depositRemaining: finalFields.depositRemaining,
       };
   
       try {
