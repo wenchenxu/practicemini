@@ -176,7 +176,7 @@ Page({
       this.setData({ form });
     } catch (e) {
       console.error(e);
-      wx.showToast({ title: '加载失败', icon: 'none' });
+      wx.showToast({ title: '加载失败', icon: 'none', duration: 5000 });
     }
   },
 
@@ -293,7 +293,7 @@ Page({
     const selectedTypeName = data.selectedTypeName;
   
     const err = this.validate();
-    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
+    if (err) { wx.showToast({ title: err, icon: 'none', duration: 5000 }); return; }
   
     const payload = this.toPersistObject();
   
@@ -318,13 +318,13 @@ Page({
         const result = (res && res.result) ? res.result : {};
         const fileID = result.fileID || '';
   
-        wx.showToast({ title: '合同已生成', icon: 'success' });
+        wx.showToast({ title: '合同已生成', icon: 'success', duration: 3000 });
   
         if (fileID) {
           const dres = await wx.cloud.downloadFile({ fileID: fileID });
           await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
         } else {
-          wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none' });
+          wx.showToast({ title: '合同已保存，但文档未生成，可稍后重试', icon: 'none', duration: 5000 });
         }
       } else if (mode === 'edit' && id) {
         const res2 = await wx.cloud.callFunction({
@@ -333,16 +333,16 @@ Page({
         });
         const r2 = (res2 && res2.result) ? res2.result : {};
         if (r2.ok && r2.updated === 1) {
-          wx.showToast({ title: '已更新' });
+          wx.showToast({ title: '已更新', duration: 3000 });
         } else {
-          wx.showToast({ title: r2.error || '更新失败', icon: 'none' });
+          wx.showToast({ title: r2.error || '更新失败', icon: 'none', duration: 5000 });
         }
       }
   
       setTimeout(function () { wx.navigateBack({ delta: 1 }); }, 300);
     } catch (e) {
       console.error(e);
-      wx.showToast({ title: '保存失败', icon: 'none' });
+      wx.showToast({ title: '保存失败', icon: 'none', duration: 5000});
     } finally {
       this.submitting = false;
     }
@@ -366,7 +366,7 @@ Page({
         }
       });
     } else {
-      wx.showToast({ title: '未找到门店资料', icon: 'none' });
+      wx.showToast({ title: '未找到门店资料', icon: 'none', duration: 5000 });
     }
   },
 
