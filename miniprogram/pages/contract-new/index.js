@@ -329,7 +329,7 @@ Page({
       } else if (mode === 'edit' && id) {
         const res2 = await wx.cloud.callFunction({
           name: 'contractOps',
-          data: { action: 'update', id: id, fields: payload }
+          data: { action: 'update', id, fields: payload }
         });
         const r2 = (res2 && res2.result) ? res2.result : {};
         if (r2.ok && r2.updated === 1) {
