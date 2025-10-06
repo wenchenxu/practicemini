@@ -36,6 +36,22 @@ function toNum(x) {
     return isFinite(n) ? n : 0;
 }
 
+function nowInTZ(tz) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const y = parts.find(p => p.type === 'year').value;
+    const m = parts.find(p => p.type === 'month').value;
+    const d = parts.find(p => p.type === 'day').value;
+    return { y, m, d, ymd: `${y}${m}${d}` };
+}
+
+// 业务时区
+const BIZ_TZ = 'Asia/Shanghai'; 
+
 // 模板映射 
 const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
 
@@ -85,11 +101,8 @@ exports.main = async function (event, context) {
     if (!cityCode) throw new Error('cityCode required');
 
     // 用服务端时间，避免前端时区
-    var now = new Date();
-    var yyyy = now.getFullYear();
-    var mm = pad(now.getMonth() + 1);
-    var dd = pad(now.getDate());
-    var dateStr = '' + yyyy + mm + dd;
+    const { y: yyyy, m: mm, d: dd, ymd: dateStr } = nowInTZ(BIZ_TZ);
+    console.log('[ts]', `${yyyy}-${mm}-${dd}`, 'dateStr=', dateStr, 'tz=', BIZ_TZ);
 
     // === 编号 aa 与流水作用域 ===
     var AA_BY_BRANCH = { gzh_a: 'GZ1', gzh_b: 'GZ2' };
