@@ -9,3 +9,8 @@
 .input, .picker { border:1px solid #ddd; border-radius: 10rpx; padding: 18rpx; }
 .btn-row { margin-top: 24rpx; }
 .btn { border-radius: 12rpx; }
+.footer-actions { padding: 16rpx 24rpx 40rpx; }
+.footer-actions button { height: 88rpx; line-height: 88rpx; font-weight: 600; }
+.readonly-field { padding: 16rpx 0; }
+.readonly-field .label { color:#888; margin-right: 16rpx; }
+.readonly-field .value { font-weight: 600; }

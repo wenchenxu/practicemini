@@ -36,6 +36,8 @@ function toNum(x) {
     return isFinite(n) ? n : 0;
 }
 
+// 业务时区
+const BIZ_TZ = 'Asia/Shanghai';
 function nowInTZ(tz) {
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: tz,
@@ -48,9 +50,6 @@ function nowInTZ(tz) {
     const d = parts.find(p => p.type === 'day').value;
     return { y, m, d, ymd: `${y}${m}${d}` };
 }
-
-// 业务时区
-const BIZ_TZ = 'Asia/Shanghai'; 
 
 // 模板映射 
 const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';

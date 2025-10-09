@@ -90,8 +90,15 @@ Page({
 
   editOne(e) {
     const id = e.currentTarget.dataset.id;
-    const { city } = this.data;
-    wx.navigateTo({ url: `/pages/contract-new/index?city=${encodeURIComponent(city)}&mode=edit&id=${id}` });
+    const { cityCode, city } = this.data;
+    wx.navigateTo({ 
+        url: 
+        `/pages/contract-new/index` +
+        `?id=${id}` +
+        `&mode=edit` +
+        `&cityCode=${encodeURIComponent(cityCode)}` +
+        `&city=${encodeURIComponent(city)}`
+    });
   },
 
   async delOne(e) {

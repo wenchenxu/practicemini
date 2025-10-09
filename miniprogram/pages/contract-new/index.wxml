@@ -1,17 +1,35 @@
 <!-- 仅广州显示：选择分公司（必选） -->
-<view wx:if="{{showBranchPicker}}" class="form-item">
+<view wx:if="{{mode==='create' && showBranchPicker}}" class="form-item">
   <view class="label">选择分公司</view>
-  <picker mode="selector" range="{{branchOptions}}" range-key="name" value="{{branchIndex}}" bindchange="onPickBranch">
-    <view class="picker-value">{{ branchIndex>=0 ? branchOptions[branchIndex].name : '请选择' }}</view>
+  <picker mode="selector" 
+          range="{{branchOptions}}" 
+          range-key="name" 
+          value="{{branchIndex}}" 
+          bindchange="onPickBranch">
+    <view class="picker-value">
+        {{ branchIndex>=0 ? branchOptions[branchIndex].name : '请选择' }}
+    </view>
   </picker>
 </view>
 
 <!-- 合同类型：城市多类型则展示；仅一种则隐藏但会自动赋值 -->
-<view wx:if="{{showTypePicker}}" class="form-item">
+<view wx:if="{{mode==='create' && showTypePicker}}" class="form-item">
   <view class="label">合同类型</view>
-  <picker mode="selector" range="{{typeOptions}}" range-key="name" value="{{typeIndex}}" bindchange="onPickType">
-    <view class="picker-value">{{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择' }}</view>
+  <picker mode="selector" 
+          range="{{typeOptions}}" 
+          range-key="name" 
+          value="{{typeIndex}}" 
+          bindchange="onPickType">
+    <view class="picker-value">
+        {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择' }}
+    </view>
   </picker>
+</view>
+
+<!-- 编辑/查看模式：只读合同类型展示，不可交互 -->
+<view wx:elif="{{mode!=='create'}}" class="readonly-field">
+  <text class="label">合同类型</text>
+  <text class="value">{{ selectedTypeName || '—' }}</text>
 </view>
 
 <view class="container">
@@ -69,8 +87,16 @@
       </block>
     </block>
 
+    <!---
     <view class="btn-row" wx:if="{{mode!=='view'}}">
       <button formType="submit" type="primary" class="btn">保存</button>
+    </view>
+    --->
+
+    <view wx:if="{{mode!=='view'}}" class="footer-actions">
+      <button type="primary" bindtap="onSubmit" loading="{{saving}}">
+        {{ mode==='create' ? '生成合同': '保存并生成' }}
+      </button>
     </view>
   </form>
 

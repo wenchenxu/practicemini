@@ -80,17 +80,26 @@ function numberToCN(n) {
     return str;
   };
 
+async function openDocByFileID(fileID) {
+    const dres = await wx.cloud.downloadFile({ fileID });
+    await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+}
+
 Page({
   data: {
     cityCode: '',
     city: '',
     mode: 'create', // create | view | edit
     id: '',
+    // 用于“重新生成合同”按钮的 loading
+    regenLoading: false,
+
     // 新增：分公司/类型选择状态
     showBranchPicker: false,
     branchOptions: [],
     branchIndex: -1,          // 选中下标
     selectedBranchCode: '',   // 选中的 code
+
     selectedBranchName: '',
 
     showTypePicker: false,
@@ -98,9 +107,160 @@ Page({
     typeIndex: -1,
     selectedTypeCode: '',
     selectedTypeName: '',
-
+    
     fields: FIELDS,
-    form: {}
+    form: {},
+    visibleFields: [],
+    saving: false,
+  },
+
+  onLoad(options) {
+    console.log('[contract-new onLoad] options=', options);
+
+    // 1) 解析参数
+    const id = options.id || '';
+    const mode = options.mode || 'create'; // create | edit | view
+    const cityCode = decodeURIComponent(options.cityCode || '');
+    const city = decodeURIComponent(options.city || '');
+
+    // 2) 基础状态
+    this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
+
+    // 3) 顶部标题
+    wx.setNavigationBarTitle({
+        title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}`
+    });
+
+    // 4) 计算可见字段（先按当前 mode 初始化一遍）
+    this.initVisibleFields(mode);
+
+    // 5) 分公司与合同类型选项（来源保持你现有常量）
+    const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
+    const showBranchPicker = branchOptions.length > 0;
+
+    const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
+    const showTypePicker = typeOptions.length > 1;
+
+    // 若只有一个类型/分公司，默认选中它
+    const typeIndex = typeOptions.length === 1 ? 0 : -1;
+    const selectedTypeCode = typeIndex >= 0 ? typeOptions[typeIndex].code : '';
+    const selectedTypeName = typeIndex >= 0 ? typeOptions[typeIndex].name : '';
+
+    const branchIndex = branchOptions.length === 1 ? 0 : -1;
+    const selectedBranchCode = branchIndex >= 0 ? branchOptions[branchIndex].code : '';
+    const selectedBranchName = branchIndex >= 0 ? branchOptions[branchIndex].name : '';
+
+    this.setData({
+        branchOptions, showBranchPicker, branchIndex, selectedBranchCode, selectedBranchName,
+        typeOptions, showTypePicker, typeIndex, selectedTypeCode, selectedTypeName,
+    });
+
+    // 6) 根据模式处理
+    if ((mode === 'edit' || mode === 'view') && id) {
+        // 统一使用 loadDoc(id) 回填（如果你有 fetchDetail 且它做了更多事，也可以继续用它——二选一别都用）
+        this.loadDoc(id).then(() => {
+        // 回填后再算一次可见字段（有些显隐依赖分公司/类型）
+        this.initVisibleFields(this.data.mode);
+        });
+    } else if (mode === 'create') {
+        // 需要的话，做自动门店数据回填
+        // this.autofillBranch && this.autofillBranch();
+    }
+  },
+
+  // might be obsolete
+  async fetchDetail(id) {
+    try {
+      const { data } = await COL.doc(id).get();
+      // 兼容老数据结构
+      const form = data.fields || {};
+      this.setData({ form });
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: '加载失败', icon: 'none', duration: 5000 });
+    }
+  },
+
+  async loadDoc(id) {
+    try {
+      const db = wx.cloud.database();
+      const res = await db.collection('contracts').doc(id).get();
+      const doc = res.data;
+      console.log('[loadDoc]', doc);
+
+      // 回填到表单
+      this.setData({
+        form: doc.fields || {},
+        // 若你把这几个存在了顶层，顺便回填，供编辑时传回
+        selectedBranchCode: doc.branchCode || '',
+        selectedBranchName: doc.branchName || '',
+        selectedTypeCode: doc.contractType || '',
+        selectedTypeName: doc.contractTypeName || ''
+      });
+    } catch (e) {
+      console.error('[loadDoc error]', e);
+      wx.showToast({ title: '加载合同失败', icon: 'none' });
+    }
+  },
+
+  async onSaveAndRender() {
+    const { id, mode } = this.data;
+    if (mode !== 'edit' || !id) {
+      wx.showToast({ title: '仅编辑状态可用', icon: 'none' });
+      return;
+    }
+
+    const err = this.validate && this.validate();
+    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
+
+    const payload = this.toPersistObject();
+
+    if (this.data.saving) return;
+    this.setData({ saving: true });
+    wx.showLoading({ title: '保存中…', mask: true });
+
+    try {
+      // 1) 保存更新
+      const upRes = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'update', id, fields: payload }
+      });
+      const upOk = upRes?.result?.ok && upRes.result.updated === 1;
+      if (!upOk) {
+        wx.showToast({ title: upRes?.result?.error || '保存失败', icon: 'none' });
+        return;
+      }
+
+      // 2) 渲染并覆盖
+      wx.showLoading({ title: '生成文档…', mask: true });
+      const rnRes = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'render', id }
+      });
+      const rnOk = rnRes?.result?.ok;
+      const fileID = rnRes?.result?.fileID || '';
+
+      if (rnOk) {
+        wx.hideLoading();
+        wx.showToast({ title: '已生成', icon: 'success' });
+        if (fileID) {
+          // 3) 直接打开
+          const dres = await wx.cloud.downloadFile({ fileID });
+          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+        }
+        // 可选：返回上一页（若你希望停留就删掉这两行）
+        // setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
+      } else {
+        wx.hideLoading();
+        wx.showToast({ title: rnRes?.result?.error || '已保存，但文档未生成', icon: 'none' });
+      }
+    } catch (e) {
+      console.error(e);
+      wx.hideLoading();
+      wx.showToast({ title: '操作失败', icon: 'none' });
+    } finally {
+      this.setData({ saving: false });
+    }
   },
 
   initVisibleFields(mode) {
@@ -112,42 +272,12 @@ Page({
       return true;
     });
     this.setData({ visibleFields: visible });
-  },
-
-  onLoad(query) {
-    const cityCode = decodeURIComponent(query.cityCode || '');
-    const city = decodeURIComponent(query.city || '');
-    const mode = (query.mode || 'create');
-    const id = query.id || '';
-    this.setData({ cityCode, city, mode });
-    this.initVisibleFields(mode);
-    wx.setNavigationBarTitle({ title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}` });
-    
-    // 分公司选项（仅广州）
-    const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
-    const showBranchPicker = branchOptions.length > 0;
-
-    // 合同类型选项（广州佛山多条、其他城市default一条）
-    const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
-    const showTypePicker = typeOptions.length > 1; // 多于1才展示
-
-    // 如果只有一个类型，自动选中
-    const typeIndex = typeOptions.length === 1 ? 0 : -1;
-    const selectedTypeCode = typeIndex>=0 ? typeOptions[typeIndex].code : '';
-    const selectedTypeName = typeIndex>=0 ? typeOptions[typeIndex].name : '';
-
-    this.setData({
-      branchOptions, showBranchPicker,
-      typeOptions, showTypePicker,
-      typeIndex, selectedTypeCode, selectedTypeName,
-    });
-
-    if (id) this.fetchDetail(id);
-    if (mode==='creat') this.autofillBranch();
+    console.log('[initVisibleFields]', this.data.mode, 'count=', visible.length);
   },
 
   // 分公司选择
   onPickBranch(e) {
+    if (this.data.mode !== 'create') return;
     const idx = Number(e.detail.value);
     const opt = this.data.branchOptions[idx];
     this.setData({
@@ -159,6 +289,7 @@ Page({
     
   // 合同类型选择
   onPickType(e) {
+    if (this.data.mode !== 'create') return; // 编辑/查看时禁选
     const idx = Number(e.detail.value);
     const opt = this.data.typeOptions[idx];
     this.setData({
@@ -166,18 +297,6 @@ Page({
         selectedTypeCode: opt.code,
         selectedTypeName: opt.name,
     });
-  },
-
-  async fetchDetail(id) {
-    try {
-      const { data } = await COL.doc(id).get();
-      // 兼容老数据结构
-      const form = data.fields || {};
-      this.setData({ form });
-    } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '加载失败', icon: 'none', duration: 5000 });
-    }
   },
 
   // 文本输入
@@ -282,67 +401,67 @@ Page({
   },
 
   async onSubmit() {
-    const data = this.data || {};
-    const cityCode = data.cityCode;
-    const city = data.city;
-    const mode = data.mode;
-    const id = data.id;
-    const selectedBranchCode = data.selectedBranchCode;
-    const selectedBranchName = data.selectedBranchName;
-    const selectedTypeCode = data.selectedTypeCode;
-    const selectedTypeName = data.selectedTypeName;
+    const {
+      cityCode, city, mode, id,
+      selectedBranchCode, selectedBranchName,
+      selectedTypeCode, selectedTypeName
+    } = this.data;
   
-    const err = this.validate();
-    if (err) { wx.showToast({ title: err, icon: 'none', duration: 5000 }); return; }
+    const err = this.validate && this.validate();
+    if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
   
     const payload = this.toPersistObject();
-  
     if (this.submitting) return;
     this.submitting = true;
   
     try {
+      if (mode === 'edit' && id) {
+        // —— 合并流程：更新 → 渲染 → 打开 —— //
+        await this.onSaveAndRender();
+        return; // ← 记得 return，避免落到后面的 navigateBack
+      }
+  
+      // —— 新建：沿用你原有流程 —— //
       if (mode === 'create') {
         const res = await wx.cloud.callFunction({
           name: 'createContract',
           data: {
-            cityCode: cityCode,
+            cityCode,
             cityName: city,
             branchCode: selectedBranchCode || null,
             branchName: selectedBranchName || null,
             contractType: selectedTypeCode,
             contractTypeName: selectedTypeName,
-            payload: payload
+            payload
           }
         });
   
-        const result = (res && res.result) ? res.result : {};
+        const result = res?.result || {};
         const fileID = result.fileID || '';
   
-        wx.showToast({ title: '合同已生成', icon: 'success', duration: 3000 });
+        wx.showToast({ title: '合同已生成', icon: 'success', duration: 2000 });
   
         if (fileID) {
-          const dres = await wx.cloud.downloadFile({ fileID: fileID });
+          const dres = await wx.cloud.downloadFile({ fileID });
           await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
         } else {
-          wx.showToast({ title: '提示', content: '合同已保存，但文档未生成，可稍后重试', showCancel: false, confirmText: '知道了' });
+          // 这里用 showModal，而不是 showToast 的 content/confirmText
+          wx.showModal({
+            title: '提示',
+            content: '合同已保存，但文档未生成，可稍后重试',
+            showCancel: false,
+            confirmText: '知道了'
+          });
         }
-      } else if (mode === 'edit' && id) {
-        const res2 = await wx.cloud.callFunction({
-          name: 'contractOps',
-          data: { action: 'update', id, fields: payload }
-        });
-        const r2 = (res2 && res2.result) ? res2.result : {};
-        if (r2.ok && r2.updated === 1) {
-          wx.showToast({ title: '已更新', duration: 3000 });
-        } else {
-          wx.showToast({ title: r2.error || '更新失败', icon: 'none', duration: 5000 });
-        }
+  
+        // 修改合同后返回上一页
+        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
       }
   
-      setTimeout(function () { wx.navigateBack({ delta: 1 }); }, 300);
     } catch (e) {
       console.error(e);
-      wx.showToast({ title: '保存失败', icon: 'none', duration: 5000});
+      wx.hideLoading();
+      wx.showToast({ title: '保存失败', icon: 'none', duration: 3000 });
     } finally {
       this.submitting = false;
     }
@@ -375,5 +494,33 @@ Page({
     wx.navigateTo({
       url: `/pages/contract-new/index?city=${encodeURIComponent(city)}&mode=edit&id=${id}`
     });
+  },
+
+  async onRegenDoc() {
+    const id = this.data.id;
+    console.log('[onRegenDoc] id=', id);
+    if (!id) { wx.showToast({ title:'缺少合同ID', icon:'none' }); return; }
+
+    try {
+      this.setData({ regenLoading: true });
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'render', id }
+      });
+      console.log('[render result]', res);
+      const rr = res && res.result ? res.result : {};
+      if (rr.ok) {
+        wx.showToast({ title: '已重新生成', icon:'success' });
+        // 可选：立即预览
+        if (rr.fileID) await openDocByFileID(rr.fileID);
+      } else {
+        wx.showToast({ title: rr.error || '生成失败', icon:'none' });
+      }
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title:'生成失败', icon:'none' });
+    } finally {
+      this.setData({ regenLoading: false });
+    }
   }
 });
