@@ -240,19 +240,24 @@ Page({
       const rnOk = rnRes?.result?.ok;
       const fileID = rnRes?.result?.fileID || '';
 
+      wx.hideLoading();
       if (rnOk) {
-        wx.hideLoading();
         wx.showToast({ title: '已生成', icon: 'success' });
-        if (fileID) {
-          // 3) 直接打开
-          const dres = await wx.cloud.downloadFile({ fileID });
-          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
-        }
-        // 可选：返回上一页（若你希望停留就删掉这两行）
-        // setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
+
+        try {
+            if (fileID) {
+              const dres = await wx.cloud.downloadFile({ fileID });
+              await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+            }
+          } catch (e) {
+            // 打不开也不影响返回
+            console.warn('openDocument failed', e);
+          }
+        
+        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
       } else {
-        wx.hideLoading();
-        wx.showToast({ title: rnRes?.result?.error || '已保存，但文档未生成', icon: 'none' });
+            wx.showToast({ title: rnRes?.result?.error || '已保存，但文档未生成', icon: 'none' });
+            return;
       }
     } catch (e) {
       console.error(e);
