@@ -113,20 +113,24 @@ Page({
     if (!confirm) return;
   
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'contractOps',
-        data: { action: 'delete', id }
-      });
-      console.log('contractOps.delete result:', res.result);
-      if (res.result?.ok && res.result.updated === 1) {
-        wx.showToast({ title: '已删除' });
-        await this.refresh(); // 删除后强制刷新列表
-      } else {
-        wx.showToast({ title: res.result?.error || '删除失败', icon: 'none' });
-      }
+        wx.showLoading({ title: '删除中', mask: true });
+        const res = await wx.cloud.callFunction({
+          name: 'contractOps',
+          data: { action: 'delete', id }   // ← 改成 delete
+        });
+        wx.hideLoading();
+    
+        const r = res?.result || {};
+        if (r.ok && (r.deleted === 1 || r.updated === 1)) {
+          wx.showToast({ title: '已删除' });
+          await this.refresh(); // 或本地 splice
+        } else {
+          wx.showToast({ title: r.error || '删除失败', icon: 'none' });
+        }
     } catch (err) {
-      console.error(err);
-      wx.showToast({ title: '删除失败', icon: 'none' });
+        wx.hideLoading();
+        console.error(err);
+        wx.showToast({ title: '删除失败', icon: 'none' });
     }
   },
   

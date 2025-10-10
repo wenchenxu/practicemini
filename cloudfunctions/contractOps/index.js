@@ -193,6 +193,29 @@ exports.main = async (event, context) => {
         const rr = await renderDocxForContract(doc);
         return rr;
       }
+
+      if (action === 'delete') {
+        const { id } = event;
+        if (!id) return { ok:false, error:'missing-id' };
+
+        const db = cloud.database();
+        const COL = db.collection('contracts');
+
+        try {
+            const up = await COL.doc(id).update({
+            data: {
+                deleted: true,
+                deletedAt: db.serverDate(),
+                // deletedBy: openid  // 如需记录操作者，可在前端把 openid 传进来或在云端从 context 取
+            }
+            });
+            console.log('[contractOps] delete ok', id, up);
+            return { ok:true, deleted: (up.stats ? up.stats.updated : 1) };
+        } catch (e) {
+            console.error('[contractOps] delete error', e);
+            return { ok:false, error: e.message || 'delete-failed' };
+        }
+      }
   
       return { ok:false, error:'unknown-action' };
     } catch (e) {
