@@ -1,0 +1,30 @@
+<view class="wrap">
+  <view class="title">法大大 · 云函数联调测试</view>
+
+  <button bindtap="onPing">1) Ping</button>
+  <button bindtap="onGetToken">2) 获取Token</button>
+
+  <view class="split"></view>
+
+  <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
+  <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" />
+  <button bindtap="onGetAuthUrl">3) 获取授权URL</button>
+
+  <view class="split"></view>
+
+  <input class="ipt" placeholder="subject（合同标题）" value="{{subject}}" bindinput="onInputSubject" />
+  <input class="ipt" placeholder="fileId（先在法大大侧准备）" value="{{fileId}}" bindinput="onInputFileId" />
+  <button bindtap="onCreateSignTask">4) 创建签署任务</button>
+
+  <view class="split"></view>
+
+  <input class="ipt" placeholder="signTaskId（上一步返回的）" value="{{signTaskId}}" bindinput="onInputSignTaskId" />
+  <button bindtap="onGetSignUrl">5) 获取签署URL</button>
+
+  <view class="split"></view>
+
+  <view class="subtitle">响应结果：</view>
+  <scroll-view scroll-y="true" class="log">
+    <text selectable="true">{{log}}</text>
+  </scroll-view>
+</view>
