@@ -14,39 +14,40 @@ const FIELDS = [
   { name:'branchCityCode', label:'城市编码', type:'string', required:false, maxLength:10, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Client ----
-  { name:'clientName', label:'客户姓名', type:'string', required:true, maxLength:12 },
-  { name:'clientId', label:'客户身份证号', type:'string', required:false, minLength: 18, maxLength:18},
-  { name:'clientPhone', label:'客户电话', type:'string', required:false, min:0, minLength: 11, maxLength:11},
-  { name:'clientAddress', label:'客户地址', type:'string', required:false, maxLength:60 },
-  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:false, maxLength:12 },
-  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:false, min:0, minLength: 11, maxLength: 11},
+  { name:'clientName', label:'乙方客户姓名', type:'string', required:true, maxLength:12 },
+  { name:'clientId', label:'身份证号码', type:'string', required:true, minLength: 18, maxLength:18},
+  { name:'clientPhone', label:'电话', type:'string', required:true, min:0, minLength: 11, maxLength:11},
+  { name:'clientAddress', label:'身份证地址', type:'string', required:true, maxLength:60 },
+  { name:'clientAddressCurrent', label:'现居住地址', type:'string', required:false, maxLength:60 },
+  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:true, maxLength:12 },
+  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:true, min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
-  { name:'carColor', label:'车身颜色', type:'string', required:false, maxLength:20 },
-  { name:'carPlate', label:'车牌号', type:'string', required:false, minLength: 8, maxLength:8 },
+  { name:'carModel', label:'车型', type:'string', required:true, maxLength:50 },
+  { name:'carColor', label:'车身颜色', type:'string', required:true, maxLength:20 },
+  { name:'carPlate', label:'车牌号', type:'string', required:true, minLength: 8, maxLength:8 },
   { name:'carVin', label:'车架号', type:'string', required:true, minLength:14, maxLength:14, help:'必须14位' },
   { name:'carRentalCity', label:'租赁城市', type:'string', required:false, maxLength:20 },
 
   // ---- Contract / Rent ----
   { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:60 },
-  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:false },
-  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:false },
+  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:true },
+  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:true },
   { name:'rentMonthly', label:'月租金', type:'number', required:true, min:0 },
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', required:false, disabled:true},
-  { name:'rentToday', label:'首日支付金', type:'number', required:false, min:0 },
+  { name:'rentToday', label:'首日支付金', type:'number', required:true, min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:true, help: '1-31号', min:1, max:31 },
 
   // ---- Deposit ----
-  { name:'deposit', label:'押金总额', type:'number', required:false, min:0 },
-  { name:'depositInitial', label:'押金首付', type:'number', required:false, min:0 },
+  { name:'deposit', label:'押金总额', type:'number', required:true, min:0 },
+  { name:'depositInitial', label:'押金首付', type:'number', required:true, min:0 },
   { name:'depositFormal', label:'押金总额（大写）', type:'string', required:false, disabled:true },
-  { name:'depositServiceFee', label:'服务费', type:'number', required:false, min:0 },
-  { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', required:false, disabled:true },
+  { name:'depositServiceFee', label:'服务费', type:'number', required:false, min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Dates / Serial ----
-  { name:'contractDate', label:'签约日期', type:'date', required:false },
+  { name:'contractDate', label:'签约日期', type:'date', required:true },
   { name:'contractSerialNumber', label:'合同流水号', type:'number', required:false, disabled:true, hideOnCreate: true },
 ];
 
