@@ -189,6 +189,7 @@ exports.main = async function (event, context) {
         clientId: finalFields.clientId,
         clientPhone: finalFields.clientPhone,
         clientAddress: finalFields.clientAddress,
+        clientAddressCurrent: finalFields.clientAddressCurrent,
         clientEmergencyContact: finalFields.clientEmergencyContact,
         clientEmergencyPhone: finalFields.clientEmergencyPhone,
 
