@@ -1,11 +1,13 @@
+// 直传到 ECS：请先把 ECS 域名加入“小程序管理后台 -> 开发设置 -> uploadFile 合法域名”
+const ECS_UPLOAD_URL = 'https://tusifu.cn/api/esign/uploadFile';
+const ECS_INTERNAL_TOKEN = '8Ap130bab9oi1oihbqozbpoifuaoijgu85b4adoibua0b424bjahbanajkafyh';
+
 Page({
     data: {
-      clientUserId: 'driver_123',
-      redirectUrl: 'https://example.com/after-auth',
-      subject: '司机租车合同-测试',
-      fileId: '',
-      signTaskId: '',
-      log: ''
+      token: '',
+      fileUrl: '',
+      fddFileUrl: '',
+      directFddFileUrl: ''
     },
   
     // 小工具
@@ -19,6 +21,9 @@ Page({
     onInputSubject(e) { this.setData({ subject: e.detail.value }); },
     onInputFileId(e) { this.setData({ fileId: e.detail.value }); },
     onInputSignTaskId(e) { this.setData({ signTaskId: e.detail.value }); },
+    onInputUrl(e) {
+        this.setData({ fileUrl: e.detail.value })
+      },
   
     call(action, payload) {
       return wx.cloud.callFunction({
@@ -37,13 +42,19 @@ Page({
     },
   
     async onGetToken() {
-      try {
-        const { result } = await this.call('getToken');
-        this.appendLog(result);
-        wx.showToast({ title: 'Token OK', icon: 'success' });
-      } catch (e) {
-        this.appendLog(`Token Error: ${e.message || e}`);
-      }
+        try {
+          const { result } = await this.call('getToken');
+          this.appendLog(result);
+          const ok = result?.success && result?.data?.accessToken;
+          if (ok) {
+            wx.showToast({ title: 'Token OK', icon: 'success' });
+          } else {
+            wx.showToast({ title: 'Token 获取失败', icon: 'none' });
+          }
+        } catch (e) {
+          this.appendLog(`Token Error: ${e.message || e}`);
+          wx.showToast({ title: 'Token 异常', icon: 'none' });
+        }
     },
   
     async onGetAuthUrl() {
@@ -65,6 +76,50 @@ Page({
       }
     },
   
+    async onUploadPdf() {
+        try {
+          const choose = await wx.chooseMessageFile({
+            count: 1,
+            type: 'file',
+            extension: ['pdf']
+          });
+          const file = choose?.tempFiles?.[0];
+          if (!file) return;
+    
+          wx.showLoading({ title: '上传中...' });
+    
+          // 直传：wx.uploadFile
+          const uploadRes = await wx.uploadFile({
+            url: ECS_UPLOAD_URL,
+            filePath: file.path,
+            name: 'file',
+            header: { 'x-internal-token': ECS_INTERNAL_TOKEN },
+            formData: { } // 可附带 fileName 等
+          });
+    
+          wx.hideLoading();
+    
+          // 解析返回
+          let data = {};
+          try { data = JSON.parse(uploadRes.data); } catch {}
+          this.appendLog(data);
+    
+          const fileId = data?.fileId || data?.data?.fileId || data?.id;
+          if (fileId) {
+            this.setData({ fileId });
+            wx.showToast({ title: '已拿到fileId', icon: 'success' });
+          } else if (data?.error) {
+            wx.showToast({ title: '上传失败', icon: 'none' });
+          } else {
+            wx.showToast({ title: '未知返回', icon: 'none' });
+          }
+        } catch (e) {
+          wx.hideLoading();
+          this.appendLog(`Upload Error: ${e.message || e}`);
+          wx.showToast({ title: '上传异常', icon: 'none' });
+        }
+      },
+
     async onCreateSignTask() {
       try {
         const { subject, fileId, clientUserId } = this.data;

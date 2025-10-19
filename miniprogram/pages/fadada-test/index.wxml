@@ -12,6 +12,14 @@
 
   <view class="split"></view>
 
+  <button bindtap="onUploadPdf">上传PDF获取 fileId（直传ECS）</button>
+
+  <view class="split"></view>
+  
+  <view class="subtitle">当前 fileId：</view>
+  <view style="font-family:Menlo,Consolas,monospace;word-break:break-all;">
+     {{ fileId || '(未获取)' }}
+  </view>
   <input class="ipt" placeholder="subject（合同标题）" value="{{subject}}" bindinput="onInputSubject" />
   <input class="ipt" placeholder="fileId（先在法大大侧准备）" value="{{fileId}}" bindinput="onInputFileId" />
   <button bindtap="onCreateSignTask">4) 创建签署任务</button>

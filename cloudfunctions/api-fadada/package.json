@@ -8,8 +8,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@fddnpm/fasc-openapi-node-sdk": "^5.4.7",
+    "@fddnpm/fasc-openapi-node-sdk": "^5.4.5",
     "dotenv": "^16.6.1",
+    "axios": "^1.7.7",
     "wx-server-sdk": "^2.5.3"
   },
   "keywords": [],
