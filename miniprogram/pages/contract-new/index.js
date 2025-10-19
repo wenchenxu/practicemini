@@ -38,12 +38,14 @@ const FIELDS = [
   { name:'rentToday', label:'首日支付金', type:'number', required:true, min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:true, help: '1-31号', min:1, max:31 },
+  { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', require: false},
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', required:true, min:0 },
   { name:'depositInitial', label:'押金首付', type:'number', required:true, min:0 },
   { name:'depositFormal', label:'押金总额（大写）', type:'string', required:false, disabled:true },
-  { name:'depositServiceFee', label:'服务费', type:'number', required:false, min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', required:false, min:0 },
+  { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', required:false, min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Dates / Serial ----
