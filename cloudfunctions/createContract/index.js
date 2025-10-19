@@ -201,19 +201,19 @@ exports.main = async function (event, context) {
         contractValidPeriodStart: finalFields.contractValidPeriodStart,
         contractValidPeriodEnd: finalFields.contractValidPeriodEnd,
         rentDurationMonth: finalFields.rentDurationMonth,
-
         rentMonthly: finalFields.rentMonthly,
         rentMonthlyFormal: finalFields.rentMonthlyFormal,
         rentToday: finalFields.rentToday,
         rentTodayFormal: finalFields.rentTodayFormal,
         rentPaybyDayInMonth: finalFields.rentPaybyDayInMonth,
+        rentCustomized: finalFields.rentCustomized,
 
         deposit: finalFields.deposit,
         depositFormal: finalFields.depositFormal,
         depositInitial: finalFields.depositInitial,
         depositServiceFee: finalFields.depositServiceFee,
         depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
-        
+        depositUnpaidMonthly: finalFields.depositUnpaidMonthly,
         depositRemaining: finalFields.depositRemaining,
       };
   
