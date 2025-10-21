@@ -147,8 +147,9 @@ Page({
   async openDocFromRow(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
-    const fileID = item && item.file && item.file.docxFileID;
-  
+    // const fileID = item && item.file && item.file.docxFileID;
+    const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
+
     if (!fileID) {
       wx.showToast({ title: '暂无文档', icon: 'none' });
       return;
@@ -157,7 +158,8 @@ Page({
     try {
       wx.showLoading({ title: '打开中', mask: true });
       const dres = await wx.cloud.downloadFile({ fileID });
-      await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+      const isPdf = /\.pdf(\?|$)/i.test(fileID) || (item?.file?.pdfFileID === fileID);
+      await wx.openDocument({ filePath: dres.tempFilePath, fileType: isPdf ? 'pdf' : 'docx' });
     } catch (err) {
       console.error(err);
       wx.showToast({ title: '打开失败', icon: 'none' });
