@@ -40,7 +40,7 @@
   </view>
 
   <form bindsubmit="onSubmit">
-    <block wx:for="{{visibleFields}}" wx:key="name">
+    <block wx:for="{{visibleFields || []}}" wx:key="name">
       <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
         <view class="form-item">
           <label class="label">

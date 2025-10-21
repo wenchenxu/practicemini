@@ -14,3 +14,7 @@ cloudfunctions/*/.env
 
 # Node.js
 node_modules/
+cloudfunctions/**/node_modules/
+
+# local
+cloudfunctions/ciProbe/

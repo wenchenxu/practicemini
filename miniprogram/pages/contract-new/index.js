@@ -16,33 +16,33 @@ const FIELDS = [
   // ---- Client ----
   { name:'clientName', label:'乙方客户姓名', type:'string', required:true, maxLength:12 },
   { name:'clientId', label:'身份证号码', type:'string', required:true, minLength: 18, maxLength:18},
-  { name:'clientPhone', label:'电话', type:'string', required:true, min:0, minLength: 11, maxLength:11},
-  { name:'clientAddress', label:'身份证地址', type:'string', required:true, maxLength:60 },
+  { name:'clientPhone', label:'电话', type:'string', required:false, min:0, minLength: 11, maxLength:11},
+  { name:'clientAddress', label:'身份证地址', type:'string', required:false, maxLength:60 },
   { name:'clientAddressCurrent', label:'现居住地址', type:'string', required:false, maxLength:60 },
-  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:true, maxLength:12 },
-  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:true, min:0, minLength: 11, maxLength: 11},
+  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:false, maxLength:12 },
+  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:false, min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', required:true, maxLength:50 },
-  { name:'carColor', label:'车身颜色', type:'string', required:true, maxLength:20 },
-  { name:'carPlate', label:'车牌号', type:'string', required:true, minLength: 8, maxLength:8 },
+  { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
+  { name:'carColor', label:'车身颜色', type:'string', required:false, maxLength:20 },
+  { name:'carPlate', label:'车牌号', type:'string', required:false, minLength: 8, maxLength:8 },
   { name:'carVin', label:'车架号', type:'string', required:true, minLength:14, maxLength:14, help:'必须14位' },
   { name:'carRentalCity', label:'租赁城市', type:'string', required:false, maxLength:20 },
 
   // ---- Contract / Rent ----
   { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:60 },
-  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:true },
-  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:true },
-  { name:'rentMonthly', label:'月租金', type:'number', required:true, min:0 },
+  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:false },
+  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:false },
+  { name:'rentMonthly', label:'月租金', type:'number', required:false, min:0 },
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', required:false, disabled:true},
-  { name:'rentToday', label:'首日支付金', type:'number', required:true, min:0 },
+  { name:'rentToday', label:'首日支付金', type:'number', required:false, min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:true, help: '1-31号', min:1, max:31 },
   { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', require: false},
 
   // ---- Deposit ----
-  { name:'deposit', label:'押金总额', type:'number', required:true, min:0 },
-  { name:'depositInitial', label:'押金首付', type:'number', required:true, min:0 },
+  { name:'deposit', label:'押金总额', type:'number', required:false, min:0 },
+  { name:'depositInitial', label:'押金首付', type:'number', required:false, min:0 },
   { name:'depositFormal', label:'押金总额（大写）', type:'string', required:false, disabled:true },
   { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', required:false, min:0 },
   { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', required:false, min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
@@ -85,7 +85,7 @@ function numberToCN(n) {
 
 async function openDocByFileID(fileID) {
     const dres = await wx.cloud.downloadFile({ fileID });
-    await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+    await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
 }
 
 Page({
@@ -250,7 +250,7 @@ Page({
         try {
             if (fileID) {
               const dres = await wx.cloud.downloadFile({ fileID });
-              await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+              await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
             }
           } catch (e) {
             // 打不开也不影响返回
@@ -451,7 +451,7 @@ Page({
   
         if (fileID) {
           const dres = await wx.cloud.downloadFile({ fileID });
-          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'docx' });
+          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
         } else {
           // 这里用 showModal，而不是 showToast 的 content/confirmText
           wx.showModal({
