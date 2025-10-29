@@ -9,13 +9,25 @@
   <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
   <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" />
   <button bindtap="onGetAuthUrl">3) 获取授权URL</button>
-
   <view class="split"></view>
-
+  <input class="ipt" placeholder="clientCorpId（你的企业外部ID）" value="{{clientCorpId}}" bindinput="onInputClientCorpId" />
+  <button bindtap="onGetCorpAuthUrl">获取企业授权URL</button>
+  <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>
+  <view class="split"></view>
   <button bindtap="onUploadPdf">上传PDF获取 fileId（直传ECS）</button>
 
   <view class="split"></view>
   
+  <view>
+  <text selectable="true">最近一次PDF直连URL：</text>
+  <text selectable="true" style="word-break:break-all">{{lastPdfUrl}}</text>
+  </view>
+  <button bindtap="copyLastUrl" wx:if="{{lastPdfUrl}}">复制直连URL</button>
+
+  <view class="split"></view>
+  <button bindtap="onGetUploadUrl">获取直传URL并上传（本地直传）</button>
+
+  <view class="split"></view>
   <view class="subtitle">当前 fileId：</view>
   <view style="font-family:Menlo,Consolas,monospace;word-break:break-all;">
      {{ fileId || '(未获取)' }}
@@ -23,6 +35,7 @@
   <input class="ipt" placeholder="subject（合同标题）" value="{{subject}}" bindinput="onInputSubject" />
   <input class="ipt" placeholder="fileId（先在法大大侧准备）" value="{{fileId}}" bindinput="onInputFileId" />
   <button bindtap="onCreateSignTask">4) 创建签署任务</button>
+  <button bindtap="onCreateSignTaskV51">创建签署任务（v5.1行业方案）</button>
 
   <view class="split"></view>
 
@@ -31,7 +44,10 @@
 
   <view class="split"></view>
 
-  <view class="subtitle">响应结果：</view>
+  <view class="subtitle">
+    响应结果：
+    <button size="mini" bindtap="onCopyLast">复制</button>
+  </view>
   <scroll-view scroll-y="true" class="log">
     <text selectable="true">{{log}}</text>
   </scroll-view>
