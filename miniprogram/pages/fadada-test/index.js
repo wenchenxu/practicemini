@@ -1,6 +1,4 @@
-// 直传到 ECS：请先把 ECS 域名加入“小程序管理后台 -> 开发设置 -> uploadFile 合法域名”
-const ECS_UPLOAD_URL = 'https://tusifu.cn/api/esign/uploadFile';
-const INTERNAL_TOKEN = 'qwertyuiopoiuytrewqwerty';
+// 直传到 ECS （不推荐，待修改）：请先把 ECS 域名加入“小程序管理后台 -> 开发设置 -> uploadFile 合法域名”
 
 Page({
     data: {

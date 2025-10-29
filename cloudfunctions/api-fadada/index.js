@@ -3,8 +3,8 @@ const cloud = require('wx-server-sdk');
 const axios = require('axios');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
-const ECS_BASE = 'http://121.40.234.100:3001';
-const ECS_INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
+const ECS_BASE = process.env.ECS_BASE_URL || 'http://121.40.234.100:3001';
+const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
 
 // ========== 环境与SDK初始化工具 ==========
 const APP_ID = process.env.FADADA_APP_ID;
@@ -14,7 +14,7 @@ async function post(path, data) {
     const url = `${ECS_BASE}${path}`;
     try {
       const res = await axios.post(url, data, {
-        headers: { 'x-internal-token': ECS_INTERNAL_TOKEN, 'content-type': 'application/json' },
+        headers: { 'x-internal-token': INTERNAL_TOKEN, 'content-type': 'application/json' },
         timeout: 10000
       });
       return res.data;
