@@ -10,7 +10,7 @@
     <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
     <view class="tab {{filter=='void'?'on':''}}" data-filter="void" bindtap="onFilterTap">作废</view>
     <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view>
-    <view class="tab debug" bindtap="goDebug">调试/开发</view>
+    <!-- <view class="tab debug" bindtap="goDebug">调试/开发</view>-->
   </view>
 
   <view wx:if="{{loading}}" class="empty">加载中...</view>
@@ -33,13 +33,13 @@
           {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
         <view class="sub">
-          编号：{{item.fields.contractSerialNumberFormatted || '—'}} ｜签约：{{item.fields.contractDate || '—'}}
+          {{item.fields.contractSerialNumberFormatted || '—'}} ｜{{item.fields.contractDate || '—'}}
         </view>
         <view class="sub">
           {{item.branchName || '—'}} ｜ {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-          {{item._fddStatusText || '未生成电子签'}}
+          签署状态：{{item._fddStatusText || '未生成电子签'}}
         </view>
       </view>
 
