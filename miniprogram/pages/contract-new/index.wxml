@@ -99,7 +99,31 @@
       </button>
     </view>
   </form>
+  
+  <view wx:if="{{mode === 'view'}}" class="esign-panel">
+  <view class="esign-title">电子签</view>
+  <view class="esign-row">状态：{{contract.fdd && contract.fdd.status ? contract.fdd.status : '未生成'}}</view>
 
+  <!-- 1. 没有 fileId，就让他先生成 -->
+  <button wx:if="{{!contract.fdd || !contract.fdd.fileId}}" bindtap="onGenerateFddFile" type="primary">
+    生成电子签文件
+  </button>
+
+  <!-- 2. 有 fileId 但没有 signTaskId，就让他发起签署 -->
+  <button wx:if="{{contract.fdd && contract.fdd.fileId && !contract.fdd.signTaskId}}" bindtap="onCreateSignTask">
+    发起签署
+  </button>
+
+  <!-- 3. 已有 signTaskId，就可以拿签署链接 -->
+  <button wx:if="{{contract.fdd && contract.fdd.signTaskId}}" bindtap="onGetSignUrl">
+    打开签署链接
+  </button>
+
+  <button wx:if="{{contract.fdd && contract.fdd.signUrl}}" bindtap="onCopySignUrl">
+    复制签署链接
+  </button>
+  </view>
+  
   <view class="btn-row" wx:if="{{mode==='view'}}">
     <button type="default" class="btn" bindtap="toEdit">修改</button>
   </view>

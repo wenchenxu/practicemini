@@ -530,5 +530,87 @@ Page({
     } finally {
       this.setData({ regenLoading: false });
     }
+  },
+
+  async onGenerateFddFile() {
+    const id = this.data.id;
+    // 这里调你现在那个“上传PDF → file/process”云函数
+    const { result } = await wx.cloud.callFunction({
+      name: 'api-fadada',
+      data: {
+        action: 'uploadAndProcessContract',   // 你自己起的名字
+        payload: { contractId: id }
+      }
+    });
+    // 成功后重新拉一次详情
+    this.loadDetail(id);
+  },
+  
+  async onCreateSignTask() {
+    const c = this.data.contract;
+    if (!c?.fdd?.fileId) {
+      wx.showToast({ title: '请先生成电子签文件', icon: 'none' });
+      return;
+    }
+  
+    const signerClientUserId = `driver:${c.fields.driverMobile || c.fields.clientPhone || c.fields.clientName}`;
+    const { result } = await wx.cloud.callFunction({
+      name: 'api-fadada',
+      data: {
+        action: 'createSignTask',
+        payload: {
+          subject: `${c.city || ''}${c.branchName || ''} - ${c.fields.clientName || ''} 合同`,
+          fileId: c.fdd.fileId,
+          signerClientUserId
+        }
+      }
+    });
+  
+    // 把 signTaskId 回写你自己的表，可以建个云函数：contract.updateFdd
+    // 然后再 loadDetail()
+    this.loadDetail(this.data.id);
+  },
+  
+  async onGetSignUrl() {
+    const c = this.data.contract;
+    if (!c?.fdd?.signTaskId) {
+      wx.showToast({ title: '还没有签署任务', icon: 'none' });
+      return;
+    }
+  
+    const { result } = await wx.cloud.callFunction({
+      name: 'api-fadada',
+      data: {
+        action: 'getSignUrl',
+        payload: { signTaskId: c.fdd.signTaskId }
+      }
+    });
+  
+    const url =
+      result?.data?.signUrl ||
+      result?.signUrl ||
+      result?.data?.data?.signUrl;
+  
+    if (!url) {
+      wx.showToast({ title: '未拿到签署URL', icon: 'none' });
+      return;
+    }
+  
+    // 存一下，方便下次复制
+    this.setData({
+      'contract.fdd.signUrl': url
+    });
+  
+    // 司机在店里：直接打开
+    wx.navigateTo({
+      url: `/pages/webview/index?url=${encodeURIComponent(url)}`
+    });
+  },
+  
+  onCopySignUrl() {
+    const url = this.data.contract?.fdd?.signUrl;
+    if (!url) return wx.showToast({ title: '暂无签署链接', icon: 'none' });
+    wx.setClipboardData({ data: url });
+    wx.showToast({ title: '已复制', icon: 'success' });
   }
 });

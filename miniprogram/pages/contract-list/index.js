@@ -11,6 +11,7 @@ Page({
       hasMore: true, 
       lastCreatedAt: null, //上一页最后一条的创建时间
       lastId: '',          //同时带上 _id 作为并列条件的次级游标
+      filter: 'all',   // all | waiting | signed | void | history
     },
 
   onLoad(query) {
@@ -33,6 +34,22 @@ Page({
     try {
       const whereBase = { cityCode: this.data.cityCode, deleted: _.neq(true) };
   
+      // 根据过滤增加条件
+      // 后端存的字段，稍后把 status 字段名替成现在库里的
+      const filter = this.data.filter;
+      if (filter === 'waiting') {
+        whereBase['fdd.status'] = 'waiting_sign';
+      } else if (filter === 'signed') {
+        whereBase['fdd.status'] = 'signed';
+      } else if (filter === 'void') {
+        whereBase['fdd.status'] = 'void';
+      } else if (filter === 'history') {
+        // 历史你原来就有的，可以是已签+已作废+已归档
+        // 这里先写成 signed
+        whereBase['fdd.status'] = _.in(['signed', 'void', 'archived']);
+      }
+      // all 就不加额外条件
+
       let condition = COL.where(whereBase);
   
       // 分页游标（createdAt < lastCreatedAt，或时间相同则 _id < lastId）
@@ -59,7 +76,8 @@ Page({
   
       const page = res.data.map(d => ({
         ...d,
-        _createTime: this.formatTime(d.createdAt)
+        _createTime: this.formatTime(d.createdAt),
+        _fddStatusText: this.mapFddStatus(d?.fdd?.status)
       }));
   
       const newList = this.data.list.concat(page);
@@ -78,6 +96,15 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
+  },
+
+  mapFddStatus(s) {
+    if (!s) return '未生成电子签';
+    if (s === 'file_ready') return '文件已生成';
+    if (s === 'waiting_sign') return '待签署';
+    if (s === 'signed') return '已签';
+    if (s === 'void') return '已作废';
+    return s;
   },
 
   loadMore() { this.fetch(); },
@@ -147,9 +174,8 @@ Page({
   async openDocFromRow(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
-    // const fileID = item && item.file && item.file.docxFileID;
     const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
-
+  
     if (!fileID) {
       wx.showToast({ title: '暂无文档', icon: 'none' });
       return;
@@ -159,7 +185,7 @@ Page({
       wx.showLoading({ title: '打开中', mask: true });
       const dres = await wx.cloud.downloadFile({ fileID });
       const isPdf = /\.pdf(\?|$)/i.test(fileID) || (item?.file?.pdfFileID === fileID);
-      await wx.openDocument({ filePath: dres.tempFilePath, fileType: isPdf ? 'pdf' : 'docx' });
+      await wx.openDocument({ filePath: dres.tempFilePath, fileType: isPdf ? 'pdf' : 'docx'  });
     } catch (err) {
       console.error(err);
       wx.showToast({ title: '打开失败', icon: 'none' });
@@ -182,4 +208,26 @@ Page({
   onReachBottom() {
     this.loadMore();
   },
+
+  // ✅ 新增：点击“空白区域/整行”进详情
+  goDetail(e) {
+    const id = e.currentTarget.dataset.id;
+    const { city, cityCode } = this.data;
+    wx.navigateTo({
+      url:
+        `/pages/contract-new/index` +
+        `?id=${id}` +
+        `&mode=view` +          // 你现在已有的查看模式
+        `&cityCode=${encodeURIComponent(cityCode)}` +
+        `&city=${encodeURIComponent(city)}`
+    });
+  },
+
+  // ✅ 每个城市加一个“调试/开发”
+  goDebug() {
+    const { cityCode, city } = this.data;
+    wx.navigateTo({
+      url: `/pages/fadada-test/index?cityCode=${encodeURIComponent(cityCode)}&city=${encodeURIComponent(city)}`
+    });
+  }
 });
