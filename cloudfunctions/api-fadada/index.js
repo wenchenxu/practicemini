@@ -10,6 +10,7 @@ const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
 const APP_ID = process.env.FADADA_APP_ID;
 const APP_SECRET = process.env.FADADA_APP_SECRET;
 
+// 旧版 post，未使用官方格式，可用
 async function post(path, data) {
     const url = `${ECS_BASE}${path}`;
     try {
@@ -27,27 +28,43 @@ async function post(path, data) {
     }
   }
 
+// 根据官方文档的格式，未调用，待测试
+async function post2(path, data) {
+    const base = process.env.ECS_BASE_URL;
+    const resp = await axios.post(base + path, data, {
+      headers: {
+        'x-internal-token': process.env.INTERNAL_TOKEN
+      },
+      timeout: 10000
+    });
+    return resp.data;
+  }
+
 exports.main = async (event, context) => {
   try {
     const { action, payload = {} } = event || {};
     switch (action) {
       case 'ping': return { success: true, data: { ok: true, ts: Date.now() } };
+      // 签合同最简流程
       case 'getToken': return { success: true, data: await post('/api/esign/getToken', {}) };
+      case 'uploadFileByUrl':
+        return { success: true, data: await post('/api/esign/uploadFileByUrl', payload) };
+      case 'convertFddUrlToFileId':
+        return { success: true, data: await post('/api/esign/convertFddUrlToFileId', payload) }; 
+      case 'createSignTaskV51':
+        return { success: true, data: await post('/api/esign/createTaskV51', payload) };
+      case 'getActorUrl': 
+        return { success: true, data: await post('/api/esign/getActorUrl', payload) };
+      //其他功能，待验证，未使用官方 Pre-request Script
       case 'getCorpAuthUrl':
         return { success: true, data: await post('/api/esign/getCorpAuthUrl', payload) };
       case 'getCorpAuthStatus':
         return { success: true, data: await post('/api/esign/getCorpAuthStatus?clientCorpId=' + encodeURIComponent(payload.clientCorpId), {}) };
       case 'getAuthUrl': return { success: true, data: await post('/api/esign/getAuthUrl', payload) };
       case 'createSignTask': return { success: true, data: await post('/api/esign/createTask', payload) };
-      case 'createSignTaskV51':
-        return { success: true, data: await post('/api/esign/createTaskV51', payload) };
       case 'getSignUrl': return { success: true, data: await post('/api/esign/getSignUrl', payload) };
-      case 'uploadFileByUrl':
-        return { success: true, data: await post('/api/esign/uploadFileByUrl', payload) };
-      case 'getUploadUrl':
-        return { success: true, data: await post('/api/esign/getUploadUrl', payload) };
-      case 'convertFddUrlToFileId':
-        return { success: true, data: await post('/api/esign/convertFddUrlToFileId', payload) };  
+      case 'getUploadUrl':       // 直传本地文件，不使用
+        return { success: true, data: await post('/api/esign/getUploadUrl', payload) }; 
       case 'diag':
         return {
             success: true,

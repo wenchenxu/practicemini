@@ -51,7 +51,18 @@
         <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
           <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
         </view>
+        <!-- 新增：发起签署并拿链接 -->
+        <button
+            class="mini-op"
+            data-id="{{item._id}}"
+            bindtap="onSignFromRow"
+            size="mini"
+            type="primary"
+            loading="{{runningId === item._id}}"
+        >发起签署</button>
       </view>
+      <!-- 调试用，看看最后拿到的链接 -->
+      <!-- <text selectable="true">{{lastEsignUrl}}</text>-->
     </view>
   </block>
 

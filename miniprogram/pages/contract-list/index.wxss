@@ -82,3 +82,16 @@
 .icon-btn--hover { opacity: .7; }
 .icon-btn .icon { width: 64rpx; height: 64rpx; }
 .icon-btn.danger { background: #fff0f0; }
+
+.ops {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    align-items: flex-end;
+  }
+  
+  .mini-op {
+    font-size: 20rpx;
+    padding: 6rpx 16rpx;
+  }
+  

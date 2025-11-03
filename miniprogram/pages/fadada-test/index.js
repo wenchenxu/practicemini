@@ -8,7 +8,11 @@ Page({
       directFddFileUrl: '',
       lastResponse: '',
       lastPdfUrl: '',
-      clientCorpId: ''
+      clientCorpId: '',
+      signTaskId: '',
+      actorId: '',
+      clientUserId: '',
+      embedUrl: ''
     },
 
     onInputClientCorpId(e){ this.setData({ clientCorpId: e.detail.value }); },
@@ -252,6 +256,13 @@ Page({
           if (fileId) {
             this.setData({ fileId });
             wx.showToast({ title: '已拿到fileId', icon: 'success' });
+            // fileId 放入复制板
+            /* wx.setClipboardData({
+                data: fileId,
+                success: () => {
+                  wx.showToast({ title: 'fileId 已复制', icon: 'success' });
+                }
+              });*/
           } else {
             wx.showToast({ title: '上传返回未包含 fileId', icon: 'none' });
           }
@@ -323,6 +334,7 @@ Page({
         }
     },      
 
+    // 旧版（已弃用，做参考）
     async onCreateSignTask() {
       try {
         const { subject, fileId, clientUserId } = this.data;
@@ -357,6 +369,7 @@ Page({
       }
     },
   
+    // 新版
     async onCreateSignTaskV51() {
         try {
           const { subject, fileId } = this.data;
@@ -368,10 +381,11 @@ Page({
             data: {
               action: 'createSignTaskV51',
               payload: {
-                subject: subject || '劳动合同签署',
-                docFileId: fileId,
-                signerName: '张三'
-                // signerOpenId: '可选：用户openId'
+                subject: this.data.subject || subject,
+                docFileId: this.data.fileId || fileId,
+                signerName: this.data.signerName,
+                signerId: this.data.signerId,
+                signerPhone: '13725511890' || this.data.signerPhone
               }
             }
           });
@@ -397,6 +411,7 @@ Page({
         }
     },
 
+    // unused?
     async onGetSignUrl() {
       try {
         const { signTaskId } = this.data;
@@ -418,6 +433,56 @@ Page({
       } catch (e) {
         this.appendLog(`GetSignUrl Error: ${e.message || e}`);
       }
-    }
+    },
+
+    async onGetActorUrl() {
+        try {
+          const { signTaskId, actorId, clientUserId } = this.data;
+          if (!signTaskId) {
+            return wx.showToast({ title: '请先创建任务', icon: 'none' });
+          }
+          const { result } = await wx.cloud.callFunction({
+            name: 'api-fadada',
+            data: {
+              action: 'getActorUrl',
+              payload: {
+                signTaskId,
+                actorId: actorId || 'driver-1',
+                clientUserId: clientUserId || `CU_${Date.now()}`,
+                redirectMiniAppUrl: '/pages/index/index'
+              }
+            }
+          });
+    
+          // 后端返回结构：{ success: true, data: { ok, actorSignTaskEmbedUrl, ... } }
+          const embedUrl =
+            result?.data?.actorSignTaskEmbedUrl ||
+            result?.data?.data?.actorSignTaskEmbedUrl ||
+            result?.actorSignTaskEmbedUrl;
+    
+          if (!embedUrl) {
+            this.appendLog && this.appendLog(result);
+            return wx.showModal({
+              title: '获取失败',
+              content: JSON.stringify(result),
+              showCancel: false
+            });
+          }
+    
+          this.setData({ actorUrl: embedUrl });
+    
+          // 复制到剪贴板
+          wx.setClipboardData({
+            data: embedUrl,
+            success: () => {
+              wx.showToast({ title: '签署链接已复制', icon: 'success' });
+            }
+          });
+    
+        } catch (e) {
+          console.error(e);
+          wx.showToast({ title: '异常', icon: 'none' });
+        }
+      }
   });
   
