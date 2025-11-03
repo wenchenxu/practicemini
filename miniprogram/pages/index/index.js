@@ -8,5 +8,12 @@ Page({
     wx.navigateTo({
       url: `/pages/city/index?cityCode=${encodeURIComponent(code)}&city=${encodeURIComponent(name)}`
     });
+  },
+
+  // 新增：跳转到法大大测试页
+  goFadadaTest() {
+    wx.navigateTo({
+      url: '/pages/fadada-test/index'
+    });
   }
 });

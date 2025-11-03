@@ -530,5 +530,5 @@ Page({
     } finally {
       this.setData({ regenLoading: false });
     }
-  }
+  },
 });

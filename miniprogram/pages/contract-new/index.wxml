@@ -99,7 +99,7 @@
       </button>
     </view>
   </form>
-
+  
   <view class="btn-row" wx:if="{{mode==='view'}}">
     <button type="default" class="btn" bindtap="toEdit">修改</button>
   </view>

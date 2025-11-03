@@ -1,0 +1,50 @@
+<view class="wrap">
+  <view class="title">法大大 · 云函数联调测试</view>
+  <button bindtap="onGetToken">获取Token</button>
+
+  <view class="split"></view>
+  <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
+  <!-- <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" /> -->
+  <button bindtap="onGetAuthUrl">个人授权URL</button>
+  <view class="split"></view>
+  <input class="ipt" placeholder="clientCorpId（你的企业外部ID）" value="{{clientCorpId}}" bindinput="onInputClientCorpId" />
+  <button bindtap="onGetCorpAuthUrl">企业授权URL</button>
+  <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>
+  <view class="split"></view>
+  <button bindtap="onUploadPdf">上传PDF获取fileId</button>
+
+  <view class="split"></view>
+  <!-- 
+  <view>
+  <text selectable="true">最近一次PDF直连URL：</text>
+  <text selectable="true" style="word-break:break-all">{{lastPdfUrl}}</text>
+  </view>
+  <button bindtap="copyLastUrl" wx:if="{{lastPdfUrl}}">复制直连URL</button>
+
+  <view class="split"></view>
+  <button bindtap="onGetUploadUrl">获取直传URL并上传（本地直传）</button> 
+
+  <view class="split"></view>-->
+  <view class="subtitle">当前 fileId：</view>
+  <view style="font-family:Menlo,Consolas,monospace;word-break:break-all;">
+     {{ fileId || '(未获取)' }}
+  </view>
+  <input class="ipt" placeholder="subject（合同标题）" value="{{subject}}" bindinput="onInputSubject" />
+  <input class="ipt" placeholder="fileId（先在法大大侧准备）" value="{{fileId}}" bindinput="onInputFileId" />
+  <button bindtap="onCreateSignTaskV51">创建签署任务（v5.1）</button>
+
+  <view class="split"></view>
+  <input class="ipt" placeholder="signTaskId（上一步返回的）" value="{{signTaskId}}" bindinput="onInputSignTaskId" />
+  <!-- <button bindtap="onGetSignUrl">获取签署URL</button> -->
+  <view class="split"></view>
+  <button bindtap="onGetActorUrl">获取司机签署链接</button>
+  <text selectable="true">{{actorUrl}}</text>
+  <view class="split"></view>
+  <view class="subtitle">
+    响应结果：
+    <button size="mini" bindtap="onCopyLast">复制Last</button>
+  </view>
+  <scroll-view scroll-y="true" class="log">
+    <text selectable="true">{{log}}</text>
+  </scroll-view>
+</view>

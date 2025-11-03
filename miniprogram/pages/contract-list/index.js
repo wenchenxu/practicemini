@@ -11,6 +11,10 @@ Page({
       hasMore: true, 
       lastCreatedAt: null, //上一页最后一条的创建时间
       lastId: '',          //同时带上 _id 作为并列条件的次级游标
+      filter: 'all',
+      runningId: '',
+      // 为了调试
+      lastEsignUrl: ''
     },
 
   onLoad(query) {
@@ -32,7 +36,7 @@ Page({
   
     try {
       const whereBase = { cityCode: this.data.cityCode, deleted: _.neq(true) };
-  
+
       let condition = COL.where(whereBase);
   
       // 分页游标（createdAt < lastCreatedAt，或时间相同则 _id < lastId）
@@ -81,6 +85,152 @@ Page({
   },
 
   loadMore() { this.fetch(); },
+
+  // 顶部筛选（现在先做前端过滤，真正的筛选你以后可以做到数据库里）
+  onFilterTap(e) {
+    const filter = e.currentTarget.dataset.filter;
+    this.setData({ filter });
+    // 暂时直接重新拉一次，也可以只前端过滤
+    this.refresh();
+  },
+
+  // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
+  async onSignFromRow(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    // 1) 拿到小程序存储的 PDF fileID
+    const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
+    if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
+
+    // 2) 组几个签署要用的字段
+    const signerPhone = item.fields?.clientPhone || '13725511890';   // 签署人手机号
+    const signerName  = item.fields?.clientName || '签署人';         // 签署人姓名
+    // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
+    const actorId     = signerPhone;
+    // 这个是你刚才特别强调“不要为空”的 clientUserId
+    const clientUserId = signerPhone
+      ? `driver:${signerPhone}`
+      : `contract:${item._id}`;
+    // 合同标题，用你原来那一套
+    const subject =
+      item.fields?.contractSerialNumberFormatted ||
+      `${this.data.city || ''}-${signerName}合同`;
+
+    try {
+      this.setData({ runningId: id });
+      wx.showLoading({ title: '签署生成中...', mask: true });
+
+      // A. 取临时URL
+      const tmp = await wx.cloud.getTempFileURL({ fileList: [fileID] });
+      const tempUrl = tmp?.fileList?.[0]?.tempFileURL;
+      if (!tempUrl) throw new Error('getTempFileURL 失败');
+
+      // B. 上传到法大大（URL方式）
+      const up = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'uploadFileByUrl',
+          payload: {
+            url: tempUrl,
+            fileName: `${signerName}.pdf`,
+            fileType: 'doc'
+          }
+        }
+      });
+
+      const fddFileUrl =
+        up?.result?.data?.result?.data?.fddFileUrl ||
+        up?.result?.data?.data?.fddFileUrl;
+      if (!fddFileUrl) throw new Error('未拿到 fddFileUrl');
+
+      // C. 文件处理 → 拿到 fileId
+      const conv = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'convertFddUrlToFileId',
+          payload: {
+            // 这里 ECS 那条路由是按官方写的 fileType=doc 来处理的
+            fddFileUrl,
+            fileType: 'doc',
+            fileName: `${signerName}.pdf`
+          }
+        }
+      });
+
+      const fileId =
+        conv?.result?.data?.data?.fileIdList?.[0]?.fileId ||
+        conv?.result?.data?.result?.data?.fileIdList?.[0]?.fileId;
+      if (!fileId) throw new Error('文件处理未返回 fileId');
+
+      // D. 创建签署任务（注意：这里名字和字段都要对上 ECS）
+      const create = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'createSignTaskV51',     // ✅ 名字对上云函数
+          payload: {
+            subject,
+            docFileId: fileId,             // ✅ 名字对上 ECS
+            signerName,                    // 下面三个是我们刚加的那版 ECS 要的
+            signerId: actorId,
+            signerPhone
+          }
+        }
+      });
+
+      const signTaskId =
+        create?.result?.data?.signTaskId ||
+        create?.result?.signTaskId ||
+        create?.result?.data?.data?.signTaskId;
+      if (!signTaskId) {
+        const msg =
+          create?.result?.data?.msg ||
+          create?.result?.msg ||
+          '创建签署任务失败';
+        throw new Error(msg);
+      }
+
+      // E. 获取参与方签署链接（名字也要对上）
+      const actor = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getActorUrl',      // ✅ 名字对上云函数
+          payload: {
+            signTaskId,
+            actorId,
+            clientUserId,
+            redirectMiniAppUrl: '/pages/contract-list/index'
+          }
+        }
+      });
+
+      const embedUrl =
+        actor?.result?.data?.actorSignTaskEmbedUrl ||
+        actor?.result?.data?.data?.actorSignTaskEmbedUrl ||
+        actor?.result?.actorSignTaskEmbedUrl;
+
+      if (!embedUrl) {
+        throw new Error('未拿到签署URL');
+      }
+
+      // F. 复制
+      wx.setClipboardData({
+        data: embedUrl,
+        success: () => {
+          this.setData({ lastEsignUrl: embedUrl });
+          wx.showToast({ title: '签署链接已复制', icon: 'success' });
+        }
+      });
+
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '签署失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+      this.setData({ runningId: '' });
+    }
+  },
 
   viewOne(e) {
     const id = e.currentTarget.dataset.id;
@@ -147,9 +297,8 @@ Page({
   async openDocFromRow(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
-    // const fileID = item && item.file && item.file.docxFileID;
     const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
-
+  
     if (!fileID) {
       wx.showToast({ title: '暂无文档', icon: 'none' });
       return;
@@ -159,7 +308,7 @@ Page({
       wx.showLoading({ title: '打开中', mask: true });
       const dres = await wx.cloud.downloadFile({ fileID });
       const isPdf = /\.pdf(\?|$)/i.test(fileID) || (item?.file?.pdfFileID === fileID);
-      await wx.openDocument({ filePath: dres.tempFilePath, fileType: isPdf ? 'pdf' : 'docx' });
+      await wx.openDocument({ filePath: dres.tempFilePath, fileType: isPdf ? 'pdf' : 'docx'  });
     } catch (err) {
       console.error(err);
       wx.showToast({ title: '打开失败', icon: 'none' });
@@ -181,5 +330,5 @@ Page({
   //触底加载
   onReachBottom() {
     this.loadMore();
-  },
+  }
 });
