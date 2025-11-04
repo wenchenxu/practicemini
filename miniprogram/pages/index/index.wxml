@@ -16,4 +16,10 @@
   <view class="fadada-test-entry">
     <button type="default" bindtap="goFadadaTest">法大大测试</button>
   </view>
+  <!-- 管理员可见按钮 -->
+  <view wx:if="{{isAdmin}}">
+  <button class="admin-btn" type="primary" bindtap="goWhitelist">
+    成员白名单管理
+  </button>
+  </view>
 </view>
