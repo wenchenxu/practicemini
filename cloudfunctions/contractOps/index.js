@@ -6,7 +6,6 @@ const fetch = require('node-fetch');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const COL = db.collection('contracts');
-const fetch = require('node-fetch');
 
 // —— 公用工具（与 createContract 保持一致）——
 function pad(n, width=2){ return String(n).padStart(width,'0'); }
