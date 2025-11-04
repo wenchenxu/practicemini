@@ -105,8 +105,8 @@ Page({
     if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
 
     // 2) 组几个签署要用的字段
-    const signerPhone = item.fields?.clientPhone || '13725511890';   // 签署人手机号
-    const signerName  = item.fields?.clientName || '签署人';         // 签署人姓名
+    const signerPhone = item.fields?.clientPhone;   // 签署人手机号
+    const signerName  = item.fields?.clientName;         // 签署人姓名
     // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
     const actorId     = signerPhone;
     // 这个是你刚才特别强调“不要为空”的 clientUserId
@@ -164,15 +164,15 @@ Page({
         conv?.result?.data?.result?.data?.fileIdList?.[0]?.fileId;
       if (!fileId) throw new Error('文件处理未返回 fileId');
 
-      // D. 创建签署任务（注意：这里名字和字段都要对上 ECS）
+      // D. 创建签署任务（这里名字和字段都要对上 ECS）
       const create = await wx.cloud.callFunction({
         name: 'api-fadada',
         data: {
-          action: 'createSignTaskV51',     // ✅ 名字对上云函数
+          action: 'createSignTaskV51',     // 名字对上云函数
           payload: {
             subject,
-            docFileId: fileId,             // ✅ 名字对上 ECS
-            signerName,                    // 下面三个是我们刚加的那版 ECS 要的
+            docFileId: fileId,             // 名字对上 ECS
+            signerName,                    // ECS 要的
             signerId: actorId,
             signerPhone
           }
@@ -195,11 +195,12 @@ Page({
       const actor = await wx.cloud.callFunction({
         name: 'api-fadada',
         data: {
-          action: 'getActorUrl',      // ✅ 名字对上云函数
+          action: 'getActorUrl',
           payload: {
             signTaskId,
             actorId,
             clientUserId,
+            clientPhone: signerPhone,
             redirectMiniAppUrl: '/pages/contract-list/index'
           }
         }
