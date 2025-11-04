@@ -2,6 +2,6 @@
   <view class="city-title">{{city}}</view>
   <view class="center-box">
     <button class="primary" type="primary" bindtap="goNew">添加新合同</button>
-    <button class="ghost" bindtap="goList">查看历史合同</button>
+    <button class="ghost" bindtap="goList">合同中心</button>
   </view>
 </view>

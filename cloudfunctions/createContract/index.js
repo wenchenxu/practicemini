@@ -3,6 +3,7 @@ console.log('[createContract boot]');
 const cloud = require('wx-server-sdk');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const fetch = require('node-fetch');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -189,6 +190,7 @@ exports.main = async function (event, context) {
         clientId: finalFields.clientId,
         clientPhone: finalFields.clientPhone,
         clientAddress: finalFields.clientAddress,
+        clientAddressCurrent: finalFields.clientAddressCurrent,
         clientEmergencyContact: finalFields.clientEmergencyContact,
         clientEmergencyPhone: finalFields.clientEmergencyPhone,
 
@@ -200,19 +202,19 @@ exports.main = async function (event, context) {
         contractValidPeriodStart: finalFields.contractValidPeriodStart,
         contractValidPeriodEnd: finalFields.contractValidPeriodEnd,
         rentDurationMonth: finalFields.rentDurationMonth,
-
         rentMonthly: finalFields.rentMonthly,
         rentMonthlyFormal: finalFields.rentMonthlyFormal,
         rentToday: finalFields.rentToday,
         rentTodayFormal: finalFields.rentTodayFormal,
         rentPaybyDayInMonth: finalFields.rentPaybyDayInMonth,
+        rentCustomized: finalFields.rentCustomized,
 
         deposit: finalFields.deposit,
         depositFormal: finalFields.depositFormal,
         depositInitial: finalFields.depositInitial,
         depositServiceFee: finalFields.depositServiceFee,
         depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
-        
+        depositUnpaidMonthly: finalFields.depositUnpaidMonthly,
         depositRemaining: finalFields.depositRemaining,
       };
   
@@ -226,19 +228,70 @@ exports.main = async function (event, context) {
       var outBuf = doc.getZip().generate({ type: 'nodebuffer' });
   
       // —— 上传（按  城市/分公司/类型/编号 归档）——
-      var folderBranch = branchCode || 'default';
-      var folderType = contractType || 'default';
-      var uploadRes = await cloud.uploadFile({
-        cloudPath: 'contracts/' + cityCode + '/' + folderBranch + '/' + folderType + '/' + serialFormatted + '.docx',
+      var branchFolder = branchCode || 'default';
+      var typeFolder = contractType || 'default';
+      const basePath   = `contracts/${cityCode}/${branchFolder}/${typeFolder}/${serialFormatted}`;
+      var uploadDocxRes = await cloud.uploadFile({
+        cloudPath: `${basePath}.docx`,
         fileContent: outBuf
       });
-      console.log('upload ok:', uploadRes.fileID);
+      const docxFileID = uploadDocxRes.fileID;         // ← 修正变量名
+      console.log('[create] upload docx ok:', docxFileID);
   
+      // —— 立即把 DOCX 写回数据库（这样就算 PDF 失败，列表也能点击 DOCX）
       await db.collection('contracts').doc(contractId).update({
-        data: { file: { docxFileID: uploadRes.fileID } }
+        data: { file: { docxFileID }, updatedAt: db.serverDate() }
       });
   
-      return { _id: contractId, contractSerialNumberFormatted: serialFormatted, fileID: uploadRes.fileID };
+      // === 可选: CI 转 PDF ===
+      let pdfFileID = '';                               // ← 先定义在外层，避免未定义
+      try {
+        const tmp = await cloud.getTempFileURL({ fileList: [docxFileID] });
+        const docxUrl = tmp?.fileList?.[0]?.tempFileURL;
+        if (!docxUrl) throw new Error('tempFileURL failed');
+
+        const ciUrl = docxUrl + (docxUrl.includes('?') ? '&' : '?') + 'ci-process=doc-preview&dstType=pdf';
+        const resp = await fetch(ciUrl);
+        const ctype = resp.headers.get('content-type') || '';
+        const buf = await resp.buffer();
+
+        // 粗检：必须是 PDF 且魔数正确
+        if (!resp.ok || !/application\/pdf/i.test(ctype) || buf.length < 10 || buf.slice(0,5).toString() !== '%PDF-') {
+            console.error('[create] CI convert not pdf:', {
+            ok: resp.ok, status: resp.status, ctype, head: buf.slice(0,5).toString(), size: buf.length
+            });
+        } else {
+          const upPdf = await cloud.uploadFile({
+            cloudPath: `${basePath}.pdf`,
+            fileContent: buf,
+          });
+          pdfFileID = upPdf.fileID;
+          console.log('[create] upload pdf ok:', pdfFileID);
+
+          await db.collection('contracts').doc(contractId).update({
+          data: { file: { docxFileID, pdfFileID }, updatedAt: db.serverDate() }
+          });
+
+          // 返回给前端优先 PDF
+          return {
+            _id: contractId,
+            contractSerialNumberFormatted: serialFormatted,
+            fileID: pdfFileID,
+            docxFileID,
+            pdfFileID
+          };
+        }
+      } catch (e) {
+        console.error('[create] PDF convert fail:', e);
+      }
+
+      // —— 若走到这里，表示 PDF 未生成；至少返回 DOCX（前端可打开 DOCX）
+      return {
+        _id: contractId,
+        contractSerialNumberFormatted: serialFormatted,
+        fileID: docxFileID,
+        docxFileID
+      };
     } catch (err) {
       console.error('[createContract error]', err);
       return { errorCode: -1, errorMessage: err && err.message ? err.message : 'failed' };

@@ -1,6 +1,16 @@
 <view class="container">
   <view class="header">
-    <text class="title">{{city}} - 合同历史</text>
+    <text class="title">{{city}} - 合同中心</text>
+  </view>
+
+  <!-- 新增：顶部筛选 tabs -->
+  <view class="tabs">
+    <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
+    <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
+    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
+    <view class="tab {{filter=='void'?'on':''}}" data-filter="void" bindtap="onFilterTap">作废</view>
+    <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view>
+    <!-- <view class="tab debug" bindtap="goDebug">调试/开发</view>-->
   </view>
 
   <view wx:if="{{loading}}" class="empty">加载中...</view>
@@ -9,28 +19,50 @@
   <block wx:for="{{list}}" wx:key="_id">
     <view class="row">
       <view class="meta">
+        <!-- 有文件：可点 -->
         <view
-            class="primary {{item.file && item.file.docxFileID ? 'clickable' : 'disabled'}}"
+            wx:if="{{ item.file && (item.file.pdfFileID || item.file.docxFileID) }}"
+            class="primary clickable"
             bindtap="openDocFromRow"
             data-id="{{item._id}}"
         >
           {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
-        <view class="sub">
-          编号：{{item.fields.contractSerialNumberFormatted || '—'}} ｜签约：{{item.fields.contractDate || '—'}}
+        <!-- 无文件：禁用态 -->
+        <view wx:else class="primary disabled">
+          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
         <view class="sub">
-            {{item.branchName || '—'}} ｜ {{item.contractTypeName || '—'}}
+          {{item.fields.contractSerialNumberFormatted || '—'}} ｜{{item.fields.contractDate || '—'}}
+        </view>
+        <view class="sub">
+          {{item.branchName || '—'}} ｜ {{item.contractTypeName || '—'}}
+        </view>
+        <view class="sub status-line">
+          签署状态：{{item._fddStatusText || '未生成电子签'}}
         </view>
       </view>
+
+      <!-- 右侧操作区保留 -->
       <view class="ops">
         <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
-            <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
+          <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
         </view>
         <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
-            <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
+          <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
         </view>
+        <!-- 新增：发起签署并拿链接 -->
+        <button
+            class="mini-op"
+            data-id="{{item._id}}"
+            bindtap="onSignFromRow"
+            size="mini"
+            type="primary"
+            loading="{{runningId === item._id}}"
+        >发起签署</button>
       </view>
+      <!-- 调试用，看看最后拿到的链接 -->
+      <!-- <text selectable="true">{{lastEsignUrl}}</text>-->
     </view>
   </block>
 

@@ -2,3 +2,6 @@
 .title { font-size: 36rpx; font-weight: 600; margin-bottom: 24rpx; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24rpx; }
 .city-btn { padding: 28rpx 0; border-radius: 12rpx; }
+.fadada-test-entry {
+    margin: 24rpx 24rpx 0 24rpx;
+  }

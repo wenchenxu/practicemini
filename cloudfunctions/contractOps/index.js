@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const fetch = require('node-fetch');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -81,20 +82,20 @@ async function pickTemplateBuffer(opts) {
 }
 
 // 渲染并覆盖上传（不改编号、不改路径）
+/*
 async function renderDocxForContract(doc) {
     const { cityCode, branchCode, contractType, fields, cityName, branchName, contractTypeName, _id } = doc;
     const serialFormatted = fields.contractSerialNumberFormatted;
   
-    const { yyyy, mm, dd } = nowInTZ(BIZ_TZ);
+    const { y, m, d } = nowInTZ(BIZ_TZ);
     const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({ cityCode, branchCode, contractType });
-  
     const zip = new PizZip(content);
     const docx = new Docxtemplater(zip, { paragraphLoop:true, linebreaks:true, delimiters:{ start:'[[', end:']]'} });
   
     // 这里的数据结构要与 createContract 一致
     const dataForDocx = {
       contractNo: serialFormatted,
-      contractDate: yyyy + '-' + mm + '-' + dd,
+      contractDate: `${y}-${m}-${d}`,
       cityName: cityName,
       branchName: branchName || '',
       contractTypeName: contractTypeName,
@@ -141,19 +142,197 @@ async function renderDocxForContract(doc) {
     // 与 createContract 一样的归档路径（覆盖）
     const folderBranch = branchCode || 'default';
     const folderType = contractType || 'default';
-    const uploadRes = await cloud.uploadFile({
-      cloudPath: 'contracts/' + cityCode + '/' + folderBranch + '/' + folderType + '/' + serialFormatted + '.docx',
+    const basePath = `contracts/${cityCode}/${folderBranch}/${folderType}/${serialFormatted}`;
+    const upDocx = await cloud.uploadFile({
+      cloudPath: `${basePath}.docx`,
       fileContent: outBuf,
     });
-    console.log('upload ok:', uploadRes.fileID);
+    const docxFileID = upDocx.fileID;
+    console.log('[render] upload docx ok:', docxFileID);
   
-    // 可选择是否回写 file.docxFileID（路径相同则 fileID 可能不变；回写与否皆可）
-    await COL.doc(_id).update({
-      data: { file: { docxFileID: uploadRes.fileID }, updatedAt: db.serverDate() }
+    // 3) 通过 CI 把 DOCX 转 PDF （拿临时 URL + ci-process）
+    const tmp = await cloud.getTempFileURL({ fileList: [docxFileID] });
+    const docxUrl = tmp?.fileList?.[0]?.tempFileURL;
+    if (!docxUrl) {
+        console.error('[render] getTempFileURL failed', tmp);
+        // 至少回写 docx，避免前端完全没法打开
+        await COL.doc(_id).update({
+            data: { file: { docxFileID }, updatedAt: db.serverDate() }
+        });
+        return { ok:true, fileID: docxFileID, docxFileID, warning: 'tempfileurl-failed' };
+    }
+
+    const ciUrl = docxUrl + (docxUrl.includes('?') ? '&' : '?') + 'ci-process=doc-preview&dstType=pdf';
+
+    let pdfBuf = null;
+    try {
+        const resp = await fetch(ciUrl);
+        const ctype = resp.headers.get('content-type') || '';
+        const buf = await resp.buffer();
+
+        // 粗检：必须是 PDF 且非空
+        if (!resp.ok || !/application\/pdf/i.test(ctype) || buf.length < 10 || buf.slice(0,5).toString() !== '%PDF-') {
+            console.error('[render] CI convert not pdf:', { ok: resp.ok, status: resp.status, ctype, head: buf.slice(0,5).toString(), size: buf.length });
+            // 回写 docx，返回成功（前端可回退打开 docx）
+            await COL.doc(_id).update({
+            data: { file: { docxFileID }, updatedAt: db.serverDate() }
+            });
+            return { ok:true, fileID: docxFileID, docxFileID, warning: 'pdf-invalid' };
+        }
+        pdfBuf = buf;
+    } catch (e) {
+        console.error('[render] CI convert failed:', e);
+        await COL.doc(_id).update({
+            data: { file: { docxFileID }, updatedAt: db.serverDate() }
+        });
+      return { ok:true, fileID: docxFileID, docxFileID, warning: 'pdf-fetch-failed' };
+    }
+
+    // 4) 上传 PDF 并回写
+    const upPdf = await cloud.uploadFile({
+        cloudPath: `${basePath}.pdf`,
+        fileContent: pdfBuf,
     });
-  
+    const pdfFileID = upPdf.fileID;
+    console.log('[render] upload pdf ok:', pdfFileID);
+
+    await COL.doc(_id).update({
+        data: {
+            file: { docxFileID, pdfFileID },
+            updatedAt: db.serverDate()
+        }
+    });
+
+    // 5) 返回给前端：优先 pdf
     return { ok:true, fileID: uploadRes.fileID };
 }
+*/
+
+async function renderDocxForContract(doc) {
+    const { cityCode, branchCode, contractType, fields, cityName, branchName, contractTypeName, _id } = doc;
+    const serialFormatted = fields.contractSerialNumberFormatted;
+  
+    // 修正这里的命名
+    const { y, m, d } = nowInTZ(BIZ_TZ);
+  
+    // 1) 选模板并渲染 DOCX
+    const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({ cityCode, branchCode, contractType });
+    const zip = new PizZip(content);
+    const docx = new Docxtemplater(zip, { paragraphLoop:true, linebreaks:true, delimiters:{ start:'[[', end:']]'} });
+  
+    const dataForDocx = {
+      contractNo: serialFormatted,
+      contractDate: `${y}-${m}-${d}`,
+      cityName: cityName,
+      branchName: branchName || '',
+      contractTypeName: contractTypeName,
+  
+      clientName: fields.clientName,
+      clientId: fields.clientId,
+      clientPhone: fields.clientPhone,
+      clientAddress: fields.clientAddress,
+      clientEmergencyContact: fields.clientEmergencyContact,
+      clientEmergencyPhone: fields.clientEmergencyPhone,
+  
+      carModel: fields.carModel,
+      carColor: fields.carColor,
+      carPlate: fields.carPlate,
+      carVin: fields.carVin,
+  
+      contractValidPeriodStart: fields.contractValidPeriodStart,
+      contractValidPeriodEnd: fields.contractValidPeriodEnd,
+      rentDurationMonth: fields.rentDurationMonth,
+  
+      rentMonthly: fields.rentMonthly,
+      rentMonthlyFormal: fields.rentMonthlyFormal,
+      rentToday: fields.rentToday,
+      rentTodayFormal: fields.rentTodayFormal,
+      rentPaybyDayInMonth: fields.rentPaybyDayInMonth,
+  
+      deposit: fields.deposit,
+      depositFormal: fields.depositFormal,
+      depositInitial: fields.depositInitial,
+      depositServiceFee: fields.depositServiceFee,
+      depositServiceFeeFormal: fields.depositServiceFeeFormal,
+  
+      depositRemaining: fields.depositRemaining,
+    };
+  
+    try { docx.render(dataForDocx); }
+    catch (e) {
+      console.error('DOCX render error:', e);
+      return { ok:false, error:'render-failed' };
+    }
+  
+    const outBuf = docx.getZip().generate({ type:'nodebuffer' });
+  
+    // 2) 覆盖上传 DOCX
+    const folderBranch = branchCode || 'default';
+    const folderType = contractType || 'default';
+    const basePath = `contracts/${cityCode}/${folderBranch}/${folderType}/${serialFormatted}`;
+    const upDocx = await cloud.uploadFile({
+      cloudPath: `${basePath}.docx`,
+      fileContent: outBuf,
+    });
+    const docxFileID = upDocx.fileID;
+    console.log('[render] upload docx ok:', docxFileID);
+  
+    // 3) 通过 CI 把 DOCX 转 PDF （拿临时 URL + ci-process）
+    const tmp = await cloud.getTempFileURL({ fileList: [docxFileID] });
+    const docxUrl = tmp?.fileList?.[0]?.tempFileURL;
+    if (!docxUrl) {
+      console.error('[render] getTempFileURL failed', tmp);
+      // 至少回写 docx，避免前端完全没法打开
+      await COL.doc(_id).update({
+        data: { file: { docxFileID }, updatedAt: db.serverDate() }
+      });
+      return { ok:true, fileID: docxFileID, docxFileID, warning: 'tempfileurl-failed' };
+    }
+  
+    const ciUrl = docxUrl + (docxUrl.includes('?') ? '&' : '?') + 'ci-process=doc-preview&dstType=pdf';
+  
+    let pdfBuf = null;
+    try {
+      const resp = await fetch(ciUrl);
+      const ctype = resp.headers.get('content-type') || '';
+      const buf = await resp.buffer();
+  
+      // 粗检：必须是 PDF 且非空
+      if (!resp.ok || !/application\/pdf/i.test(ctype) || buf.length < 10 || buf.slice(0,5).toString() !== '%PDF-') {
+        console.error('[render] CI convert not pdf:', { ok: resp.ok, status: resp.status, ctype, head: buf.slice(0,5).toString(), size: buf.length });
+        // 回写 docx，返回成功（前端可回退打开 docx）
+        await COL.doc(_id).update({
+          data: { file: { docxFileID }, updatedAt: db.serverDate() }
+        });
+        return { ok:true, fileID: docxFileID, docxFileID, warning: 'pdf-invalid' };
+      }
+      pdfBuf = buf;
+    } catch (e) {
+      console.error('[render] CI convert failed:', e);
+      await COL.doc(_id).update({
+        data: { file: { docxFileID }, updatedAt: db.serverDate() }
+      });
+      return { ok:true, fileID: docxFileID, docxFileID, warning: 'pdf-fetch-failed' };
+    }
+  
+    // 4) 上传 PDF 并回写
+    const upPdf = await cloud.uploadFile({
+      cloudPath: `${basePath}.pdf`,
+      fileContent: pdfBuf,
+    });
+    const pdfFileID = upPdf.fileID;
+    console.log('[render] upload pdf ok:', pdfFileID);
+  
+    await COL.doc(_id).update({
+      data: {
+        file: { docxFileID, pdfFileID },
+        updatedAt: db.serverDate()
+      }
+    });
+  
+    // 5) 返回给前端：优先 pdf
+    return { ok:true, fileID: pdfFileID, pdfFileID, docxFileID };
+  }
 
 exports.main = async (event, context) => {
     const { action } = event || {};

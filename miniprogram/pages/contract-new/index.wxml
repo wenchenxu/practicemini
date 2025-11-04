@@ -40,7 +40,7 @@
   </view>
 
   <form bindsubmit="onSubmit">
-    <block wx:for="{{visibleFields}}" wx:key="name">
+    <block wx:for="{{visibleFields || []}}" wx:key="name">
       <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
         <view class="form-item">
           <label class="label">
@@ -99,7 +99,7 @@
       </button>
     </view>
   </form>
-
+  
   <view class="btn-row" wx:if="{{mode==='view'}}">
     <button type="default" class="btn" bindtap="toEdit">修改</button>
   </view>
