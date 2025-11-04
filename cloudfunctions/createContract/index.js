@@ -1,4 +1,4 @@
-console.log('[createContract boot]');
+// console.log('[createContract boot]');
 // 云函数入口文件
 const cloud = require('wx-server-sdk');
 const PizZip = require('pizzip');
@@ -79,10 +79,10 @@ async function pickTemplateBuffer(opts) {
   for (const fileID of candidates) {
     try {
       const res = await cloud.downloadFile({ fileID });
-      console.log('[tpl] use', fileID);
+      // console.log('[tpl] use', fileID);
       return { fileID, buffer: res.fileContent }; // 命中后直接带回 buffer
     } catch (e) {
-      console.log('[tpl] miss', fileID);
+      // console.log('[tpl] miss', fileID);
     }
   }
   throw new Error('no template available');
@@ -102,7 +102,7 @@ exports.main = async function (event, context) {
 
     // 用服务端时间，避免前端时区
     const { y: yyyy, m: mm, d: dd, ymd: dateStr } = nowInTZ(BIZ_TZ);
-    console.log('[ts]', `${yyyy}-${mm}-${dd}`, 'dateStr=', dateStr, 'tz=', BIZ_TZ);
+    // console.log('[ts]', `${yyyy}-${mm}-${dd}`, 'dateStr=', dateStr, 'tz=', BIZ_TZ);
 
     // === 编号 aa 与流水作用域 ===
     var AA_BY_BRANCH = { gzh_a: 'GZ1', gzh_b: 'GZ2' };
@@ -158,7 +158,7 @@ exports.main = async function (event, context) {
             updatedAt: db.serverDate()
           }
         });
-        console.log('contracts.add ok:', addRes._id, serialFormatted);
+        // console.log('contracts.add ok:', addRes._id, serialFormatted);
         return { _id: addRes._id, serialFormatted: serialFormatted, fields: fields };
       });
   
@@ -236,7 +236,7 @@ exports.main = async function (event, context) {
         fileContent: outBuf
       });
       const docxFileID = uploadDocxRes.fileID;         // ← 修正变量名
-      console.log('[create] upload docx ok:', docxFileID);
+      // console.log('[create] upload docx ok:', docxFileID);
   
       // —— 立即把 DOCX 写回数据库（这样就算 PDF 失败，列表也能点击 DOCX）
       await db.collection('contracts').doc(contractId).update({
@@ -266,7 +266,7 @@ exports.main = async function (event, context) {
             fileContent: buf,
           });
           pdfFileID = upPdf.fileID;
-          console.log('[create] upload pdf ok:', pdfFileID);
+          // console.log('[create] upload pdf ok:', pdfFileID);
 
           await db.collection('contracts').doc(contractId).update({
           data: { file: { docxFileID, pdfFileID }, updatedAt: db.serverDate() }

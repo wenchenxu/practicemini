@@ -1,12 +1,14 @@
+// pages/no-access/no-access.js
 Page({
-    data: { openid: '' },
+    data: {
+      openid: '',
+      showAudit: false,
+      auditToken: ''
+    },
   
     async onLoad() {
-      // 获取自己的 openid（通过云函数）
       try {
-        const { result } = await wx.cloud.callFunction({ name: 'auth_checkAccess' });
-        // 不返回 OPENID，本页仅做复制引导；如需 OPENID，可写一个 getOpenid 函数返回 OPENID
-        // 这里给一个简单实现（安全性足够MVP用）：
+        // 取 openid 用于复制（方便你加白名单）
         const { result: idRet } = await wx.cloud.callFunction({ name: 'auth_getOpenid' });
         this.setData({ openid: idRet?.openid || '' });
       } catch (e) {}
@@ -15,6 +17,37 @@ Page({
     copyOpenid() {
       if (!this.data.openid) return;
       wx.setClipboardData({ data: this.data.openid });
+    },
+  
+    showAudit() { this.setData({ showAudit: true }); },
+    onAuditInput(e) { this.setData({ auditToken: (e.detail.value || '').trim() }); },
+  
+    async tryAudit() {
+      const auditToken = this.data.auditToken;
+      if (!auditToken) return wx.showToast({ title: '请输入审核口令', icon: 'none' });
+  
+      try {
+        const { result } = await wx.cloud.callFunction({
+          name: 'auth_checkAccess',
+          data: { auditToken }
+        });
+  
+        if (result?.allowed) {
+          // 通过：写入全局 + 可选写入本地“有效期”
+          const app = getApp();
+          app.globalData.allowed = true;
+          app.globalData.role = result.role || 'staff';
+          if (result.ttlHours) {
+            wx.setStorageSync('audit_pass_until', Date.now() + result.ttlHours * 3600 * 1000);
+          }
+          wx.showToast({ title: '审核通道已开启', icon: 'success' });
+          setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 400);
+        } else {
+          wx.showToast({ title: '口令无效', icon: 'none' });
+        }
+      } catch (e) {
+        wx.showToast({ title: '网络异常', icon: 'none' });
+      }
     }
   });
   

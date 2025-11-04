@@ -5,7 +5,8 @@
     "pages/contract-new/index",
     "pages/contract-list/index",
     "pages/fadada-test/index",
-    "pages/admin/whitelist/whitelist"
+    "pages/admin/whitelist/whitelist",
+    "pages/no-access/no-access"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

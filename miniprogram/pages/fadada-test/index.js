@@ -187,8 +187,8 @@ Page({
           const temp = await wx.cloud.getTempFileURL({ fileList: [up.fileID] });
           const fileObj = temp?.fileList?.[0] || {};
           const url = fileObj.tempFileURL;
-          console.log('[TempFileURL object]', fileObj);
-          console.log('[PDF direct URL]', url);
+          // console.log('[TempFileURL object]', fileObj);
+          // console.log('[PDF direct URL]', url);
           // this.appendLog({ tempFileURL: url, meta: fileObj });
           // this.setData({ lastPdfUrl: url }); 
 
