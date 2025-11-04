@@ -12,8 +12,8 @@
       <button class="city" bindtap="goCity" data-code="suzhou">苏州</button>
     </block>
   </view>
-  <!-- 法大大测试入口（你可以把这段放到任何合适的位置） -->
+  <!-- 法大大测试入口（你可以把这段放到任何合适的位置） 
   <view class="fadada-test-entry">
     <button type="default" bindtap="goFadadaTest">法大大测试</button>
-  </view>
+  </view> -->
 </view>
