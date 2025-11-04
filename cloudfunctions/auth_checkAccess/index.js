@@ -1,4 +1,3 @@
-// cloudfunctions/checkAccess/index.js
 const cloud = require('wx-server-sdk');
 
 // 如果你的项目有多个环境，指定 prod 环境：

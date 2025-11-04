@@ -9,7 +9,7 @@ App({
     async onLaunch() {
         wx.cloud.init();
         try {
-            const { result } = await wx.cloud.callFunction({ name: 'checkAccess' });
+            const { result } = await wx.cloud.callFunction({ name: 'auth_checkAccess' });
             const { allowed, role = 'guest' } = result || {};
             this.globalData.allowed = !!allowed;
             this.globalData.role = role;

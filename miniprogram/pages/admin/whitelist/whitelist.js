@@ -27,7 +27,7 @@ Page({
     try {
       const { page, pageSize, keyword } = this.data;
       const { result } = await wx.cloud.callFunction({
-        name: 'listWhitelist',
+        name: 'auth_listWhitelist',
         data: { page, pageSize, keyword }
       });
       if (result && result.ok) {
@@ -46,7 +46,7 @@ Page({
 
     try {
       const { result } = await wx.cloud.callFunction({
-        name: 'grantByOpenid',
+        name: 'auth_grantByOpenid',
         data: { targetOpenid: openid, name, role }
       });
       if (result?.ok) {
@@ -70,7 +70,7 @@ Page({
         if (!ret.confirm) return;
         try {
           const { result } = await wx.cloud.callFunction({
-            name: 'removeWhitelist',
+            name: 'auth_removeWhitelist',
             data: { targetOpenid: openid }
           });
           if (result?.ok) {

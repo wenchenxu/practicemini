@@ -1,5 +1,5 @@
 {
-  "name": "getOpenid",
+  "name": "auth_getOpenid",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
