@@ -105,7 +105,7 @@ Page({
     if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
 
     // 2) 组几个签署要用的字段
-    const signerPhone = item.fields?.clientPhone || '';   // 签署人手机号
+    const signerPhone = item.fields?.clientPhone || '13725511890';   // 签署人手机号
     const signerName  = item.fields?.clientName;         // 签署人姓名
     // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
     const actorId     = signerPhone;
@@ -135,7 +135,7 @@ Page({
           payload: {
             url: tempUrl,
             fileName: `${signerName}.pdf`,
-            fileType: 'doc'
+            fileType: 'doc' //这是正确的 fileType
           }
         }
       });
@@ -200,7 +200,7 @@ Page({
             signTaskId,
             actorId,
             clientUserId,
-            clientPhone: signerPhone,
+            // clientPhone: signerPhone,
             redirectMiniAppUrl: '/pages/contract-list/index'
           }
         }
