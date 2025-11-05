@@ -6,11 +6,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const ECS_BASE = process.env.ECS_BASE_URL || 'http://121.40.234.100:3001';
 const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
 
-// ========== 环境与SDK初始化工具 ==========
-const APP_ID = process.env.FADADA_APP_ID;
-const APP_SECRET = process.env.FADADA_APP_SECRET;
-
-// 旧版 post，未使用官方格式，可用
+// 环境与SDK初始化工具 
+// 现用 post，未使用官方格式，目前所有模块依赖此版本
 async function post(path, data) {
     const url = `${ECS_BASE}${path}`;
     try {
@@ -28,7 +25,7 @@ async function post(path, data) {
     }
   }
 
-// 根据官方文档的格式，未调用，待测试
+// （未使用）官方文档格式 post，需要按需修改 getToken, uploadFileByUrl 和convertFddUrlToFileId。否则会崩
 async function post2(path, data) {
     const base = process.env.ECS_BASE_URL;
     const resp = await axios.post(base + path, data, {
@@ -40,11 +37,44 @@ async function post2(path, data) {
     return resp.data;
   }
 
+// 仅针对 TCB 写库，不经 ECS
+async function saveContractEsign(payload) {
+    const db = cloud.database();
+    const { contractId, fileId, fddFileUrl, signTaskId, actorUrl } = payload || {};
+  
+    // 1) 强校验 + 打点
+    console.log('[saveContractEsign] payload =', payload);
+    if (!contractId) throw new Error('contractId required');
+  
+    // 2) 只构造“有值”的字段（避免 undefined 写进去）
+    const data = {};
+    if (fileId) {
+      data['esign.fileId'] = fileId;
+    }
+    if (signTaskId) {
+      data['esign.signTaskId'] = signTaskId;
+    }
+    if (actorUrl) {
+      data['esign.lastActorUrl'] = actorUrl;
+    }
+    // 统一更新时间（无论写了哪个字段）
+    data['esign.updatedAt'] = db.serverDate();
+  
+    if (Object.keys(data).length === 1) { // 只有 updatedAt
+      throw new Error('nothing to update');
+    }
+  
+    // 3) 真正写库 + 打点
+    const ret = await db.collection('contracts').doc(contractId).update({ data });
+    console.log('[saveContractEsign] update ret =', ret);
+  
+    return { ok: true, matched: ret.stats?.updated || ret.stats?.updatedDocs || 0 };
+  }
+  
 exports.main = async (event, context) => {
   try {
     const { action, payload = {} } = event || {};
     switch (action) {
-      case 'ping': return { success: true, data: { ok: true, ts: Date.now() } };
       // 签合同最简流程
       case 'getToken': return { success: true, data: await post('/api/esign/getToken', {}) };
       case 'uploadFileByUrl':
@@ -55,7 +85,9 @@ exports.main = async (event, context) => {
         return { success: true, data: await post('/api/esign/createTaskV51', payload) };
       case 'getActorUrl': 
         return { success: true, data: await post('/api/esign/getActorUrl', payload) };
-      //其他功能，待验证，未使用官方 Pre-request Script
+      case 'saveContractEsign':
+        return { success: true, data: await saveContractEsign(payload) };
+      //其他功能，未使用官方 Pre-request Script，待验证/修改
       case 'getCorpAuthUrl':
         return { success: true, data: await post('/api/esign/getCorpAuthUrl', payload) };
       case 'getCorpAuthStatus':

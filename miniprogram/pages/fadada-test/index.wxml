@@ -14,17 +14,6 @@
   <button bindtap="onUploadPdf">上传PDF获取fileId</button>
 
   <view class="split"></view>
-  <!-- 
-  <view>
-  <text selectable="true">最近一次PDF直连URL：</text>
-  <text selectable="true" style="word-break:break-all">{{lastPdfUrl}}</text>
-  </view>
-  <button bindtap="copyLastUrl" wx:if="{{lastPdfUrl}}">复制直连URL</button>
-
-  <view class="split"></view>
-  <button bindtap="onGetUploadUrl">获取直传URL并上传（本地直传）</button> 
-
-  <view class="split"></view>-->
   <view class="subtitle">当前 fileId：</view>
   <view style="font-family:Menlo,Consolas,monospace;word-break:break-all;">
      {{ fileId || '(未获取)' }}
