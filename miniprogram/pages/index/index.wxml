@@ -12,12 +12,12 @@
       <button class="city" bindtap="goCity" data-code="suzhou">苏州</button>
     </block>
   </view>
-  <view class="title">人员管理</view>
+  <view class="title">企业管理</view>
   <view class="grid">
     <!-- 管理员可见按钮 -->
     <view wx:if="{{isAdmin}}">
     <button class="admin-btn" bindtap="goWhitelist">
-        白名单
+        人员管理
     </button>
     </view>
   </view>
