@@ -118,7 +118,7 @@ Page({
   },
 
   onLoad(options) {
-    console.log('[contract-new onLoad] options=', options);
+    // console.log('[contract-new onLoad] options=', options);
 
     // 1) 解析参数
     const id = options.id || '';
@@ -189,7 +189,7 @@ Page({
       const db = wx.cloud.database();
       const res = await db.collection('contracts').doc(id).get();
       const doc = res.data;
-      console.log('[loadDoc]', doc);
+      // console.log('[loadDoc]', doc);
 
       // 回填到表单
       this.setData({
@@ -280,7 +280,7 @@ Page({
       return true;
     });
     this.setData({ visibleFields: visible });
-    console.log('[initVisibleFields]', this.data.mode, 'count=', visible.length);
+    // console.log('[initVisibleFields]', this.data.mode, 'count=', visible.length);
   },
 
   // 分公司选择
@@ -506,7 +506,7 @@ Page({
 
   async onRegenDoc() {
     const id = this.data.id;
-    console.log('[onRegenDoc] id=', id);
+    // console.log('[onRegenDoc] id=', id);
     if (!id) { wx.showToast({ title:'缺少合同ID', icon:'none' }); return; }
 
     try {
@@ -515,7 +515,7 @@ Page({
         name: 'contractOps',
         data: { action: 'render', id }
       });
-      console.log('[render result]', res);
+      // console.log('[render result]', res);
       const rr = res && res.result ? res.result : {};
       if (rr.ok) {
         wx.showToast({ title: '已重新生成', icon:'success' });

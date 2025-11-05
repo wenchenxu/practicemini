@@ -1,5 +1,5 @@
 <view class="container">
-  <view class="title">请选择城市</view>
+  <view class="title">城市入口</view>
   <view class="grid">
     <block wx:key="*this">
       <button class="city" bindtap="goCity" data-code="guangzhou">广州</button>
@@ -11,6 +11,15 @@
       <button class="city" bindtap="goCity" data-code="nantong">南通</button>
       <button class="city" bindtap="goCity" data-code="suzhou">苏州</button>
     </block>
+  </view>
+  <view class="title">人员管理</view>
+  <view class="grid">
+    <!-- 管理员可见按钮 -->
+    <view wx:if="{{isAdmin}}">
+    <button class="admin-btn" bindtap="goWhitelist">
+        白名单
+    </button>
+    </view>
   </view>
   <!-- 法大大测试入口（你可以把这段放到任何合适的位置） -->
   <view class="fadada-test-entry">

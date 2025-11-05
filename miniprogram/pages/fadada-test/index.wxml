@@ -3,10 +3,10 @@
   <button bindtap="onGetToken">获取Token</button>
 
   <view class="split"></view>
-  <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
-  <!-- <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" /> -->
+  <!-- <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
+  <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" />
   <button bindtap="onGetAuthUrl">个人授权URL</button>
-  <view class="split"></view>
+  <view class="split"></view> -->
   <input class="ipt" placeholder="clientCorpId（你的企业外部ID）" value="{{clientCorpId}}" bindinput="onInputClientCorpId" />
   <button bindtap="onGetCorpAuthUrl">企业授权URL</button>
   <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>

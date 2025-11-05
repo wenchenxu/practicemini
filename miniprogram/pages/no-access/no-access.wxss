@@ -1,0 +1,5 @@
+.container { padding: 48rpx; display: flex; flex-direction: column; align-items: center; }
+.img { width: 240rpx; height: 240rpx; margin-top: 120rpx; }
+.title { margin-top: 32rpx; font-size: 36rpx; font-weight: 600; }
+.desc { margin-top: 16rpx; font-size: 28rpx; color: #666; text-align: center; }
+.btn { margin-top: 48rpx; width: 560rpx; }
