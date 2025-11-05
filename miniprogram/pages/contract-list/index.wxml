@@ -1,15 +1,14 @@
 <view class="container">
   <view class="header">
-    <text class="title">{{city}} - 合同中心</text>
+    <text class="title">{{city}} - 签署前合同</text>
   </view>
 
   <!-- 新增：顶部筛选 tabs -->
   <view class="tabs">
     <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
     <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
-    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
-    <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view>
-    <!-- <view class="tab debug" bindtap="goDebug">调试/开发</view>-->
+    <!-- <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view> -->
+    <!-- <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view> -->
   </view>
 
   <view wx:if="{{loading}}" class="empty">加载中...</view>
