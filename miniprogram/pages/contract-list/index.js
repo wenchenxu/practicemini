@@ -28,6 +28,22 @@ Page({
   async refresh() {
     this.setData({ list: [], hasMore: true, lastId: '', lastCreatedAt: null });
     await this.fetch();
+    // 如果逻辑在 JS 计算，判断签约状态
+    /* 
+    const data = await this.fetch();
+    if (Array.isArray(data)) {
+        const list = data.map(item => {
+          const esign = item.esign || {};
+          let statusText = '未生成电子签';
+          if (esign.lastActorUrl) {
+            statusText = '成功获取签约链接';
+          } else if (esign.signTaskId) {
+            statusText = '获取签约链接失败';
+          }
+          return { ...item, _fddStatusText: statusText };
+        });
+        this.setData({ list });
+      } */
   },
 
   async fetch() {
@@ -164,6 +180,17 @@ Page({
         conv?.result?.data?.result?.data?.fileIdList?.[0]?.fileId;
       if (!fileId) throw new Error('文件处理未返回 fileId');
 
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: {
+            contractId: item._id,
+            fileId
+          }
+        }
+      });
+
       // D. 创建签署任务（这里名字和字段都要对上 ECS）
       const create = await wx.cloud.callFunction({
         name: 'api-fadada',
@@ -214,6 +241,18 @@ Page({
       if (!embedUrl) {
         throw new Error('未拿到签署URL');
       }
+
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: {
+            contractId: item._id,
+            signTaskId,
+            actorUrl: embedUrl
+          }
+        }
+      });
 
       // F. 复制
       wx.setClipboardData({
