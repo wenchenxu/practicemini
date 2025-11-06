@@ -1,4 +1,4 @@
-// app.js
+// 旧版 app.js，做参考
 App({
   onLaunch: function () {
     this.globalData = {
