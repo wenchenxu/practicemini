@@ -37,7 +37,7 @@
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-          <!-- 签署状态： {{item._fddStatusText || '未生成电子签'}}-->
+          签署状态：<!-- {{item._fddStatusText || '未生成电子签'}}-->
         </view>
       </view>
 
