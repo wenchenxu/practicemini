@@ -31,8 +31,11 @@
           {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
         </view>
         <view class="sub">
-          {{item.fields.contractSerialNumberFormatted || '—'}} ｜{{item.fields.contractDate || '—'}}
+          {{item.fields.contractSerialNumberFormatted || '—'}}
         </view>
+        <view class="sub">
+          {{item._createTime || '—'}}
+        </view>        
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
@@ -43,11 +46,13 @@
 
       <!-- 右侧操作区保留 -->
       <view class="ops">
-        <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
-          <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
-        </view>
-        <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
-          <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
+        <view class="icon-row">
+            <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
+                <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
+            </view>
+            <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
+                <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
+            </view>
         </view>
         <!-- 新增：发起签署并拿链接 -->
         <button
@@ -58,6 +63,13 @@
             type="primary"
             loading="{{runningId === item._id}}"
         >发起签署</button>
+        
+        <button
+            data-id="{{item._id}}"
+            bindtap="onGetDownloadUrlFromRow"
+            size="mini"
+            disabled="{{!item.esign || !item.esign.signTaskId}}"
+        >获取下载</button>
       </view>
       <!-- 调试用，看看最后拿到的链接 -->
       <!-- <text selectable="true">{{lastEsignUrl}}</text>-->

@@ -3,7 +3,29 @@ const cloud = require('wx-server-sdk');
 const axios = require('axios');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
-const ECS_BASE = process.env.ECS_BASE_URL || 'http://121.40.234.100:3001';
+
+// 环境变量, prod / dev
+const ENV = process.env.FADADA_ENV || 'dev'; // 默认 dev 分支
+const IS_PROD = ENV === 'prod';
+
+const APP_ID = IS_PROD
+  ? process.env.FADADA_APP_ID_PROD
+  : process.env.FADADA_APP_ID_DEV;
+
+const BASE_URL = IS_PROD
+  ? process.env.FADADA_BASE_URL_PROD
+  : process.env.FADADA_BASE_URL_DEV;
+
+const ECS_BASE = IS_PROD
+  ? process.env.ECS_BASE_URL_PROD
+  : process.env.ECS_BASE_URL_DEV;
+
+console.log(`[api-fadada] Using ${IS_PROD ? 'PROD' : 'DEV'} Fadada config`, {
+    APP_ID,
+    BASE_URL,
+  });
+
+// const ECS_BASE = process.env.ECS_BASE_URL || 'http://121.40.234.100:3001';
 const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
 
 // 环境与SDK初始化工具 
@@ -40,7 +62,7 @@ async function post2(path, data) {
 // 仅针对 TCB 写库，不经 ECS
 async function saveContractEsign(payload) {
     const db = cloud.database();
-    const { contractId, fileId, fddFileUrl, signTaskId, actorUrl } = payload || {};
+    const { contractId, fileId, signTaskId, actorUrl } = payload || {};
   
     // 1) 强校验 + 打点
     console.log('[saveContractEsign] payload =', payload);
@@ -87,6 +109,8 @@ exports.main = async (event, context) => {
         return { success: true, data: await post('/api/esign/getActorUrl', payload) };
       case 'saveContractEsign':
         return { success: true, data: await saveContractEsign(payload) };
+      case 'getOwnerDownloadUrl':
+        return { success: true, data: await post('/api/esign/getOwnerDownloadUrl', payload) };            
       //其他功能，未使用官方 Pre-request Script，待验证/修改
       case 'getCorpAuthUrl':
         return { success: true, data: await post('/api/esign/getCorpAuthUrl', payload) };
@@ -97,6 +121,8 @@ exports.main = async (event, context) => {
       case 'getSignUrl': return { success: true, data: await post('/api/esign/getSignUrl', payload) };
       case 'getUploadUrl':       // 直传本地文件，不使用
         return { success: true, data: await post('/api/esign/getUploadUrl', payload) }; 
+      case 'getEnvInfo':
+        return { success: true, env: process.env.FADADA_ENV || 'dev' };
       case 'diag':
         return {
             success: true,
