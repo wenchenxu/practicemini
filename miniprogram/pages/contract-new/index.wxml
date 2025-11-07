@@ -1,6 +1,6 @@
 <!-- 仅广州显示：选择分公司（必选） -->
 <view wx:if="{{mode==='create' && showBranchPicker}}" class="form-item">
-  <view class="label">选择分公司</view>
+  <view class="label">分公司</view>
   <picker mode="selector" 
           range="{{branchOptions}}" 
           range-key="name" 

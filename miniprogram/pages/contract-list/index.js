@@ -110,6 +110,65 @@ Page({
     this.refresh();
   },
 
+  async onGetDownloadUrlFromRow(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    const signTaskId = item?.esign?.signTaskId;
+    if (!signTaskId) {
+      return wx.showToast({ title: '请先发起并创建签署任务', icon: 'none' });
+    }
+
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      // 你可以传 customName（自定义下载文件名，不含扩展名时平台会按规则补）
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getOwnerDownloadUrl',
+          payload: {
+            signTaskId,
+            // 可选：自定义下载名。若不传即用任务主题
+            // customName: `${item.fields?.clientName || '合同'}-${Date.now()}`
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      // 复制到剪贴板（最省事的做法）
+      wx.setClipboardData({
+        data: url,
+        success() {
+          wx.showToast({ title: '下载链接已复制', icon: 'success' });
+        }
+      });
+
+      // 如果你以后想在小程序内直接下载预览：
+      // 需要把法大大下载域名加入 小程序「downloadFile合法域名」
+      // wx.downloadFile({ url, success: ({ tempFilePath }) => wx.openDocument({ filePath: tempFilePath }) });
+
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '异常', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+  
   // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
   async onSignFromRow(e) {
     const id = e.currentTarget.dataset.id;
