@@ -14,13 +14,13 @@
 
 <!-- 合同类型：城市多类型则展示；仅一种则隐藏但会自动赋值 -->
 <view wx:if="{{mode==='create' && showTypePicker}}" class="form-item">
-  <view class="label">合同类型</view>
+  <view class="label-contractType">合同类型</view>
   <picker mode="selector" 
           range="{{typeOptions}}" 
           range-key="name" 
           value="{{typeIndex}}" 
           bindchange="onPickType">
-    <view class="picker-value">
+    <view class="picker-value-contractType">
         {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择' }}
     </view>
   </picker>
@@ -28,8 +28,8 @@
 
 <!-- 编辑/查看模式：只读合同类型展示，不可交互 -->
 <view wx:elif="{{mode!=='create'}}" class="readonly-field">
-  <text class="label">合同类型</text>
-  <text class="value">{{ selectedTypeName || '—' }}</text>
+  <text class="label-contractType">合同类型</text>
+  <text class="value-contractType">{{ selectedTypeName || '—' }}</text>
 </view>
 
 <view class="container">

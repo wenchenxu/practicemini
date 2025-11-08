@@ -9,6 +9,18 @@ App({
     async onLaunch() {
       wx.cloud.init({ traceUser: true });
   
+      // 环境检测：判断是否正式版
+      try {
+        const info = wx.getAccountInfoSync();
+        const envVersion = info.miniProgram.envVersion; // 'develop' | 'trial' | 'release'
+        this.globalData.isProd = (envVersion === 'release' || envVersion === 'trial');
+        // console.log('当前小程序环境版本:', envVersion);
+        // console.log('isProd:', this.globalData.isProd);
+      } catch (e) {
+        this.globalData.isProd = false; // 容错：默认当作开发环境
+      }
+
+      // 访问者以及审核人员授权流程
       try {
         const { result } = await wx.cloud.callFunction({ name: 'auth_checkAccess' });
         const { allowed, role = 'guest' } = result || {};
@@ -37,6 +49,7 @@ App({
       initialized: false,
       allowed: false,
       role: 'guest',
+      isProd: false
     }
   });
   

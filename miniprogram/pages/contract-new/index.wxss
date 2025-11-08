@@ -14,3 +14,6 @@
 .readonly-field { padding: 16rpx 0; }
 .readonly-field .label { color:#888; margin-right: 16rpx; }
 .readonly-field .value { font-weight: 600; }
+.label-contractType { display:block; margin-bottom: 8rpx; margin-top: 50rpx; margin-left: 100rpx; color:#333; }
+.picker-value-contractType { display:block; margin-bottom: 8rpx; margin-left: 100rpx; color:#333; }
+.value-contractType { display:block; margin-bottom: 8rpx; margin-left: 100rpx; color:#333; }

@@ -1,56 +1,58 @@
 const db = wx.cloud.database();
 const COL = db.collection('contracts');
 import { BRANCH_OPTIONS_BY_CITY, TYPE_OPTIONS_BY_CITY } from '../../utils/config';
+const app = getApp();
+const IS_PROD = app.globalData.isProd;   // 拿到环境开关
 
-const FIELDS = [
+const BASE_FIELDS = [
   // ---- Branch ----
-  { name:'branchName', label:'门店名称', type:'string', required:false,  maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
-  { name:'branchAddress', label:'门店地址', type:'string', required:false, maxLength:200, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchManagerName', label:'门店负责人姓名', type:'string', required:false, maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchLicense', label:'门店营业执照号', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchPhone', label:'门店电话', type:'string', required:false, minLength: 11, maxLength:11, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchBankAccount', label:'门店银行账号', type:'number', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
-  { name:'branchBankName', label:'开户行名称', type:'string', required:false, maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'branchCityCode', label:'城市编码', type:'string', required:false, maxLength:10, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchName', label:'门店名称', type:'string', requiredWhen:'never',  maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
+  { name:'branchAddress', label:'门店地址', type:'string', requiredWhen:'never', maxLength:200, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchManagerName', label:'门店负责人姓名', type:'string', requiredWhen:'never', maxLength:50, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchLicense', label:'门店营业执照号', type:'string', requiredWhen:'never', maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchPhone', label:'门店电话', type:'string', requiredWhen:'never', minLength: 11, maxLength:11, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchBankAccount', label:'门店银行账号', type:'number', requiredWhen:'never', disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true},
+  { name:'branchBankName', label:'开户行名称', type:'string', requiredWhen:'never', maxLength:100, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'branchCityCode', label:'城市编码', type:'string', requiredWhen:'never', maxLength:10, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Client ----
-  { name:'clientName', label:'乙方客户姓名', type:'string', required:true, maxLength:12 },
-  { name:'clientId', label:'身份证号码', type:'string', required:true, minLength: 18, maxLength:18},
-  { name:'clientPhone', label:'电话', type:'string', required:false, min:0, minLength: 11, maxLength:11},
-  { name:'clientAddress', label:'身份证地址', type:'string', required:false, maxLength:60 },
-  { name:'clientAddressCurrent', label:'现居住地址', type:'string', required:false, maxLength:60 },
-  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', required:false, maxLength:12 },
-  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', required:false, min:0, minLength: 11, maxLength: 11},
+  { name:'clientName', label:'乙方客户姓名', type:'string', requiredWhen:'always', maxLength:12 },
+  { name:'clientId', label:'身份证号码', type:'string', requiredWhen:'always', minLength: 18, maxLength:18},
+  { name:'clientPhone', label:'电话', type:'string', requiredWhen:'always', min:0, minLength: 11, maxLength:11},
+  { name:'clientAddress', label:'身份证地址', type:'string', requiredWhen:'prod', maxLength:60 },
+  { name:'clientAddressCurrent', label:'现居住地址', type:'string', requiredWhen:'never', maxLength:60 },
+  { name:'clientEmergencyContact', label:'紧急联系人姓名', type:'string', requiredWhen:'prod', maxLength:12 },
+  { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', requiredWhen:'prod', min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', required:false, maxLength:50 },
-  { name:'carColor', label:'车身颜色', type:'string', required:false, maxLength:20 },
-  { name:'carPlate', label:'车牌号', type:'string', required:false, minLength: 8, maxLength:8 },
-  { name:'carVin', label:'车架号', type:'string', required:true, minLength:14, maxLength:14, help:'必须14位' },
-  { name:'carRentalCity', label:'租赁城市', type:'string', required:false, maxLength:20 },
+  { name:'carModel', label:'车型', type:'string', requiredWhen:'prod', maxLength:50 },
+  { name:'carColor', label:'车身颜色', type:'string', requiredWhen:'prod', maxLength:20 },
+  { name:'carPlate', label:'车牌号', type:'string', requiredWhen:'prod', minLength: 8, maxLength:8 },
+  { name:'carVin', label:'车架号', type:'string', requiredWhen:'always', minLength:14, maxLength:14, help:'必须14位' },
+  { name:'carRentalCity', label:'租赁城市', type:'string', requiredWhen:'never', maxLength:20 },
 
   // ---- Contract / Rent ----
-  { name:'rentDurationMonth', label:'租期（月）', type:'number', required:true, min:1, max:60 },
-  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', required:false },
-  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', required:false },
-  { name:'rentMonthly', label:'月租金', type:'number', required:false, min:0 },
-  { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', required:false, disabled:true},
-  { name:'rentToday', label:'首日支付金', type:'number', required:false, min:0 },
-  { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', required:false, disabled:true },
-  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', required:true, help: '1-31号', min:1, max:31 },
-  { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', require: false},
+  { name:'rentDurationMonth', label:'租期（月）', type:'number', requiredWhen:'always', min:1, max:60 },
+  { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', requiredWhen:'prod' },
+  { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', requiredWhen:'prod' },
+  { name:'rentMonthly', label:'月租金', type:'number', requiredWhen:'always', min:0 },
+  { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', requiredWhen:'never', disabled:true},
+  { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'prod', min:0 },
+  { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true },
+  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'prod', help: '1-31号', min:1, max:31 },
+  { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never'},
 
   // ---- Deposit ----
-  { name:'deposit', label:'押金总额', type:'number', required:false, min:0 },
-  { name:'depositInitial', label:'押金首付', type:'number', required:false, min:0 },
-  { name:'depositFormal', label:'押金总额（大写）', type:'string', required:false, disabled:true },
-  { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', required:false, min:0 },
-  { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', required:false, min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', required:false, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
+  { name:'depositInitial', label:'押金首付', type:'number', requiredWhen:'prod', min:0 },
+  { name:'depositFormal', label:'押金总额（大写）', type:'string', requiredWhen:'never', disabled:true },
+  { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', requiredWhen:'prod', min:0 },
+  { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', requiredWhen:'never', min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', requiredWhen:'never', disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Dates / Serial ----
-  { name:'contractDate', label:'签约日期', type:'date', required:true },
-  { name:'contractSerialNumber', label:'合同流水号', type:'number', required:false, disabled:true, hideOnCreate: true },
+  { name:'contractDate', label:'签约日期', type:'date', requiredWhen:'always' },
+  { name:'contractSerialNumber', label:'合同流水号', type:'number', requiredWhen:'never', disabled:true, hideOnCreate: true },
 ];
 
 // 将数字自动换成中文大写
@@ -87,6 +89,20 @@ async function openDocByFileID(fileID) {
     const dres = await wx.cloud.downloadFile({ fileID });
     await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
 }
+
+function resolveRequired(field, isProd) {
+    switch (field.requiredWhen) {
+      case 'always': return true;
+      case 'never': return false;
+      case 'prod':
+      default: return !!isProd;
+    }
+}
+  
+const FIELDS = BASE_FIELDS.map(f => ({
+    ...f,
+    required: resolveRequired(f, IS_PROD)
+  }));
 
 Page({
   data: {
