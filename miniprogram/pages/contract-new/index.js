@@ -44,8 +44,9 @@ const BASE_FIELDS = [
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
-  { name:'depositInitial', label:'押金首付', type:'number', requiredWhen:'prod', min:0 },
+  { name:'depositToday', label:'押金首付', type:'number', requiredWhen:'prod', min:0 },
   { name:'depositFormal', label:'押金总额（大写）', type:'string', requiredWhen:'never', disabled:true },
+  { name:'depositTodayFormal', label:'押金首付（大写）', type:'string', requiredWhen:'never', disabled:true },
   { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', requiredWhen:'prod', min:0 },
   { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', requiredWhen:'never', min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', requiredWhen:'never', disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
@@ -340,6 +341,7 @@ Page({
         rentMonthly: 'rentMonthlyFormal',
         rentToday: 'rentTodayFormal',
         deposit: 'depositFormal',
+        depositToday: 'depositToday',
         depositServiceFee: 'depositServiceFeeFormal'
     };
     if (map[name]) {

@@ -126,7 +126,8 @@ async function renderDocxForContract(doc) {
   
       deposit: fields.deposit,
       depositFormal: fields.depositFormal,
-      depositInitial: fields.depositInitial,
+      depositToday: fields.depositToday,
+      depositTodayFormal: fields.depositTodayFormal,
       depositServiceFee: fields.depositServiceFee,
       depositServiceFeeFormal: fields.depositServiceFeeFormal,
   
@@ -218,13 +219,14 @@ exports.main = async (event, context) => {
   
         // —— 服务器端轻量复算（与 createContract 一致）
         const rentMonthlyNum = toNum(fields.rentMonthly);
-        const depositInitialNum = toNum(fields.depositInitial);
-        const depositRemaining = +(rentMonthlyNum - depositInitialNum).toFixed(2);
+        const depositTodayNum = toNum(fields.depositToday);
+        const depositRemaining = +(rentMonthlyNum - depositTodayNum).toFixed(2);
   
         const patched = Object.assign({}, fields, {
           rentMonthlyFormal: numberToCN(rentMonthlyNum),
           rentTodayFormal: numberToCN(toNum(fields.rentToday)),
           depositFormal: numberToCN(toNum(fields.deposit)),
+          depositTodayFormal: numberToCN(toNum(fields.depositToday)),
           depositServiceFeeFormal: numberToCN(toNum(fields.depositServiceFee)),
           depositRemaining,
         });

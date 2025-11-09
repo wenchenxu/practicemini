@@ -117,7 +117,7 @@ exports.main = async function (event, context) {
         const serialCol = tx.collection('serials');
         const doc = await serialCol.doc(serialKey).get().catch(() => null);
         const rentMonthlyNum = toNum(payload.rentMonthly);
-        const depositInitialNum = toNum(payload.depositInitial);
+        const depositTodayNum = toNum(payload.depositToday);
 
         // 合同序列号
         let seq = 1;
@@ -128,13 +128,14 @@ exports.main = async function (event, context) {
         var serialFormatted = `TSFZX-${aa}-${dateStr}-${seqStr}`;
   
         // 计算零租金的剩余应补押金
-        const depositRemaining = rentMonthlyNum - depositInitialNum;
+        const depositRemaining = rentMonthlyNum - depositTodayNum;
 
         var fields = Object.assign({}, payload, {
           // 金额自动大写转换
           rentMonthlyFormal: numberToCN(payload.rentMonthly || 0),
           rentTodayFormal: numberToCN(payload.rentToday || 0),
           depositFormal: numberToCN(payload.deposit || 0),
+          depositTodayFormal: numberToCN(payload.depositToday || 0),
           depositServiceFeeFormal: numberToCN(payload.depositServiceFee || 0),
 
           // 剩余押金（数值）
@@ -211,7 +212,8 @@ exports.main = async function (event, context) {
 
         deposit: finalFields.deposit,
         depositFormal: finalFields.depositFormal,
-        depositInitial: finalFields.depositInitial,
+        depositToday: finalFields.depositToday,
+        depositTodayFormal: finalFields.depositTodayFormal,
         depositServiceFee: finalFields.depositServiceFee,
         depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
         depositUnpaidMonthly: finalFields.depositUnpaidMonthly,
