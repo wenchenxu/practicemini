@@ -12,7 +12,9 @@ Page({
       signTaskId: '',
       actorId: '',
       clientUserId: '',
-      embedUrl: ''
+      embedUrl: '',
+      corpOpenId: '',     // 可留空，服务端会用 FADADA_INITIATOR_OPENID 兜底
+      corpEntities: []
     },
 
     onInputClientCorpId(e){ this.setData({ clientCorpId: e.detail.value }); },
@@ -448,6 +450,37 @@ Page({
           console.error(e);
           wx.showToast({ title: '异常', icon: 'none' });
         }
-      }
-  });
+      },
+
+    // 点击按钮触发
+  async onGetCorpEntityList() {
+    try {
+      wx.showLoading({ title: '查询中...', mask: true });
+      const { corpOpenId } = this.data;
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getCorpEntityList',
+          payload: {} // 留空也行
+        }
+      });
+
+      const list =
+        result?.data?.list ||
+        (Array.isArray(result?.data?.data) ? result.data.data : []) ||
+        [];
+      this.setData({ corpEntities: list });
+
+      wx.showToast({ title: `共 ${list.length} 条`, icon: 'success' });
+      // 控制台也打一下方便你看完整字段
+      console.log('[corpEntities]', list);
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: e.message || '查询失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+  }
+});
   
