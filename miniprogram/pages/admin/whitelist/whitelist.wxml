@@ -1,0 +1,38 @@
+<view class="wrap">
+  <view class="card">
+    <view class="title">添加成员</view>
+    <view class="row">
+      <input class="ipt" placeholder="粘贴对方 OpenID" bindinput="onOpenidInput"/>
+    </view>
+    <view class="row">
+      <input class="ipt" placeholder="姓名（可选）" bindinput="onNameInput"/>
+      <picker mode="selector" range="{{roles}}" bindchange="onRoleChange">
+        <view class="picker">角色：{{ role }}</view>
+      </picker>
+    </view>
+    <button class="btn" type="primary" bindtap="addMember">添加到白名单</button>
+  </view>
+
+  <view class="card">
+    <view class="title">成员列表</view>
+    <view class="row">
+      <input class="ipt" placeholder="搜索姓名/OPENID/角色" bindinput="onKeyword"/>
+      <button size="mini" bindtap="reload">搜索</button>
+    </view>
+    <view>
+      <block wx:for="{{list}}" wx:key="openid">
+        <view class="item">
+          <view class="main">
+            <view class="name">{{item.name || '（未命名）'}}</view>
+            <view class="sub">{{item.openid}}</view>
+            <view class="tag">{{item.role}}</view>
+          </view>
+          <view>
+            <button size="mini" data-openid="{{item.openid}}" bindtap="remove">删除</button>
+          </view>
+        </view>
+      </block>
+      <view wx:if="{{!list.length}}" class="empty">暂无成员</view>
+    </view>
+  </view>
+</view>

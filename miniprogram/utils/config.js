@@ -13,8 +13,8 @@ export const CITY_CODE_MAP = {
   // 仅广州有两个分公司
   export const BRANCH_OPTIONS_BY_CITY = {
     guangzhou: [
-      { code: 'gzh_a', name: '广州公司A' },
-      { code: 'gzh_b', name: '广州公司B' },
+      { code: 'gzh_a', name: '广州兔斯夫' },
+      { code: 'gzh_b', name: '广州益行' },
     ],
     // 其他城市不配置 = 不显示分公司选择
   };

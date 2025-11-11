@@ -28,6 +28,22 @@ Page({
   async refresh() {
     this.setData({ list: [], hasMore: true, lastId: '', lastCreatedAt: null });
     await this.fetch();
+    // 如果逻辑在 JS 计算，判断签约状态
+    /* 
+    const data = await this.fetch();
+    if (Array.isArray(data)) {
+        const list = data.map(item => {
+          const esign = item.esign || {};
+          let statusText = '未生成电子签';
+          if (esign.lastActorUrl) {
+            statusText = '成功获取签约链接';
+          } else if (esign.signTaskId) {
+            statusText = '获取签约链接失败';
+          }
+          return { ...item, _fddStatusText: statusText };
+        });
+        this.setData({ list });
+      } */
   },
 
   async fetch() {
@@ -94,6 +110,72 @@ Page({
     this.refresh();
   },
 
+  async onGetDownloadUrlFromRow(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    const signTaskId = item?.esign?.signTaskId;
+    if (!signTaskId) {
+      return wx.showToast({ title: '请先发起并创建签署任务', icon: 'none' });
+    }
+
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      // 你可以传 customName（自定义下载文件名，不含扩展名时平台会按规则补）
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getOwnerDownloadUrl',
+          payload: {
+            signTaskId,
+            // 可选：如果要强制指定别的主体，就传对象
+            // ownerId: { idType: 'corp', openId: 'xxxxxx' },
+            customName: `${item.fields?.clientName || '合同'}-${Date.now()}`,
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      await wx.setClipboardData({ data: url });
+      wx.hideLoading();
+      // 弹窗提示，不带取消
+      wx.showModal({
+        title: '签署完毕！',
+        content: '合同下载链接已复制。有效期 1 小时，请尽快下载保存。',
+        confirmText: '知道了',
+        showCancel: false
+      });
+      // 复制到剪贴板（旧可用方法）
+      /*
+      wx.setClipboardData({
+        data: url,
+        success() {
+          wx.showToast({ title: '下载链接已复制', icon: 'success' });
+        }
+      });
+      */
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '异常', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+  
   // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
   async onSignFromRow(e) {
     const id = e.currentTarget.dataset.id;
@@ -105,7 +187,7 @@ Page({
     if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
 
     // 2) 组几个签署要用的字段
-    const signerPhone = item.fields?.clientPhone;   // 签署人手机号
+    const signerPhone = item.fields?.clientPhone || '13725511890';   // 签署人手机号
     const signerName  = item.fields?.clientName;         // 签署人姓名
     // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
     const actorId     = signerPhone;
@@ -135,7 +217,7 @@ Page({
           payload: {
             url: tempUrl,
             fileName: `${signerName}.pdf`,
-            fileType: 'doc'
+            fileType: 'doc' //这是正确的 fileType
           }
         }
       });
@@ -164,7 +246,20 @@ Page({
         conv?.result?.data?.result?.data?.fileIdList?.[0]?.fileId;
       if (!fileId) throw new Error('文件处理未返回 fileId');
 
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: {
+            contractId: item._id,
+            fileId
+          }
+        }
+      });
+
       // D. 创建签署任务（这里名字和字段都要对上 ECS）
+      const { cityCode, city } = this.data;
+
       const create = await wx.cloud.callFunction({
         name: 'api-fadada',
         data: {
@@ -174,7 +269,10 @@ Page({
             docFileId: fileId,             // 名字对上 ECS
             signerName,                    // ECS 要的
             signerId: actorId,
-            signerPhone
+            signerPhone,
+            cityCode,
+            cityName: city,
+            businessId: this.data.selectedBusinessId
           }
         }
       });
@@ -200,7 +298,7 @@ Page({
             signTaskId,
             actorId,
             clientUserId,
-            clientPhone: signerPhone,
+            // clientPhone: signerPhone,
             redirectMiniAppUrl: '/pages/contract-list/index'
           }
         }
@@ -214,6 +312,18 @@ Page({
       if (!embedUrl) {
         throw new Error('未拿到签署URL');
       }
+
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: {
+            contractId: item._id,
+            signTaskId,
+            actorUrl: embedUrl
+          }
+        }
+      });
 
       // F. 复制
       wx.setClipboardData({

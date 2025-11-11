@@ -3,28 +3,26 @@
   <button bindtap="onGetToken">获取Token</button>
 
   <view class="split"></view>
-  <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
-  <!-- <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" /> -->
+  <button bindtap="onGetCorpEntityList">查询企业主体列表</button>
+
+  <view wx:for="{{corpEntities}}" wx:key="entityId" style="margin:8px 0;padding:8px;border:1px solid #eee;border-radius:8px;">
+  <view>{{item.corpName}}（{{item.entityType}}）</view>
+  <view>统一社会信用代码：{{item.corpIdentNo}}</view>
+  <view>法定代表人：{{item.legalRepName}}</view>
+  <view>认证状态：{{item.identStatus}}</view>
+  <view>entityId：{{item.entityId}}</view>
+  </view>
+  <!-- <input class="ipt" placeholder="clientUserId（例如：driver_123）" value="{{clientUserId}}" bindinput="onInputClientUserId" />
+  <input class="ipt" placeholder="授权完成跳转redirectUrl" value="{{redirectUrl}}" bindinput="onInputRedirectUrl" />
   <button bindtap="onGetAuthUrl">个人授权URL</button>
   <view class="split"></view>
   <input class="ipt" placeholder="clientCorpId（你的企业外部ID）" value="{{clientCorpId}}" bindinput="onInputClientCorpId" />
   <button bindtap="onGetCorpAuthUrl">企业授权URL</button>
-  <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>
+  <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>-->
   <view class="split"></view>
   <button bindtap="onUploadPdf">上传PDF获取fileId</button>
 
   <view class="split"></view>
-  <!-- 
-  <view>
-  <text selectable="true">最近一次PDF直连URL：</text>
-  <text selectable="true" style="word-break:break-all">{{lastPdfUrl}}</text>
-  </view>
-  <button bindtap="copyLastUrl" wx:if="{{lastPdfUrl}}">复制直连URL</button>
-
-  <view class="split"></view>
-  <button bindtap="onGetUploadUrl">获取直传URL并上传（本地直传）</button> 
-
-  <view class="split"></view>-->
   <view class="subtitle">当前 fileId：</view>
   <view style="font-family:Menlo,Consolas,monospace;word-break:break-all;">
      {{ fileId || '(未获取)' }}

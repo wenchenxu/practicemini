@@ -12,7 +12,11 @@ Page({
       signTaskId: '',
       actorId: '',
       clientUserId: '',
-      embedUrl: ''
+      embedUrl: '',
+      corpOpenId: '',     // 可留空，服务端会用 FADADA_INITIATOR_OPENID 兜底
+      corpEntities: [],
+      businessScenes: [],          // 列表
+      selectedBusinessId: ''       // 你若要选一个回填 createTask 用
     },
 
     onInputClientCorpId(e){ this.setData({ clientCorpId: e.detail.value }); },
@@ -187,8 +191,8 @@ Page({
           const temp = await wx.cloud.getTempFileURL({ fileList: [up.fileID] });
           const fileObj = temp?.fileList?.[0] || {};
           const url = fileObj.tempFileURL;
-          console.log('[TempFileURL object]', fileObj);
-          console.log('[PDF direct URL]', url);
+          // console.log('[TempFileURL object]', fileObj);
+          // console.log('[PDF direct URL]', url);
           // this.appendLog({ tempFileURL: url, meta: fileObj });
           // this.setData({ lastPdfUrl: url }); 
 
@@ -228,7 +232,7 @@ Page({
           }
 
           // 给后端极短准备时间，允许法大大完成落盘，避免立刻请求拿不到 fileId
-          await new Promise(r => setTimeout(r, 500));
+          // await new Promise(r => setTimeout(r, 100));
 
           // 2) 立刻调用“文件处理”把 fddFileUrl 换成 fileId
           const r2 = await wx.cloud.callFunction({
@@ -333,41 +337,6 @@ Page({
           wx.showToast({ title: '直传异常', icon: 'none' });
         }
     },      
-
-    // 旧版（已弃用，做参考）
-    async onCreateSignTask() {
-      try {
-        const { subject, fileId, clientUserId } = this.data;
-        if (!fileId) {
-          wx.showToast({ title: '请先填 fileId', icon: 'none' });
-          return;
-        }
-        const { result } = await wx.cloud.callFunction({
-            name: 'api-fadada',
-            data: { action: 'createSignTask', payload: { subject, fileId, signerClientUserId: clientUserId } }
-        });
-        this.appendLog(result);
-
-        const taskId = 
-            result?.signTaskId || 
-            result?.data?.signTaskId || 
-            result?.data?.data?.signTaskId;
-
-        if (taskId) {
-          this.setData({ signTaskId: taskId });
-          wx.showToast({ title: '任务已创建', icon: 'success' });
-          return;
-        }
-
-        // 平台业务错误（400 时）
-        const errCode = result?.data?.code || result?.code;
-        const errMsg  = result?.data?.msg  || result?.msg || '创建失败';
-        wx.showModal({ title: `创建失败 ${errCode||''}`, content: errMsg, showCancel: false });
-      } catch (e) {
-        this.appendLog(`CreateSignTask Error: ${e.message || e}`);
-        wx.showToast({ title: '签署任务异常', icon: 'none' });
-      }
-    },
   
     // 新版
     async onCreateSignTaskV51() {
@@ -385,7 +354,7 @@ Page({
                 docFileId: this.data.fileId || fileId,
                 signerName: this.data.signerName,
                 signerId: this.data.signerId,
-                signerPhone: '13725511890' || this.data.signerPhone
+                signerPhone: this.data.signerPhone
               }
             }
           });
@@ -483,6 +452,37 @@ Page({
           console.error(e);
           wx.showToast({ title: '异常', icon: 'none' });
         }
-      }
-  });
+      },
+
+    // 点击按钮触发
+    async onGetCorpEntityList() {
+    try {
+      wx.showLoading({ title: '查询中...', mask: true });
+      const { corpOpenId } = this.data;
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getCorpEntityList',
+          payload: {} // 留空也行
+        }
+      });
+
+      const list =
+        result?.data?.list ||
+        (Array.isArray(result?.data?.data) ? result.data.data : []) ||
+        [];
+      this.setData({ corpEntities: list });
+
+      wx.showToast({ title: `共 ${list.length} 条`, icon: 'success' });
+      // 控制台也打一下方便你看完整字段
+      console.log('[corpEntities]', list);
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: e.message || '查询失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+    }
+});
   
