@@ -20,10 +20,7 @@ const ECS_BASE = IS_PROD
   ? process.env.ECS_BASE_URL_PROD
   : process.env.ECS_BASE_URL_DEV;
 
-console.log(`[api-fadada] Using ${IS_PROD ? 'PROD' : 'DEV'} Fadada config`, {
-    APP_ID,
-    BASE_URL,
-  });
+// console.log(`[api-fadada] Using ${IS_PROD ? 'PROD' : 'DEV'} Fadada config`, { APP_ID, BASE_URL, });
 
 // const ECS_BASE = process.env.ECS_BASE_URL || 'http://121.40.234.100:3001';
 const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
@@ -65,7 +62,7 @@ async function saveContractEsign(payload) {
     const { contractId, fileId, signTaskId, actorUrl } = payload || {};
   
     // 1) 强校验 + 打点
-    console.log('[saveContractEsign] payload =', payload);
+    // console.log('[saveContractEsign] payload =', payload);
     if (!contractId) throw new Error('contractId required');
   
     // 2) 只构造“有值”的字段（避免 undefined 写进去）
@@ -88,7 +85,7 @@ async function saveContractEsign(payload) {
   
     // 3) 真正写库 + 打点
     const ret = await db.collection('contracts').doc(contractId).update({ data });
-    console.log('[saveContractEsign] update ret =', ret);
+    // console.log('[saveContractEsign] update ret =', ret);
   
     return { ok: true, matched: ret.stats?.updated || ret.stats?.updatedDocs || 0 };
   }
