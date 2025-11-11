@@ -14,7 +14,9 @@ Page({
       clientUserId: '',
       embedUrl: '',
       corpOpenId: '',     // 可留空，服务端会用 FADADA_INITIATOR_OPENID 兜底
-      corpEntities: []
+      corpEntities: [],
+      businessScenes: [],          // 列表
+      selectedBusinessId: ''       // 你若要选一个回填 createTask 用
     },
 
     onInputClientCorpId(e){ this.setData({ clientCorpId: e.detail.value }); },
@@ -453,7 +455,7 @@ Page({
       },
 
     // 点击按钮触发
-  async onGetCorpEntityList() {
+    async onGetCorpEntityList() {
     try {
       wx.showLoading({ title: '查询中...', mask: true });
       const { corpOpenId } = this.data;
@@ -481,6 +483,6 @@ Page({
     } finally {
       wx.hideLoading();
     }
-  }
+    }
 });
   

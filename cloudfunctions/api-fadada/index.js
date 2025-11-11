@@ -125,6 +125,8 @@ exports.main = async (event, context) => {
         return { success: true, env: process.env.FADADA_ENV || 'dev' };
       case 'getCorpEntityList':
         return { success: true, data: await post('/api/esign/getCorpEntityList', payload) };
+      case 'getBusinessIdList':
+        return { success: true, data: await post('/api/esign/getBusinessIdList', payload) };            
       case 'diag':
         return {
             success: true,

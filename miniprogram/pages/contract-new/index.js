@@ -39,7 +39,7 @@ const BASE_FIELDS = [
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', requiredWhen:'never', disabled:true},
   { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'prod', min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true },
-  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'prod', help: '1-31号', min:1, max:31 },
+  { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'always', help: '1-31号', min:1, max:31 },
   { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never'},
 
   // ---- Deposit ----

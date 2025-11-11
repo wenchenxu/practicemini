@@ -130,8 +130,9 @@ Page({
           action: 'getOwnerDownloadUrl',
           payload: {
             signTaskId,
-            // 可选：自定义下载名。若不传即用任务主题
-            // customName: `${item.fields?.clientName || '合同'}-${Date.now()}`
+            // 可选：如果要强制指定别的主体，就传对象
+            // ownerId: { idType: 'corp', openId: 'xxxxxx' },
+            customName: `${item.fields?.clientName || '合同'}-${Date.now()}`,
           }
         }
       });
@@ -149,18 +150,24 @@ Page({
         });
       }
 
-      // 复制到剪贴板（最省事的做法）
+      await wx.setClipboardData({ data: url });
+      wx.hideLoading();
+      // 弹窗提示，不带取消
+      wx.showModal({
+        title: '签署完毕！',
+        content: '合同下载链接已复制。有效期 1 小时，请尽快下载保存。',
+        confirmText: '知道了',
+        showCancel: false
+      });
+      // 复制到剪贴板（旧可用方法）
+      /*
       wx.setClipboardData({
         data: url,
         success() {
           wx.showToast({ title: '下载链接已复制', icon: 'success' });
         }
       });
-
-      // 如果你以后想在小程序内直接下载预览：
-      // 需要把法大大下载域名加入 小程序「downloadFile合法域名」
-      // wx.downloadFile({ url, success: ({ tempFilePath }) => wx.openDocument({ filePath: tempFilePath }) });
-
+      */
     } catch (err) {
       console.error(err);
       wx.showToast({ title: err.message || '异常', icon: 'none' });
@@ -251,6 +258,8 @@ Page({
       });
 
       // D. 创建签署任务（这里名字和字段都要对上 ECS）
+      const { cityCode, city } = this.data;
+
       const create = await wx.cloud.callFunction({
         name: 'api-fadada',
         data: {
@@ -260,7 +269,10 @@ Page({
             docFileId: fileId,             // 名字对上 ECS
             signerName,                    // ECS 要的
             signerId: actorId,
-            signerPhone
+            signerPhone,
+            cityCode,
+            cityName: city,
+            businessId: this.data.selectedBusinessId
           }
         }
       });
