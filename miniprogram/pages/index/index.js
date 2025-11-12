@@ -1,11 +1,15 @@
 import { CITY_CODE_MAP } from '../../utils/cities';
+const { ensureAccess } = require('../../utils/guard');
 
 Page({
   data: {isAdmin: false},
 
   onShow() {
     const app = getApp();
-    const apply = () => this.setData({ isAdmin: app.globalData.role === 'admin' });
+    const apply = () => {
+        if (!ensureAccess()) return;
+        this.setData({ isAdmin: app.globalData.role === 'admin' });
+      };
 
     if (app.globalData.initialized) {
       apply();

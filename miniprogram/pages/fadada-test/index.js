@@ -1,4 +1,5 @@
 // 直传到 ECS （不推荐，待修改）：请先把 ECS 域名加入“小程序管理后台 -> 开发设置 -> uploadFile 合法域名”
+const { ensureAccess } = require('../../utils/guard');
 
 Page({
     data: {
@@ -483,6 +484,12 @@ Page({
     } finally {
       wx.hideLoading();
     }
-    }
+    },
+
+    onShow() {
+        const app = getApp();
+        const check = () => { ensureAccess(); };
+        if (app.globalData.initialized) check();
+        else app.$whenReady(check);
+      }
 });
-  

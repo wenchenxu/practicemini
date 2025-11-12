@@ -38,7 +38,11 @@ App({
             if (this.globalData.role !== 'admin') this.globalData.role = 'staff';
           }
         }
-  
+
+        if (!this.globalData.allowed) {
+            wx.reLaunch({ url: '/pages/no-access/no-access' });
+        }
+
         this.globalData.initialized = true;
         this._readyCbs.forEach(fn => fn());
         this._readyCbs = [];
