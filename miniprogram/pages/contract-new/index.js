@@ -1,6 +1,7 @@
 const db = wx.cloud.database();
 const COL = db.collection('contracts');
 import { BRANCH_OPTIONS_BY_CITY, TYPE_OPTIONS_BY_CITY } from '../../utils/config';
+const { ensureAccess } = require('../../utils/guard');
 const app = getApp();
 const IS_PROD = app.globalData.isProd;   // 拿到环境开关
 
@@ -135,57 +136,70 @@ Page({
   },
 
   onLoad(options) {
-    // console.log('[contract-new onLoad] options=', options);
+    const run = () => {
+        if (!ensureAccess()) return;
+        // console.log('[contract-new onLoad] options=', options);
 
-    // 1) 解析参数
-    const id = options.id || '';
-    const mode = options.mode || 'create'; // create | edit | view
-    const cityCode = decodeURIComponent(options.cityCode || '');
-    const city = decodeURIComponent(options.city || '');
+      // 1) 解析参数
+      const id = options.id || '';
+      const mode = options.mode || 'create'; // create | edit | view
+      const cityCode = decodeURIComponent(options.cityCode || '');
+      const city = decodeURIComponent(options.city || '');
 
-    // 2) 基础状态
-    this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
+      // 2) 基础状态
+      this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
 
-    // 3) 顶部标题
-    wx.setNavigationBarTitle({
+      // 3) 顶部标题
+      wx.setNavigationBarTitle({
         title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}`
-    });
+      });
 
-    // 4) 计算可见字段（先按当前 mode 初始化一遍）
-    this.initVisibleFields(mode);
+      // 4) 计算可见字段（先按当前 mode 初始化一遍）
+      this.initVisibleFields(mode);
 
-    // 5) 分公司与合同类型选项（来源保持你现有常量）
-    const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
-    const showBranchPicker = branchOptions.length > 0;
+      // 5) 分公司与合同类型选项（来源保持你现有常量）
+      const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
+      const showBranchPicker = branchOptions.length > 0;
 
-    const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
-    const showTypePicker = typeOptions.length > 1;
+      const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
+      const showTypePicker = typeOptions.length > 1;
 
-    // 若只有一个类型/分公司，默认选中它
-    const typeIndex = typeOptions.length === 1 ? 0 : -1;
-    const selectedTypeCode = typeIndex >= 0 ? typeOptions[typeIndex].code : '';
-    const selectedTypeName = typeIndex >= 0 ? typeOptions[typeIndex].name : '';
+      // 若只有一个类型/分公司，默认选中它
+      const typeIndex = typeOptions.length === 1 ? 0 : -1;
+      const selectedTypeCode = typeIndex >= 0 ? typeOptions[typeIndex].code : '';
+      const selectedTypeName = typeIndex >= 0 ? typeOptions[typeIndex].name : '';
 
-    const branchIndex = branchOptions.length === 1 ? 0 : -1;
-    const selectedBranchCode = branchIndex >= 0 ? branchOptions[branchIndex].code : '';
-    const selectedBranchName = branchIndex >= 0 ? branchOptions[branchIndex].name : '';
+      const branchIndex = branchOptions.length === 1 ? 0 : -1;
+      const selectedBranchCode = branchIndex >= 0 ? branchOptions[branchIndex].code : '';
+      const selectedBranchName = branchIndex >= 0 ? branchOptions[branchIndex].name : '';
 
-    this.setData({
+      this.setData({
         branchOptions, showBranchPicker, branchIndex, selectedBranchCode, selectedBranchName,
         typeOptions, showTypePicker, typeIndex, selectedTypeCode, selectedTypeName,
-    });
+      });
 
-    // 6) 根据模式处理
-    if ((mode === 'edit' || mode === 'view') && id) {
+      // 6) 根据模式处理
+      if ((mode === 'edit' || mode === 'view') && id) {
         // 统一使用 loadDoc(id) 回填（如果你有 fetchDetail 且它做了更多事，也可以继续用它——二选一别都用）
         this.loadDoc(id).then(() => {
         // 回填后再算一次可见字段（有些显隐依赖分公司/类型）
         this.initVisibleFields(this.data.mode);
         });
-    } else if (mode === 'create') {
+      } else if (mode === 'create') {
         // 需要的话，做自动门店数据回填
         // this.autofillBranch && this.autofillBranch();
-    }
+      }
+    };
+
+    if (app.globalData.initialized) run();
+    else app.$whenReady(run);
+  },
+
+  onShow() {
+    const check = () => { ensureAccess(); };
+    if (app.globalData.initialized) check();
+    else app.$whenReady(check);
+
   },
 
   // might be obsolete
