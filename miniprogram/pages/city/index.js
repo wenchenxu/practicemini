@@ -1,10 +1,26 @@
+const { ensureAccess } = require('../../utils/guard');
+
 Page({
     onLoad(q) {
-      const cityCode = decodeURIComponent(q.cityCode || '');
-      const city = decodeURIComponent(q.city || '');
-      this.setData({ cityCode, city });
-      wx.setNavigationBarTitle({ title: `${city} - 门店` });
+        const app = getApp();
+        const init = () => {
+          if (!ensureAccess()) return;
+          const cityCode = decodeURIComponent(q.cityCode || '');
+          const city = decodeURIComponent(q.city || '');
+          this.setData({ cityCode, city });
+          wx.setNavigationBarTitle({ title: `${city} - 门店` });
+        };
+        if (app.globalData.initialized) init();
+        else app.$whenReady(init);
     },
+
+    onShow() {
+        const app = getApp();
+        const check = () => { ensureAccess(); };
+        if (app.globalData.initialized) check();
+        else app.$whenReady(check);
+    },
+
     goNew() {
       const { cityCode, city } = this.data;
       wx.navigateTo({

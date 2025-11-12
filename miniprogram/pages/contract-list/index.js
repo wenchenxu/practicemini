@@ -2,6 +2,7 @@ const db = wx.cloud.database();
 const _ = db.command;
 const COL = db.collection('contracts');
 const PAGE_SIZE = 20;
+const { ensureAccess } = require('../../utils/guard');
 
 Page({
     data: { 
@@ -18,11 +19,24 @@ Page({
     },
 
   onLoad(query) {
-    const cityCode = decodeURIComponent(query.cityCode || '');
-    const city = decodeURIComponent(query.city || '');
-    this.setData({ cityCode, city });
-    wx.setNavigationBarTitle({ title: `${city} - 合同历史` });
-    this.refresh();
+    const app = getApp();
+    const init = () => {
+      if (!ensureAccess()) return;
+      const cityCode = decodeURIComponent(query.cityCode || '');
+      const city = decodeURIComponent(query.city || '');
+      this.setData({ cityCode, city });
+      wx.setNavigationBarTitle({ title: `${city} - 合同历史` });
+      this.refresh();
+    };
+    if (app.globalData.initialized) init();
+    else app.$whenReady(init);
+  },
+
+  onShow() {
+    const app = getApp();
+    const check = () => { ensureAccess(); };
+    if (app.globalData.initialized) check();
+    else app.$whenReady(check);
   },
 
   async refresh() {

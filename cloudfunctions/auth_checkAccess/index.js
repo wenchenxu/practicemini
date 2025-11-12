@@ -9,7 +9,8 @@ exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext();
   const { auditToken } = event || {};
 
-  // 0) 首访自动引导：空表时把首位访问者设为 admin
+  // 0) 首访自动引导：空表时把首位访问者设为 admin。上线记得关掉！
+  /*
   const total = (await WL.count()).total;
   if (total === 0) {
     await WL.add({
@@ -17,7 +18,7 @@ exports.main = async (event, context) => {
     });
     return { allowed: true, role: 'admin', bootstrap: true };
   }
-
+  */
   // 1) 正常白名单
   const me = await WL.where({ openid: OPENID }).limit(1).get();
   if (me.data.length) {
