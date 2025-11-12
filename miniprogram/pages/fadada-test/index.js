@@ -493,4 +493,3 @@ Page({
         else app.$whenReady(check);
       }
 });
-  

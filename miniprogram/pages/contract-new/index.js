@@ -199,7 +199,6 @@ Page({
     const check = () => { ensureAccess(); };
     if (app.globalData.initialized) check();
     else app.$whenReady(check);
-
   },
 
   // might be obsolete
