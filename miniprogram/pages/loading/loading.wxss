@@ -1,0 +1,17 @@
+page {
+  background-color: #ffffff;
+  height: 100%;
+}
+
+.container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-image {
+  width: 320rpx;
+  height: auto;
+}
