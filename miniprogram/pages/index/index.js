@@ -38,5 +38,9 @@ Page({
       wx.navigateTo({
           url: '/pages/admin/whitelist/whitelist'
       });
-  }
+  },
+
+  goVehicles() {
+    wx.navigateTo({ url: '/pages/vehicles/index' });
+  }  
 });

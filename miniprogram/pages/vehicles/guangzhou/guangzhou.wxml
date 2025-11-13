@@ -1,0 +1,40 @@
+<view class="container">
+  <view class="toolbar">
+    <button size="mini" bindtap="refresh">刷新</button>
+  </view>
+
+  <view class="create-box">
+    <view class="create-title">新增车辆（Guangzhou）</view>
+    <view class="row">
+      <input class="input" placeholder="VIN" value="{{form.vin}}" bindinput="onVin" />
+    </view>
+    <view class="row">
+      <input class="input" placeholder="车牌" value="{{form.plate}}" bindinput="onPlate" />
+    </view>
+    <view class="row">
+      <picker mode="selector" range="{{statusOptions}}" value="{{form.statusIndex}}" bindchange="onStatusPick">
+        <view class="picker">状态：{{statusOptions[form.statusIndex]}}</view>
+      </picker>
+    </view>
+    <button type="primary" size="mini" bindtap="create">创建</button>
+  </view>
+
+  <view class="list">
+    <block wx:for="{{vehicles}}" wx:key="_id">
+      <view class="item">
+        <view class="meta">
+          <view class="plate">{{item.plate}}</view>
+          <view class="vin">{{item.vin}}</view>
+        </view>
+        <picker mode="selector"
+          range="{{statusOptions}}"
+          value="{{statusIndexMap[item.status] || 1}}"
+          bindchange="onStatusChange"
+          data-id="{{item._id}}">
+          <view class="status">{{item.status}}</view>
+        </picker>
+      </view>
+    </block>
+  </view>
+</view>
+

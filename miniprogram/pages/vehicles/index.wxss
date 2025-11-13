@@ -1,0 +1,10 @@
+.container { padding: 24rpx; }
+.ring-wrap { position: relative; height: 600rpx; display: flex; align-items: center; justify-content: center; }
+.ring-canvas { width: 500rpx; height: 500rpx; }
+.ring-center { position: absolute; font-size: 56rpx; font-weight: 600; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24rpx; margin: 24rpx 0 8rpx; }
+.stat { background: #fff; border-radius: 12rpx; padding: 24rpx; text-align: center; }
+.stat .label { color: #666; font-size: 26rpx; }
+.stat .value { font-size: 40rpx; font-weight: 600; margin-top: 6rpx; }
+.toolbar { display: flex; gap: 16rpx; margin: 16rpx 0; }
+

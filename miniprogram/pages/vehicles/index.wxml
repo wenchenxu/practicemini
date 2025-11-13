@@ -1,0 +1,27 @@
+<view class="container">
+  <view class="ring-wrap">
+    <canvas canvas-id="ring" class="ring-canvas"></canvas>
+    <view class="ring-center">{{percent}}%</view>
+  </view>
+
+  <view class="stats-row">
+    <view class="stat">
+      <view class="label">已出租</view>
+      <view class="value">{{rented}}</view>
+    </view>
+    <view class="stat">
+      <view class="label">总数</view>
+      <view class="value">{{total}}</view>
+    </view>
+    <view class="stat">
+      <view class="label">出租率</view>
+      <view class="value">{{percent}}%</view>
+    </view>
+  </view>
+
+  <view class="toolbar">
+    <button size="mini" bindtap="refresh">刷新</button>
+    <button size="mini" bindtap="goGuangzhou">guangzhou</button>
+  </view>
+</view>
+
