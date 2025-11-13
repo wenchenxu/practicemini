@@ -8,14 +8,29 @@ const VEH = db.collection('vehicles');
 const ALLOWED = ['renting', 'available', 'repair'];
 const CITY = 'guangzhou';
 
+function normalizeStatus(s) {
+  const t = String(s || '').toLowerCase();
+  if (t === 'maintenance' || t === 'repairing') return 'repair';
+  if (t === 'rented') return 'renting';
+  if (ALLOWED.includes(t)) return t;
+  return 'available';
+}
+
+async function getScope() {
+  // If dataset contains cityCode='guangzhou', scope to it; otherwise use whole collection (MVP, single city)
+  const scoped = (await VEH.where({ cityCode: CITY }).count()).total;
+  return scoped > 0 ? { cityCode: CITY } : {};
+}
+
 async function isAdmin(openid) {
   const me = await WL.where({ openid }).limit(1).get();
   return me.data.length && me.data[0].role === 'admin';
 }
 
 async function getStats() {
-  const total = (await VEH.where({ cityCode: CITY }).count()).total;
-  const rented = (await VEH.where({ cityCode: CITY, status: 'renting' }).count()).total;
+  const scope = await getScope();
+  const total = (await VEH.where(scope).count()).total;
+  const rented = (await VEH.where({ ...scope, status: _.in(['renting', 'rented']) }).count()).total;
   const percent = total ? Math.round((rented / total) * 100) : 0;
   return { ok: true, total, rented, percent };
 }
@@ -24,15 +39,17 @@ async function listAll() {
   const pageSize = 100;
   let skip = 0;
   let all = [];
+  const scope = await getScope();
   while (true) {
-    const res = await VEH.where({ cityCode: CITY })
-      .orderBy('createdAt', 'desc')
+    const res = await VEH.where(scope)
       .skip(skip).limit(pageSize).get();
     all = all.concat(res.data || []);
     if (!res.data || res.data.length < pageSize) break;
     skip += pageSize;
   }
-  return { ok: true, data: all };
+  // Normalize statuses for UI
+  const data = all.map(d => ({ ...d, status: normalizeStatus(d.status) }));
+  return { ok: true, data };
 }
 
 async function updateStatus({ id, status }) {
@@ -73,4 +90,3 @@ exports.main = async (event) => {
     default: return { ok: false, msg: 'unknown-action' };
   }
 };
-

@@ -12,11 +12,17 @@
       <input class="input" placeholder="车牌" value="{{form.plate}}" bindinput="onPlate" />
     </view>
     <view class="row">
-      <picker mode="selector" range="{{statusOptions}}" value="{{form.statusIndex}}" bindchange="onStatusPick">
-        <view class="picker">状态：{{statusOptions[form.statusIndex]}}</view>
+      <picker mode="selector" range="{{statusLabelOptions}}" value="{{form.statusIndex}}" bindchange="onStatusPick">
+        <view class="picker">状态：{{statusLabelOptions[form.statusIndex]}}</view>
       </picker>
     </view>
     <button type="primary" size="mini" bindtap="create">创建</button>
+  </view>
+
+  <view class="filters">
+    <block wx:for="{{filterLabelOptions}}" wx:key="*this">
+      <view class="filter-item {{filterIndex===index?'active':''}}" data-index="{{index}}" bindtap="onFilterTap">{{item}}</view>
+    </block>
   </view>
 
   <view class="list">
@@ -27,14 +33,13 @@
           <view class="vin">{{item.vin}}</view>
         </view>
         <picker mode="selector"
-          range="{{statusOptions}}"
+          range="{{statusLabelOptions}}"
           value="{{statusIndexMap[item.status] || 1}}"
           bindchange="onStatusChange"
           data-id="{{item._id}}">
-          <view class="status">{{item.status}}</view>
+          <view class="status status-{{item.status}}">{{statusDisplayMap[item.status] || item.status}}</view>
         </picker>
       </view>
     </block>
   </view>
 </view>
-

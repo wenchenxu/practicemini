@@ -7,4 +7,5 @@
 .stat .label { color: #666; font-size: 26rpx; }
 .stat .value { font-size: 40rpx; font-weight: 600; margin-top: 6rpx; }
 .toolbar { display: flex; gap: 16rpx; margin: 16rpx 0; }
-
+.city-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16rpx; }
+.city-btn { width: 100%; }

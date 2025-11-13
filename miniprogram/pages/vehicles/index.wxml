@@ -21,7 +21,9 @@
 
   <view class="toolbar">
     <button size="mini" bindtap="refresh">刷新</button>
-    <button size="mini" bindtap="goGuangzhou">guangzhou</button>
+  </view>
+
+  <view class="city-grid">
+    <button class="city-btn" size="mini" bindtap="goGuangzhou">广州</button>
   </view>
 </view>
-
