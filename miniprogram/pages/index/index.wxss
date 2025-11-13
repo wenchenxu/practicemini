@@ -10,3 +10,4 @@
 .fadada-test-entry {
     margin: 24rpx 24rpx 0 24rpx;
   }
+.container-corp-management { padding: 24rpx; margin-top: 30rpx;}

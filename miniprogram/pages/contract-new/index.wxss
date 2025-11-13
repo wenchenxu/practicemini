@@ -17,3 +17,5 @@
 .label-contractType { display:block; margin-bottom: 8rpx; margin-top: 50rpx; margin-left: 100rpx; color:#333; }
 .picker-value-contractType { display:block; margin-bottom: 8rpx; margin-left: 100rpx; color:#333; }
 .value-contractType { display:block; margin-bottom: 8rpx; margin-left: 100rpx; color:#333; }
+.label-companyType { display:block; margin-bottom: 8rpx; margin-top: 50rpx; margin-left: 100rpx; color:#333; }
+.picker-value-companyType { display:block; margin-bottom: 8rpx; margin-left: 100rpx; color:#333; }

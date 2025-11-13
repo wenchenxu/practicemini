@@ -29,7 +29,7 @@ const BASE_FIELDS = [
   { name:'carModel', label:'车型', type:'string', requiredWhen:'prod', maxLength:50 },
   { name:'carColor', label:'车身颜色', type:'string', requiredWhen:'prod', maxLength:20 },
   { name:'carPlate', label:'车牌号', type:'string', requiredWhen:'prod', minLength: 8, maxLength:8 },
-  { name:'carVin', label:'车架号', type:'string', requiredWhen:'always', minLength:14, maxLength:14, help:'必须14位' },
+  { name:'carVin', label:'车架号', type:'string', requiredWhen:'always', minLength:17, maxLength:17, help:'车架号必须17位' },
   { name:'carRentalCity', label:'租赁城市', type:'string', requiredWhen:'never', maxLength:20 },
 
   // ---- Contract / Rent ----
@@ -37,17 +37,17 @@ const BASE_FIELDS = [
   { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', requiredWhen:'prod' },
   { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', requiredWhen:'prod' },
   { name:'rentMonthly', label:'月租金', type:'number', requiredWhen:'always', min:0 },
-  { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', requiredWhen:'never', disabled:true},
+  { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'prod', min:0 },
-  { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true },
+  { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true  },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'always', help: '1-31号', min:1, max:31 },
   { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never'},
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
   { name:'depositToday', label:'押金首付', type:'number', requiredWhen:'prod', min:0 },
-  { name:'depositFormal', label:'押金总额（大写）', type:'string', requiredWhen:'never', disabled:true },
-  { name:'depositTodayFormal', label:'押金首付（大写）', type:'string', requiredWhen:'never', disabled:true },
+  { name:'depositFormal', label:'押金总额（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'depositTodayFormal', label:'押金首付（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'depositUnpaidMonthly', label:'剩余押金月付金额', type:'number', requiredWhen:'prod', min:0 },
   { name:'depositServiceFee', label:'服务费 (默认为0）', type:'number', requiredWhen:'never', min:0, disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'depositServiceFeeFormal', label:'服务费（大写）', type:'string', requiredWhen:'never', disabled: true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
@@ -354,7 +354,7 @@ Page({
         rentMonthly: 'rentMonthlyFormal',
         rentToday: 'rentTodayFormal',
         deposit: 'depositFormal',
-        depositToday: 'depositToday',
+        depositToday: 'depositTodayFormal',
         depositServiceFee: 'depositServiceFeeFormal'
     };
     if (map[name]) {
