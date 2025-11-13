@@ -410,8 +410,8 @@ Page({
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${f.label}格式不正确`;
       }
     }
-    // 额外强约束：VIN 14位
-    if ((form.carVin || '').length !== 14) return '车架号必须为 14 位';
+    // 额外强约束：VIN 17位
+    if ((form.carVin || '').length !== 17) return '车架号必须为 17 位';
     // 每月支付日 1-31（上面已校验 min/max，这里冗余保护）
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
