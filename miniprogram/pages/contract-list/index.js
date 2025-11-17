@@ -290,6 +290,8 @@ Page({
           }
         }
       });
+      // 前端直接看到报错
+      // console.log('createSignTaskV51 result =', create);
 
       const signTaskId =
         create?.result?.data?.signTaskId ||
