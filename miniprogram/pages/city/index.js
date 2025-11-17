@@ -32,6 +32,14 @@ Page({
       wx.navigateTo({
         url: `/pages/contract-list/index?cityCode=${encodeURIComponent(cityCode)}&city=${encodeURIComponent(city)}`
       });
+    },
+
+    goVehicles() {
+      const { cityCode, city } = this.data;
+      wx.navigateTo({
+        url: `/pages/vehicles/index?cityCode=${encodeURIComponent(cityCode)}&city=${encodeURIComponent(city)}`
+      });
     }
   });
+
   

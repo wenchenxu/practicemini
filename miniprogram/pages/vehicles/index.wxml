@@ -1,4 +1,5 @@
 <view class="container">
+  <view class="city-indicator">当前城市：{{city}}</view>
   <view class="ring-wrap">
     <canvas canvas-id="ring" class="ring-canvas"></canvas>
     <view class="ring-center">{{percent}}%</view>

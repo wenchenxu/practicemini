@@ -1,4 +1,5 @@
 .container { padding: 24rpx; }
+.city-indicator { font-size: 28rpx; color: #666; margin-bottom: 16rpx; }
 .ring-wrap { position: relative; height: 600rpx; display: flex; align-items: center; justify-content: center; }
 .ring-canvas { width: 500rpx; height: 500rpx; }
 .ring-center { position: absolute; font-size: 56rpx; font-weight: 600; }

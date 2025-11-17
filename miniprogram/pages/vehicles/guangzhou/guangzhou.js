@@ -1,5 +1,7 @@
 const { ensureAdmin } = require('../../../utils/guard');
 
+const CITY_CODE = 'guangzhou';
+
 Page({
   data: {
     vehicles: [],
@@ -25,7 +27,7 @@ Page({
 
   async loadList() {
     try {
-      const { result } = await wx.cloud.callFunction({ name: 'vehicles', data: { action: 'list' } });
+      const { result } = await wx.cloud.callFunction({ name: 'vehicles', data: { action: 'list', cityCode: CITY_CODE } });
       if (result && result.ok) {
         const list = result.data || [];
         this.setData({ allVehicles: list });
@@ -41,7 +43,7 @@ Page({
     wx.showLoading({ title: '更新中...' });
     wx.cloud.callFunction({
       name: 'vehicles',
-      data: { action: 'updateStatus', data: { id, status } }
+      data: { action: 'updateStatus', data: { id, status, cityCode: CITY_CODE } }
     }).then(({ result }) => {
       if (result && result.ok) {
         const all = this.data.allVehicles.map(v => v._id === id ? { ...v, status } : v);
@@ -66,7 +68,7 @@ Page({
     wx.showLoading({ title: '创建中...' });
     wx.cloud.callFunction({
       name: 'vehicles',
-      data: { action: 'create', data: { vin, plate, status } }
+      data: { action: 'create', data: { vin, plate, status, cityCode: CITY_CODE } }
     }).then(({ result }) => {
       if (result && result.ok) {
         wx.showToast({ title: '创建成功', icon: 'success' });
