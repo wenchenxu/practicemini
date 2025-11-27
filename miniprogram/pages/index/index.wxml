@@ -32,4 +32,8 @@
     </view>
     -->
   </view>
+  <view class="beian-footer">
+    <text>粤ICP备2025481892号-1X</text>
+    <navigator class="beian-link" url="https://beian.miit.gov.cn" hover-class="none">https://beian.miit.gov.cn</navigator>
+  </view>
 </view>
