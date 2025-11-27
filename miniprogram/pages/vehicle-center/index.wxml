@@ -1,0 +1,98 @@
+<view class="page">
+  <view class="header">{{city}} · 车辆中心</view>
+
+  <!-- 搜索条 -->
+  <view class="search-bar">
+    <input
+      class="search-input"
+      placeholder="车牌号 / 司机名 / 车架号"
+      value="{{searchKeyword}}"
+      bindinput="onSearchInput"
+    />
+    <button
+      wx:if="{{searchKeyword}}"
+      class="search-clear"
+      size="mini"
+      bindtap="onSearchClear"
+    >清除</button>
+  </view>
+
+  <!-- 顶部状态筛选 -->
+  <view class="filter-bar">
+    <view
+      class="filter-pill {{statusFilter==='all' ? 'active' : ''}}"
+      data-status="all"
+      bindtap="onStatusFilterTap"
+    >
+      全部
+    </view>
+    <view
+      class="filter-pill {{statusFilter==='available' ? 'active' : ''}}"
+      data-status="available"
+      bindtap="onStatusFilterTap"
+    >
+      闲置
+    </view>
+    <view
+      class="filter-pill {{statusFilter==='rented' ? 'active' : ''}}"
+      data-status="rented"
+      bindtap="onStatusFilterTap"
+    >
+      已租
+    </view>
+    <view
+      class="filter-pill {{statusFilter==='maintenance' ? 'active' : ''}}"
+      data-status="maintenance"
+      bindtap="onStatusFilterTap"
+    >
+      维修
+    </view>
+  </view>
+
+  <!-- 加载 / 空状态（注意：不再直接用 list.length，先判断 list 是否存在） -->
+  <view wx:if="{{loading && (!list || list.length === 0)}}" class="loading">
+    加载中…
+  </view>
+  <view wx:elif="{{!loading && (!list || list.length === 0)}}" class="empty">
+    暂无车辆数据
+  </view>
+
+  <!-- 车辆列表 -->
+  <block wx:for="{{list}}" wx:key="_id">
+    <view class="item" bindtap="toDetail" data-id="{{item._id}}">
+      <view class="row">
+        <text class="plate">{{item.plate}}</text>
+        <view class="status-tags">
+            <!-- 租赁状态：仅使用 rentStatus / maintenanceStatus 双轴推导 -->
+            <text
+            class="status-tag status-{{item.rentStatus === 'rented' ? 'rented' : 'available'}}"
+            >
+                {{ item.rentStatus === 'rented' ? '已租' : '闲置' }}
+            </text>
+
+            <!-- 维修状态：仅在 maintenanceStatus 为 in_maintenance 时展示 -->
+            <text
+                wx:if="{{item.maintenanceStatus === 'in_maintenance'}}"
+                class="status-tag status-maintenance"
+            >
+                维修
+            </text>
+        </view>
+      </view>
+      <view class="row2">
+        <text class="model">{{item.model || '车型'}} {{item.color || '颜色'}}</text>
+      </view>
+      <view class="row3">
+        <text class="driver">
+          {{ item.driverName ? ('当前司机：' + item.driverName) : '当前无司机' }}
+        </text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 底部提示：只有在有列表数据时出现 -->
+  <view wx:if="{{list && list.length>0}}" class="list-footer">
+    <text wx:if="{{loading}}">加载中...</text>
+    <text wx:elif="{{!hasMore}}">已到底</text>
+  </view>
+</view>

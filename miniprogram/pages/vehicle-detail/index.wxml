@@ -1,0 +1,76 @@
+<!--pages/vehicle-detail/index.wxml-->
+<view class="page">
+  <view class="header">车辆详情</view>
+
+  <view wx:if="{{loading}}" class="loading">加载中…</view>
+
+  <view wx:elif="{{!vehicle}}" class="empty">
+    未找到车辆
+  </view>
+
+  <view wx:elif="{{vehicle}}">
+    <view class="section">
+      <text class="label">车牌号</text>
+      <text class="value">{{vehicle.plate}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">车型</text>
+      <text class="value">{{vehicle.model}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">颜色</text>
+      <text class="value">{{vehicle.color}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">租赁状态</text>
+      <text class="value">{{rentStatusText || '未知'}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">维修状态</text>
+      <text class="value">{{maintenanceStatusText || '未知'}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">当前司机</text>
+      <text class="value">{{driverName || '无'}}</text>
+    </view>
+
+    <view class="section">
+      <text class="label">最近合同</text>
+      <text class="value">{{contractId || '无'}}</text>
+    </view>
+
+    <!-- 操作按钮区域 -->
+    <view class="section" wx:if="{{vehicle}}">
+      <text class="label">车辆操作</text>
+      <view class="btn-row">
+        <button
+          size="mini"
+          type="primary"
+          bindtap="onMarkAvailable"
+          disabled="{{opBusy}}"
+        >
+          退租解绑
+        </button>
+        <button
+          size="mini"
+          type="warn"
+          bindtap="onMarkMaintenance"
+          disabled="{{opBusy}}"
+        >
+          车辆维修
+        </button>
+        <button
+          size="mini"
+          bindtap="toHistory"
+        >
+          车辆历史
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

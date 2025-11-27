@@ -1,0 +1,47 @@
+<!-- pages/driver-detail/index.wxml -->
+
+<view class="page">
+
+<view class="section">
+  <view class="section-title">司机信息</view>
+  <view wx:if="{{driver}}">
+    <view>姓名：{{driver.name}}</view>
+    <view>身份证：{{driver.clientId}}</view>
+    <view>手机号：{{driver.phone}}</view>
+    <view>城市：{{driver.cityName}} ({{driver.cityCode}})</view>
+    <view>户籍地址：{{driver.addressRegistered}}</view>
+    <view>现住址：{{driver.addressCurrent}}</view>
+    <view>紧急联系人：{{driver.emergencyContactName}}（{{driver.emergencyContactPhone}}）</view>
+    <view>状态：{{driver.status}}</view>
+    <view>最近合同ID：{{driver.lastContractId || '无'}}</view>
+  </view>
+  <view wx:else>暂无司机数据</view>
+</view>
+
+<view class="section">
+  <view class="section-title">最近一份合同</view>
+  <view wx:if="{{latestContract}}">
+    <view>合同号：{{latestContract.fields.contractSerialNumberFormatted}}</view>
+    <view>门店：{{latestContract.branchName}} ({{latestContract.branchCode}})</view>
+    <view>签订日期：{{latestContract.fields.contractDate || latestContract.createdAtFmt}}</view>
+    <view>租期：{{latestContract.fields.contractValidPeriodStart}} 至 {{latestContract.fields.contractValidPeriodEnd}}</view>
+    <view>月租：{{latestContract.fields.rentMonthly}} 元</view>
+    <view>押金：{{latestContract.fields.deposit}} 元</view>
+  </view>
+  <view wx:else>暂无合同记录</view>
+</view>
+
+<view class="section">
+  <view class="section-title">当前所租车辆</view>
+  <view wx:if="{{currentVehicle}}">
+    <view>车牌：{{currentVehicle.plate}}</view>
+    <view>车型：{{currentVehicle.model}}</view>
+    <view>颜色：{{currentVehicle.color}}</view>
+    <view>VIN：{{currentVehicle.vin}}</view>
+    <view>城市：{{currentVehicle.cityCode}}</view>
+    <view>状态：{{currentVehicle.status}}</view>
+  </view>
+  <view wx:else>暂无车辆记录</view>
+</view>
+
+</view>

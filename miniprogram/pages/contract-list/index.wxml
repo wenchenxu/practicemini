@@ -1,6 +1,6 @@
 <view class="container">
   <view class="header">
-    <text class="title">{{city}} - 签署前合同</text>
+    <text class="title">{{city}} - 合同中心</text>
   </view>
 
   <!-- 新增：顶部筛选 tabs -->
@@ -50,10 +50,21 @@
             <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
             </view>
+            <!-- 暂时关闭软删除，隐藏删除按钮 -->
+            <!-- 
             <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
             </view>
+            --> 
         </view>
+        <!-- 新增：司机详情 -->
+        <button
+        size="mini"
+        type="default"
+        bindtap="onOpenDriverCenter"
+        data-client-id="{{item.fields.clientId}}"
+        data-name="{{item.fields.clientName}}"
+        >司机详情</button>
         <!-- 新增：发起签署并拿链接 -->
         <button
             class="mini-op"

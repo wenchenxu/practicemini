@@ -1,0 +1,38 @@
+<view class="page">
+
+<view class="header">
+  <view class="title">{{cityName}} · 司机中心</view>
+  <view class="sub">共 {{drivers.length}} 名司机</view>
+</view>
+
+<view wx:if="{{loading}}" class="hint">加载中...</view>
+<view wx:if="{{error}}" class="error">{{error}}</view>
+
+<scroll-view
+  wx:if="{{!loading && !error}}"
+  scroll-y="true"
+  class="list"
+>
+  <block wx:for="{{drivers}}" wx:key="_id">
+    <view
+      class="row"
+      bindtap="onTapDriver"
+      data-client-id="{{item.clientId}}"
+      data-name="{{item.name}}"
+    >
+      <view class="row-main">
+        <view class="name">{{item.name || '未录入姓名'}}</view>
+        <view class="line">身份证：{{item.clientId || '无'}}</view>
+        <view class="line">手机号：{{item.phone || '无'}}</view>
+      </view>
+      <view class="row-arrow">›</view>
+    </view>
+    <view class="divider"></view>
+  </block>
+
+  <view wx:if="{{!drivers.length && !loading && !error}}" class="hint">
+    暂无司机数据
+  </view>
+</scroll-view>
+
+</view>

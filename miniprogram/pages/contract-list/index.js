@@ -457,5 +457,29 @@ Page({
   //触底加载
   onReachBottom() {
     this.loadMore();
+  },
+
+  onDriverDetail(e) {
+    const clientId = e.currentTarget.dataset.clientId;
+    const name = e.currentTarget.dataset.name || '';
+
+    if (!clientId) {
+      return wx.showToast({ title: '缺少身份证号', icon: 'none' });
+    }
+
+    wx.navigateTo({
+      url: `/pages/driver-detail/index?clientId=${encodeURIComponent(clientId)}&name=${encodeURIComponent(name)}`
+    });
+  },
+
+  onOpenDriverCenter(e) {
+    const idCard = e.currentTarget.dataset.clientId;
+    if (!idCard) {
+      wx.showToast({ title: '缺少司机身份证', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/driver-center/index?identNo=${encodeURIComponent(idCard)}`
+    });
   }
 });
