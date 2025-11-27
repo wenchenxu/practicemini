@@ -1,3 +1,3 @@
 <view class="container">
-  <image class="loading-image" src="/assets/loading/loading.png" mode="widthFix" />
+  <image class="loading-image" src="/assets/loading/loading.jpg" mode="widthFix" />
 </view>
