@@ -477,7 +477,7 @@ Page({
 
       wx.showToast({ title: `共 ${list.length} 条`, icon: 'success' });
       // 控制台也打一下方便你看完整字段
-      console.log('[corpEntities]', list);
+      // console.log('[corpEntities]', list);
     } catch (e) {
       console.error(e);
       wx.showToast({ title: e.message || '查询失败', icon: 'none' });

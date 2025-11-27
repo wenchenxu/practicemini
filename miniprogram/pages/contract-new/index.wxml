@@ -94,7 +94,7 @@
     --->
 
     <view wx:if="{{mode!=='view'}}" class="footer-actions">
-      <button type="primary" bindtap="onSubmit" loading="{{saving}}">
+      <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
         {{ mode==='create' ? '生成合同': '保存并生成' }}
       </button>
     </view>

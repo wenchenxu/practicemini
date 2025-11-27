@@ -250,7 +250,7 @@ Page({
 
     if (this.data.saving) return;
     this.setData({ saving: true });
-    wx.showLoading({ title: '保存中…', mask: true });
+    wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
 
     try {
       // 1) 保存更新
@@ -265,7 +265,7 @@ Page({
       }
 
       // 2) 渲染并覆盖
-      wx.showLoading({ title: '生成文档…', mask: true });
+      wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
       const rnRes = await wx.cloud.callFunction({
         name: 'contractOps',
         data: { action: 'render', id }
@@ -446,6 +446,8 @@ Page({
       selectedTypeCode, selectedTypeName
     } = this.data;
   
+    if (this.data.saving) return;
+
     const err = this.validate && this.validate();
     if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
   
@@ -462,6 +464,8 @@ Page({
   
       // —— 新建：沿用你原有流程 —— //
       if (mode === 'create') {
+        this.setData({ saving: true });
+        wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
         const res = await wx.cloud.callFunction({
           name: 'createContract',
           data: {
@@ -502,6 +506,8 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: '保存失败', icon: 'none', duration: 3000 });
     } finally {
+      wx.hideLoading();
+      this.setData({ saving: false });
       this.submitting = false;
     }
   },
