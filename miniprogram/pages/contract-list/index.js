@@ -14,6 +14,7 @@ Page({
       lastId: '',          //同时带上 _id 作为并列条件的次级游标
       filter: 'all',
       runningId: '',
+      refreshingId: '',
       // 为了调试
       lastEsignUrl: ''
     },
@@ -190,6 +191,65 @@ Page({
     }
   },
   
+  async onRefreshSignTaskStatus(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    const signTaskId = e.currentTarget.dataset.signTaskId || item?.esign?.signTaskId;
+
+    if (!item) {
+      return wx.showToast({ title: '未找到合同', icon: 'none' });
+    }
+
+    if (!signTaskId) {
+      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+    }
+
+    try {
+      this.setData({ refreshingId: id });
+      wx.showLoading({ title: '刷新中...', mask: true });
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getSignTaskDetail',
+          payload: { signTaskId }
+        }
+      });
+
+      const signTaskStatus =
+        result?.data?.data?.signTaskStatus ||
+        result?.data?.signTaskStatus ||
+        result?.signTaskStatus;
+
+      if (!signTaskStatus) {
+        throw new Error('未返回签署状态');
+      }
+
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: { contractId: id, signTaskStatus }
+        }
+      });
+
+      const list = this.data.list.map(it =>
+        it._id === id
+          ? { ...it, esign: { ...(it.esign || {}), signTaskStatus } }
+          : it
+      );
+
+      this.setData({ list });
+      wx.showToast({ title: `状态：${signTaskStatus}`, icon: 'none' });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '刷新失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+      this.setData({ refreshingId: '' });
+    }
+  },
+
   // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
   async onSignFromRow(e) {
     const id = e.currentTarget.dataset.id;

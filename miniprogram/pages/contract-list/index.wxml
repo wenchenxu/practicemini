@@ -40,7 +40,17 @@
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-          签署状态：<!-- {{item._fddStatusText || '未生成电子签'}}-->
+            <view>签署状态：{{(item.esign && item.esign.signTaskStatus) || '未获取'}}</view>
+            <button
+                class="mini-op refresh-btn"
+                size="mini"
+                type="default"
+                bindtap="onRefreshSignTaskStatus"
+                data-id="{{item._id}}"
+                data-sign-task-id="{{item.esign.signTaskId}}"
+                loading="{{refreshingId === item._id}}"
+                disabled="{{!item.esign || !item.esign.signTaskId}}"
+            >刷新状态</button>
         </view>
       </view>
 

@@ -99,9 +99,14 @@
     padding: 6rpx 16rpx;
   }
 
+.refresh-btn {
+    margin-top: 6rpx;
+    padding: 8rpx 20rpx;
+  }
+  
 .icon-row {
     display: flex;
     flex-direction: row;      /* 图标横排 */
     gap: 12rpx;
-}
+  }
   
