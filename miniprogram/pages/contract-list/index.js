@@ -4,6 +4,20 @@ const COL = db.collection('contracts');
 const PAGE_SIZE = 20;
 const { ensureAccess } = require('../../utils/guard');
 
+const SIGN_TASK_STATUS_TEXT = {
+    task_created: '任务创建中',
+    finish_creation: '已创建',
+    fill_progress: '填写进行中',
+    fill_completed: '填写已完成',
+    sign_progress: '签署进行中',
+    sign_completed: '签署已完成',
+    task_finished: '任务已结束',
+    task_terminated: '任务异常停止',
+    expired: '已逾期',
+    abolishing: '作废中',
+    revoked: '已作废'
+  };
+
 Page({
     data: { 
       city: '', 
@@ -64,7 +78,7 @@ Page({
   async fetch() {
     if (!this.data.hasMore || this.data.loading) return;
     this.setData({ loading: true });
-  
+
     try {
       const whereBase = { cityCode: this.data.cityCode, deleted: _.neq(true) };
 
@@ -91,10 +105,11 @@ Page({
         .orderBy('_id', 'desc')
         .limit(PAGE_SIZE)
         .get();
-  
+
       const page = res.data.map(d => ({
         ...d,
-        _createTime: this.formatTime(d.createdAt)
+        _createTime: this.formatTime(d.createdAt),
+        _signStatusText: this.mapSignTaskStatus(d?.esign?.signTaskStatus)
       }));
   
       const newList = this.data.list.concat(page);
@@ -239,8 +254,14 @@ Page({
           : it
       );
 
-      this.setData({ list });
-      wx.showToast({ title: `状态：${signTaskStatus}`, icon: 'none' });
+      const mappedList = list.map(it =>
+        it._id === id
+          ? { ...it, _signStatusText: this.mapSignTaskStatus(signTaskStatus) }
+          : it
+      );
+
+      this.setData({ list: mappedList });
+      wx.showToast({ title: `状态：${this.mapSignTaskStatus(signTaskStatus)}`, icon: 'none' });
     } catch (err) {
       console.error(err);
       wx.showToast({ title: err.message || '刷新失败', icon: 'none' });
@@ -470,7 +491,12 @@ Page({
         wx.showToast({ title: '删除失败', icon: 'none' });
     }
   },
-  
+
+  mapSignTaskStatus(status) {
+    if (!status) return '未获取';
+    return SIGN_TASK_STATUS_TEXT[status] || status;
+  },
+
   formatTime(serverDate) {
     if (!serverDate) return '';
     try {

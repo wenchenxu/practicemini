@@ -40,7 +40,7 @@
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-            <view>签署状态：{{(item.esign && item.esign.signTaskStatus) || '未获取'}}</view>
+            <view>签署状态：{{item._signStatusText || '未获取'}}</view>
             <button
                 class="mini-op refresh-btn"
                 size="mini"
@@ -49,8 +49,8 @@
                 data-id="{{item._id}}"
                 data-sign-task-id="{{item.esign.signTaskId}}"
                 loading="{{refreshingId === item._id}}"
-                disabled="{{!item.esign || !item.esign.signTaskId}}"
-            >刷新状态</button>
+                disabled="{{item._refreshDisabled}}"
+            >{{item._refreshButtonText || '刷新状态'}}</button>
         </view>
       </view>
 
