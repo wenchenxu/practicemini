@@ -216,12 +216,12 @@ Page({
         }
       });
 
+      const signTaskDetail = result?.data || result || {};
       const signTaskStatus =
-        result?.data?.data?.signTaskStatus ||
-        result?.data?.signTaskStatus ||
-        result?.signTaskStatus;
+        signTaskDetail?.raw?.data?.signTaskStatus;
 
       if (!signTaskStatus) {
+        console.warn('[getSignTaskDetail] unexpected response', signTaskDetail);
         throw new Error('未返回签署状态');
       }
 
