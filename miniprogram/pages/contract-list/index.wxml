@@ -81,6 +81,7 @@
             size="mini"
             type="primary"
             loading="{{runningId === item._id}}"
+            disabled="{{item._signFinished}}"
         >发起签署</button>
         <button
             class="mini-op refresh-btn"
@@ -90,12 +91,13 @@
             data-id="{{item._id}}"
             data-sign-task-id="{{item.esign.signTaskId}}"
             loading="{{refreshingId === item._id}}"
-            disabled="{{item._refreshDisabled}}"
+            disabled="{{item._refreshDisabled || item._signFinished}}"
         >{{item._refreshButtonText || '刷新状态'}}</button>
         <button
             data-id="{{item._id}}"
             bindtap="onGetDownloadUrlFromRow"
             size="mini"
+            type="default"
             disabled="{{!item.esign || !item.esign.signTaskId}}"
         >获取下载</button>
       </view>

@@ -106,11 +106,12 @@ Page({
         .limit(PAGE_SIZE)
         .get();
 
-      const page = res.data.map(d => ({
-        ...d,
-        _createTime: this.formatTime(d.createdAt),
-        _signStatusText: this.mapSignTaskStatus(d?.esign?.signTaskStatus)
-      }));
+      const page = res.data.map(d =>
+        this.decorateContractItem({
+          ...d,
+          _createTime: this.formatTime(d.createdAt)
+        })
+      );
   
       const newList = this.data.list.concat(page);
   
@@ -219,6 +220,10 @@ Page({
       return wx.showToast({ title: '暂无签署任务', icon: 'none' });
     }
 
+    if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
+      return wx.showToast({ title: '该合同已完成签署', icon: 'none' });
+    }
+
     try {
       this.setData({ refreshingId: id });
       wx.showLoading({ title: '刷新中...', mask: true });
@@ -248,15 +253,12 @@ Page({
         }
       });
 
-      const list = this.data.list.map(it =>
+      const mappedList = this.data.list.map(it =>
         it._id === id
-          ? { ...it, esign: { ...(it.esign || {}), signTaskStatus } }
-          : it
-      );
-
-      const mappedList = list.map(it =>
-        it._id === id
-          ? { ...it, _signStatusText: this.mapSignTaskStatus(signTaskStatus) }
+          ? this.decorateContractItem({
+              ...it,
+              esign: { ...(it.esign || {}), signTaskStatus }
+            })
           : it
       );
 
@@ -276,6 +278,10 @@ Page({
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
     if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
+      return wx.showToast({ title: '该合同签署已完成', icon: 'none' });
+    }
 
     // 1) 拿到小程序存储的 PDF fileID
     const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
@@ -495,6 +501,19 @@ Page({
   mapSignTaskStatus(status) {
     if (!status) return '未获取';
     return SIGN_TASK_STATUS_TEXT[status] || status;
+  },
+
+  isSignTaskFinished(status) {
+    return status === 'task_finished';
+  },
+
+  decorateContractItem(item) {
+    const signTaskStatus = item?.esign?.signTaskStatus;
+    return {
+      ...item,
+      _signStatusText: this.mapSignTaskStatus(signTaskStatus),
+      _signFinished: this.isSignTaskFinished(signTaskStatus)
+    };
   },
 
   formatTime(serverDate) {
