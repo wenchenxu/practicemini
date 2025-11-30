@@ -16,42 +16,47 @@
 
   <block wx:for="{{list}}" wx:key="_id">
     <view class="row">
-      <view class="meta">
+      <view class="row-main">
         <!-- 有文件：可点 -->
         <view
             wx:if="{{ item.file && (item.file.pdfFileID || item.file.docxFileID) }}"
-            class="primary clickable"
+            class="file-title clickable"
             bindtap="openDocFromRow"
             data-id="{{item._id}}"
         >
-          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
+            <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+            <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
         <!-- 无文件：禁用态 -->
-        <view wx:else class="primary disabled">
-          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
+        <view wx:else class="file-title disabled">
+          <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+          <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
+        <!-- 取消显示文件
         <view class="sub">
           {{item.fields.contractSerialNumberFormatted || '—'}}
         </view>
+         -->
         <view class="sub">
           {{item._createTime || '—'}}
-        </view>        
+        </view>
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-            <view>签署状态：{{item._signStatusText || '未获取'}}</view>
-            <button
-                class="mini-op refresh-btn"
-                size="mini"
-                type="default"
-                bindtap="onRefreshSignTaskStatus"
-                data-id="{{item._id}}"
-                data-sign-task-id="{{item.esign.signTaskId}}"
-                loading="{{refreshingId === item._id}}"
-                disabled="{{item._refreshDisabled}}"
-            >{{item._refreshButtonText || '刷新状态'}}</button>
+            <view>签署状态：{{item._signStatusText|| '未获取'}}</view>
         </view>
+        <!-- 暂时取消司机详情页 
+        <view class="driver-action">
+          <button
+            class="mini-op"
+            size="mini"
+            type="default"
+            bindtap="onOpenDriverCenter"
+            data-client-id="{{item.fields.clientId}}"
+            data-name="{{item.fields.clientName}}"
+          >司机详情</button>
+        </view> -->
       </view>
 
       <!-- 右侧操作区保留 -->
@@ -67,14 +72,7 @@
             </view>
             --> 
         </view>
-        <!-- 新增：司机详情 -->
-        <button
-        size="mini"
-        type="default"
-        bindtap="onOpenDriverCenter"
-        data-client-id="{{item.fields.clientId}}"
-        data-name="{{item.fields.clientName}}"
-        >司机详情</button>
+
         <!-- 新增：发起签署并拿链接 -->
         <button
             class="mini-op"
@@ -84,7 +82,16 @@
             type="primary"
             loading="{{runningId === item._id}}"
         >发起签署</button>
-        
+        <button
+            class="mini-op refresh-btn"
+            size="mini"
+            type="default"
+            bindtap="onRefreshSignTaskStatus"
+            data-id="{{item._id}}"
+            data-sign-task-id="{{item.esign.signTaskId}}"
+            loading="{{refreshingId === item._id}}"
+            disabled="{{item._refreshDisabled}}"
+        >{{item._refreshButtonText || '刷新状态'}}</button>
         <button
             data-id="{{item._id}}"
             bindtap="onGetDownloadUrlFromRow"
