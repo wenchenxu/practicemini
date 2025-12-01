@@ -19,11 +19,12 @@ const SIGN_TASK_STATUS_TEXT = {
   };
 
 Page({
-    data: { 
-      city: '', 
-      list: [], 
-      loading: false, 
-      hasMore: true, 
+    data: {
+      city: '',
+      list: [],
+      rawList: [],
+      loading: false,
+      hasMore: true,
       lastCreatedAt: null, //上一页最后一条的创建时间
       lastId: '',          //同时带上 _id 作为并列条件的次级游标
       filter: 'all',
@@ -55,7 +56,7 @@ Page({
   },
 
   async refresh() {
-    this.setData({ list: [], hasMore: true, lastId: '', lastCreatedAt: null });
+    this.setData({ list: [], rawList: [], hasMore: true, lastId: '', lastCreatedAt: null });
     await this.fetch();
     // 如果逻辑在 JS 计算，判断签约状态
     /* 
@@ -112,13 +113,15 @@ Page({
           _createTime: this.formatTime(d.createdAt)
         })
       );
-  
-      const newList = this.data.list.concat(page);
+
+      const rawList = this.data.rawList.concat(page);
+      const newList = this.applyFilter(rawList);
   
       // 记录新的游标
       const tail = res.data[res.data.length - 1];
       this.setData({
         list: newList,
+        rawList,
         hasMore: res.data.length === PAGE_SIZE,
         lastCreatedAt: tail ? tail.createdAt : this.data.lastCreatedAt,
         lastId: tail ? tail._id : this.data.lastId
@@ -136,9 +139,12 @@ Page({
   // 顶部筛选（现在先做前端过滤，真正的筛选你以后可以做到数据库里）
   onFilterTap(e) {
     const filter = e.currentTarget.dataset.filter;
-    this.setData({ filter });
-    // 暂时直接重新拉一次，也可以只前端过滤
-    this.refresh();
+    const rawList = this.data.rawList || [];
+    this.setData({
+      filter,
+      list: this.applyFilter(rawList, filter)
+    });
+    if (!rawList.length) this.refresh();
   },
 
   async onGetDownloadUrlFromRow(e) {
@@ -253,7 +259,7 @@ Page({
         }
       });
 
-      const mappedList = this.data.list.map(it =>
+      const mappedRawList = this.data.rawList.map(it =>
         it._id === id
           ? this.decorateContractItem({
               ...it,
@@ -262,7 +268,10 @@ Page({
           : it
       );
 
-      this.setData({ list: mappedList });
+      this.setData({
+        rawList: mappedRawList,
+        list: this.applyFilter(mappedRawList)
+      });
       wx.showToast({ title: `状态：${this.mapSignTaskStatus(signTaskStatus)}`, icon: 'none' });
     } catch (err) {
       console.error(err);
@@ -514,6 +523,22 @@ Page({
       _signStatusText: this.mapSignTaskStatus(signTaskStatus),
       _signFinished: this.isSignTaskFinished(signTaskStatus)
     };
+  },
+
+  applyFilter(list, filter = this.data.filter) {
+    if (filter === 'waiting') {
+      return list.filter(item => {
+        const status = item?.esign?.signTaskStatus;
+        return (
+          !status ||
+          ['fill_progress', 'fill_completed', 'sign_progress', 'sign_completed'].includes(status)
+        );
+      });
+    }
+    if (filter === 'signed') {
+      return list.filter(item => this.isSignTaskFinished(item?.esign?.signTaskStatus));
+    }
+    return list;
   },
 
   formatTime(serverDate) {

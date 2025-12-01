@@ -7,7 +7,7 @@
   <view class="tabs">
     <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
     <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
-    <!-- <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view> -->
+    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
     <!-- <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view> -->
   </view>
 
