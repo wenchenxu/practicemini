@@ -4,16 +4,32 @@ const COL = db.collection('contracts');
 const PAGE_SIZE = 20;
 const { ensureAccess } = require('../../utils/guard');
 
+const SIGN_TASK_STATUS_TEXT = {
+    task_created: '任务创建中',
+    finish_creation: '已创建',
+    fill_progress: '填写进行中',
+    fill_completed: '填写已完成',
+    sign_progress: '签署进行中',
+    sign_completed: '签署已完成',
+    task_finished: '任务已结束',
+    task_terminated: '任务异常停止',
+    expired: '已逾期',
+    abolishing: '作废中',
+    revoked: '已作废'
+  };
+
 Page({
-    data: { 
-      city: '', 
-      list: [], 
-      loading: false, 
-      hasMore: true, 
+    data: {
+      city: '',
+      list: [],
+      rawList: [],
+      loading: false,
+      hasMore: true,
       lastCreatedAt: null, //上一页最后一条的创建时间
       lastId: '',          //同时带上 _id 作为并列条件的次级游标
       filter: 'all',
       runningId: '',
+      refreshingId: '',
       // 为了调试
       lastEsignUrl: ''
     },
@@ -40,7 +56,7 @@ Page({
   },
 
   async refresh() {
-    this.setData({ list: [], hasMore: true, lastId: '', lastCreatedAt: null });
+    this.setData({ list: [], rawList: [], hasMore: true, lastId: '', lastCreatedAt: null });
     await this.fetch();
     // 如果逻辑在 JS 计算，判断签约状态
     /* 
@@ -63,7 +79,7 @@ Page({
   async fetch() {
     if (!this.data.hasMore || this.data.loading) return;
     this.setData({ loading: true });
-  
+
     try {
       const whereBase = { cityCode: this.data.cityCode, deleted: _.neq(true) };
 
@@ -90,18 +106,22 @@ Page({
         .orderBy('_id', 'desc')
         .limit(PAGE_SIZE)
         .get();
-  
-      const page = res.data.map(d => ({
-        ...d,
-        _createTime: this.formatTime(d.createdAt)
-      }));
-  
-      const newList = this.data.list.concat(page);
+
+      const page = res.data.map(d =>
+        this.decorateContractItem({
+          ...d,
+          _createTime: this.formatTime(d.createdAt)
+        })
+      );
+
+      const rawList = this.data.rawList.concat(page);
+      const newList = this.applyFilter(rawList);
   
       // 记录新的游标
       const tail = res.data[res.data.length - 1];
       this.setData({
         list: newList,
+        rawList,
         hasMore: res.data.length === PAGE_SIZE,
         lastCreatedAt: tail ? tail.createdAt : this.data.lastCreatedAt,
         lastId: tail ? tail._id : this.data.lastId
@@ -119,9 +139,12 @@ Page({
   // 顶部筛选（现在先做前端过滤，真正的筛选你以后可以做到数据库里）
   onFilterTap(e) {
     const filter = e.currentTarget.dataset.filter;
-    this.setData({ filter });
-    // 暂时直接重新拉一次，也可以只前端过滤
-    this.refresh();
+    const rawList = this.data.rawList || [];
+    this.setData({
+      filter,
+      list: this.applyFilter(rawList, filter)
+    });
+    if (!rawList.length) this.refresh();
   },
 
   async onGetDownloadUrlFromRow(e) {
@@ -190,11 +213,84 @@ Page({
     }
   },
   
+  async onRefreshSignTaskStatus(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    const signTaskId = e.currentTarget.dataset.signTaskId || item?.esign?.signTaskId;
+
+    if (!item) {
+      return wx.showToast({ title: '未找到合同', icon: 'none' });
+    }
+
+    if (!signTaskId) {
+      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+    }
+
+    if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
+      return wx.showToast({ title: '该合同已完成签署', icon: 'none' });
+    }
+
+    try {
+      this.setData({ refreshingId: id });
+      wx.showLoading({ title: '刷新中...', mask: true });
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getSignTaskDetail',
+          payload: { signTaskId }
+        }
+      });
+
+      const signTaskDetail = result?.data || result || {};
+      const signTaskStatus =
+        signTaskDetail?.raw?.data?.signTaskStatus;
+
+      if (!signTaskStatus) {
+        console.warn('[getSignTaskDetail] unexpected response', signTaskDetail);
+        throw new Error('未返回签署状态');
+      }
+
+      await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'saveContractEsign',
+          payload: { contractId: id, signTaskStatus }
+        }
+      });
+
+      const mappedRawList = this.data.rawList.map(it =>
+        it._id === id
+          ? this.decorateContractItem({
+              ...it,
+              esign: { ...(it.esign || {}), signTaskStatus }
+            })
+          : it
+      );
+
+      this.setData({
+        rawList: mappedRawList,
+        list: this.applyFilter(mappedRawList)
+      });
+      wx.showToast({ title: `状态：${this.mapSignTaskStatus(signTaskStatus)}`, icon: 'none' });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '刷新失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+      this.setData({ refreshingId: '' });
+    }
+  },
+
   // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
   async onSignFromRow(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
     if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
+      return wx.showToast({ title: '该合同签署已完成', icon: 'none' });
+    }
 
     // 1) 拿到小程序存储的 PDF fileID
     const fileID = item?.file?.pdfFileID || item?.file?.docxFileID;
@@ -410,7 +506,41 @@ Page({
         wx.showToast({ title: '删除失败', icon: 'none' });
     }
   },
-  
+
+  mapSignTaskStatus(status) {
+    if (!status) return '未获取';
+    return SIGN_TASK_STATUS_TEXT[status] || status;
+  },
+
+  isSignTaskFinished(status) {
+    return status === 'task_finished';
+  },
+
+  decorateContractItem(item) {
+    const signTaskStatus = item?.esign?.signTaskStatus;
+    return {
+      ...item,
+      _signStatusText: this.mapSignTaskStatus(signTaskStatus),
+      _signFinished: this.isSignTaskFinished(signTaskStatus)
+    };
+  },
+
+  applyFilter(list, filter = this.data.filter) {
+    if (filter === 'waiting') {
+      return list.filter(item => {
+        const status = item?.esign?.signTaskStatus;
+        return (
+          !status ||
+          ['fill_progress', 'fill_completed', 'sign_progress', 'sign_completed'].includes(status)
+        );
+      });
+    }
+    if (filter === 'signed') {
+      return list.filter(item => this.isSignTaskFinished(item?.esign?.signTaskStatus));
+    }
+    return list;
+  },
+
   formatTime(serverDate) {
     if (!serverDate) return '';
     try {
