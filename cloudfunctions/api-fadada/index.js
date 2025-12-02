@@ -59,7 +59,7 @@ async function post2(path, data) {
 // 仅针对 TCB 写库，不经 ECS
 async function saveContractEsign(payload) {
     const db = cloud.database();
-    const { contractId, fileId, signTaskId, actorUrl } = payload || {};
+    const { contractId, fileId, signTaskId, actorUrl, signTaskStatus } = payload || {};
   
     // 1) 强校验 + 打点
     // console.log('[saveContractEsign] payload =', payload);
@@ -76,6 +76,10 @@ async function saveContractEsign(payload) {
     if (actorUrl) {
       data['esign.lastActorUrl'] = actorUrl;
     }
+    if (signTaskStatus) {
+        data['esign.signTaskStatus'] = signTaskStatus;
+    }
+
     // 统一更新时间（无论写了哪个字段）
     data['esign.updatedAt'] = db.serverDate();
   
@@ -102,8 +106,10 @@ exports.main = async (event, context) => {
         return { success: true, data: await post('/api/esign/convertFddUrlToFileId', payload) }; 
       case 'createSignTaskV51':
         return { success: true, data: await post('/api/esign/createTaskV51', payload) };
-      case 'getActorUrl': 
+      case 'getActorUrl':
         return { success: true, data: await post('/api/esign/getActorUrl', payload) };
+      case 'getSignTaskDetail':
+        return { success: true, data: await post('/api/esign/getSignTaskDetail', payload) };
       case 'saveContractEsign':
         return { success: true, data: await saveContractEsign(payload) };
       case 'getOwnerDownloadUrl':

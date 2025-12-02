@@ -1,7 +1,7 @@
-const db = wx.cloud.database();
-const COL = db.collection('contracts');
 import { BRANCH_OPTIONS_BY_CITY, TYPE_OPTIONS_BY_CITY } from '../../utils/config';
 const { ensureAccess } = require('../../utils/guard');
+const db = wx.cloud.database();
+const COL = db.collection('contracts');
 const app = getApp();
 const IS_PROD = app.globalData.isProd;   // 拿到环境开关
 
@@ -26,11 +26,11 @@ const BASE_FIELDS = [
   { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', requiredWhen:'prod', min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', requiredWhen:'prod', maxLength:50 },
-  { name:'carColor', label:'车身颜色', type:'string', requiredWhen:'prod', maxLength:20 },
-  { name:'carPlate', label:'车牌号', type:'string', requiredWhen:'prod', minLength: 8, maxLength:8 },
-  { name:'carVin', label:'车架号', type:'string', requiredWhen:'always', minLength:17, maxLength:17, help:'车架号必须17位' },
-  { name:'carRentalCity', label:'租赁城市', type:'string', requiredWhen:'never', maxLength:20 },
+  { name:'carModel', label:'车型', type:'string', disabled: true, requiredWhen:'prod', maxLength:50, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'carColor', label:'车身颜色', type:'string', disabled: true, requiredWhen:'prod', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'carPlate', label:'车牌号', type:'string', disabled: true, requiredWhen:'prod', minLength: 8, maxLength:8},
+  { name:'carVin', label:'车架号', type:'string', disabled: true, requiredWhen:'never', hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'carRentalCity', label:'租赁城市', type:'string', disabled: true, requiredWhen:'never', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Contract / Rent ----
   { name:'rentDurationMonth', label:'租期（月）', type:'number', requiredWhen:'always', min:1, max:60 },
@@ -129,6 +129,11 @@ Page({
     selectedTypeCode: '',
     selectedTypeName: '',
     
+    // 新增：车辆选择相关
+    vehicleOptions: [],       // 原始车辆列表
+    vehiclePickerRange: [],   // picker 显示用的字符串数组
+    vehiclePickerIndex: -1,   // 当前选中的索引（未选为 -1）
+    
     fields: FIELDS,
     form: {},
     visibleFields: [],
@@ -148,6 +153,9 @@ Page({
 
       // 2) 基础状态
       this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
+      // this.setData({ id, mode, cityCode, city });
+      // 加载可出租车辆列表
+      this.loadAvailableVehicles(cityCode);
 
       // 3) 顶部标题
       wx.setNavigationBarTitle({
@@ -156,6 +164,7 @@ Page({
 
       // 4) 计算可见字段（先按当前 mode 初始化一遍）
       this.initVisibleFields(mode);
+      // setTimeout(() => { this.initVisibleFields(mode);}, 0);
 
       // 5) 分公司与合同类型选项（来源保持你现有常量）
       const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
@@ -250,7 +259,7 @@ Page({
 
     if (this.data.saving) return;
     this.setData({ saving: true });
-    wx.showLoading({ title: '保存中…', mask: true });
+    wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
 
     try {
       // 1) 保存更新
@@ -265,7 +274,7 @@ Page({
       }
 
       // 2) 渲染并覆盖
-      wx.showLoading({ title: '生成文档…', mask: true });
+      wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
       const rnRes = await wx.cloud.callFunction({
         name: 'contractOps',
         data: { action: 'render', id }
@@ -411,7 +420,7 @@ Page({
       }
     }
     // 额外强约束：VIN 17位
-    if ((form.carVin || '').length !== 17) return '车架号必须为 17 位';
+    // if ((form.carVin || '').length !== 17) return '车架号必须为 17 位';
     // 每月支付日 1-31（上面已校验 min/max，这里冗余保护）
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
@@ -446,6 +455,8 @@ Page({
       selectedTypeCode, selectedTypeName
     } = this.data;
   
+    if (this.data.saving) return;
+
     const err = this.validate && this.validate();
     if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
   
@@ -462,8 +473,11 @@ Page({
   
       // —— 新建：沿用你原有流程 —— //
       if (mode === 'create') {
+        this.setData({ saving: true });
+        wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
         const res = await wx.cloud.callFunction({
-          name: 'createContract',
+          //name: 'createContract',
+          name: 'contractV2',
           data: {
             cityCode,
             cityName: city,
@@ -477,7 +491,7 @@ Page({
   
         const result = res?.result || {};
         const fileID = result.fileID || '';
-  
+        const contractId = result.id || result._id || '';
         wx.showToast({ title: '合同已生成', icon: 'success', duration: 2000 });
   
         if (fileID) {
@@ -489,7 +503,8 @@ Page({
             title: '提示',
             content: '合同已保存，但文档未生成，可稍后重试',
             showCancel: false,
-            confirmText: '知道了'
+            confirmText: '知道了',
+            duration: 1000
           });
         }
   
@@ -502,6 +517,8 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: '保存失败', icon: 'none', duration: 3000 });
     } finally {
+      wx.hideLoading();
+      this.setData({ saving: false });
       this.submitting = false;
     }
   },
@@ -562,4 +579,68 @@ Page({
       this.setData({ regenLoading: false });
     }
   },
+
+  // 创建合同时，载入可租赁的车辆
+  async loadAvailableVehicles(cityCode) {
+    if (!cityCode) return;
+  
+    const db = wx.cloud.database();
+    const _  = db.command;
+
+    // 只查本城市、可租且不在维修中的车辆：
+    //   rentStatus = 'available'
+    //   maintenanceStatus = 'none' 或 未设置（老数据）
+    const where = {
+        cityCode,
+        rentStatus: 'available',
+        maintenanceStatus: _.or(_.eq('none'), _.exists(false))
+    };
+
+    try {
+        const { data } = await db
+        .collection('vehicles')
+        .where(where)
+        .orderBy('plate', 'asc')
+        .get();
+
+        console.log('[contract-new] available vehicles =', data.length, data);
+
+        this.setData({
+        // 整个对象列表备用
+        vehiclePickerOptions: data,
+        // picker 显示用字符串
+        vehiclePickerRange: data.map(v =>
+            `${v.plate || ''} ${v.model || ''}`.trim()
+        ),
+        vehiclePickerIndex: -1
+        });
+
+        // 如果想在加载完就自动填充第一辆，可在这里调用 onVehiclePickChange 模拟一次
+    } catch (e) {
+        console.error('[contract-new] loadAvailableVehicles error', e);
+        wx.showToast({ title: '加载车辆失败', icon: 'none' });
+    }
+  },
+
+  // 选中车辆时自动回填车字段
+  onVehiclePickChange(e) {
+    const idx = Number(e.detail.value);
+    const list = this.data.vehiclePickerOptions || [];  // 用 vehiclePickerOptions
+  
+    if (!list.length) {
+      return wx.showToast({ title: '暂无车辆', icon: 'none' });
+    }
+    const vehicle = list[idx];
+    if (!vehicle) return;
+  
+    // console.log('[contract-new] pick vehicle index =', idx, vehicle);
+  
+    this.setData({
+      vehiclePickerIndex: idx,
+      'form.carPlate': vehicle.plate || '',
+      'form.carModel': vehicle.model || '',
+      'form.carColor': vehicle.color || '',
+      'form.carVin':   vehicle.vin   || '',
+    });
+  }
 });

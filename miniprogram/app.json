@@ -9,7 +9,12 @@
     "pages/admin/whitelist/whitelist",
     "pages/no-access/no-access",
     "pages/vehicles/index",
-    "pages/vehicles/guangzhou/guangzhou"
+    "pages/vehicles/guangzhou/guangzhou",
+    "pages/driver-detail/index",
+    "pages/driver-center/index",
+    "pages/vehicle-center/index",
+    "pages/vehicle-detail/index",
+    "pages/vehicle-history/index"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

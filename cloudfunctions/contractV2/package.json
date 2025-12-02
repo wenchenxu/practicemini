@@ -1,0 +1,17 @@
+{
+  "name": "contractV2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "docxtemplater": "^3.66.3",
+    "node-fetch": "^2.7.0",
+    "pizzip": "^3.2.0",
+    "wx-server-sdk": "~3.0.1"
+  }
+}

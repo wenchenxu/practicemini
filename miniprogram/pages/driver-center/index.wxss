@@ -1,0 +1,97 @@
+/* 页面整体容器 */
+.page {
+    min-height: 100vh;
+    background: #f5f5f5;
+    box-sizing: border-box;
+    padding-bottom: 24rpx;
+  }
+  
+  /* 顶部标题区域 */
+  .header {
+    padding: 24rpx 32rpx 16rpx;
+    background: #ffffff;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.04);
+    margin-bottom: 16rpx;
+  }
+  
+  .header .title {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: #222222;
+    margin-bottom: 4rpx;
+  }
+  
+  .header .sub {
+    font-size: 24rpx;
+    color: #888888;
+  }
+  
+  /* 提示类 */
+  .hint {
+    padding: 32rpx;
+    text-align: center;
+    color: #999999;
+    font-size: 26rpx;
+  }
+  
+  .error {
+    margin: 16rpx;
+    padding: 20rpx 24rpx;
+    background: #ffecec;
+    color: #d93025;
+    border-radius: 16rpx;
+    font-size: 26rpx;
+  }
+  
+  /* 列表滚动区域 */
+  .list {
+    padding: 0 24rpx 24rpx;
+    box-sizing: border-box;
+  }
+  
+  /* 每一行司机卡片 */
+  .row {
+    background: #ffffff;
+    border-radius: 16rpx;
+    padding: 20rpx 24rpx;
+    margin-bottom: 16rpx;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.03);
+  }
+  
+  .row-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* 司机姓名 */
+  .name {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #222222;
+    margin-bottom: 8rpx;
+  }
+  
+  /* 身份证 / 手机行 */
+  .line {
+    font-size: 24rpx;
+    color: #666666;
+    margin-top: 2rpx;
+  }
+  
+  /* 右侧箭头 */
+  .row-arrow {
+    font-size: 36rpx;
+    color: #cccccc;
+    margin-left: 16rpx;
+  }
+  
+  /* 分割线（如果保留的话） */
+  .divider {
+    height: 0;
+    margin: 0;
+  }
+  

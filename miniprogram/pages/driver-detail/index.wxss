@@ -1,0 +1,18 @@
+.page {
+    padding: 16rpx;
+  }
+  
+  .section {
+    margin-bottom: 32rpx;
+    padding: 20rpx;
+    border-radius: 12rpx;
+    background-color: #ffffff;
+    box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.04);
+  }
+  
+  .section-title {
+    font-weight: 600;
+    margin-bottom: 12rpx;
+    font-size: 30rpx;
+  }
+  

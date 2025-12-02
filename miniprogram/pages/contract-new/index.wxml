@@ -26,6 +26,21 @@
   </picker>
 </view>
 
+<!-- 可出租车辆 picker -->
+<view wx:if="{{mode==='create'}}" class="form-item">
+  <view class="label">车辆</view>
+  <picker
+    mode="selector"
+    range="{{vehiclePickerRange}}"
+    value="{{vehiclePickerIndex}}"
+    bindchange="onVehiclePickChange"
+  >
+    <view class="picker-value">
+      {{ vehiclePickerIndex >= 0 ? vehiclePickerRange[vehiclePickerIndex] : '请选择可用车辆' }}
+    </view>
+  </picker>
+</view>
+
 <!-- 编辑/查看模式：只读合同类型展示，不可交互 -->
 <view wx:elif="{{mode!=='create'}}" class="readonly-field">
   <text class="label-contractType">合同类型</text>
@@ -94,7 +109,7 @@
     --->
 
     <view wx:if="{{mode!=='view'}}" class="footer-actions">
-      <button type="primary" bindtap="onSubmit" loading="{{saving}}">
+      <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
         {{ mode==='create' ? '生成合同': '保存并生成' }}
       </button>
     </view>

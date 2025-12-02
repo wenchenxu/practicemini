@@ -21,13 +21,19 @@
             人员管理
         </button>
         </view>
+        <!--
         <view>
         <button class="admin-btn" bindtap="goVehicles">车辆管理</button>
-        </view>
+        </view> -->
     </view>
-    <!-- 法大大测试入口（你可以把这段放到任何合适的位置） -->
+    <!-- 法大大测试入口（你可以把这段放到任何合适的位置)
     <view wx:if="{{isAdmin}}" class="fadada-test-entry">
         <button type="default" bindtap="goFadadaTest">法大大测试</button>
     </view>
+    -->
+  </view>
+  <view class="beian-footer">
+    <text>粤ICP备2025481892号</text>
+    <navigator class="beian-link" url="https://beian.miit.gov.cn" hover-class="none">https://beian.miit.gov.cn</navigator>
   </view>
 </view>

@@ -1,13 +1,13 @@
 <view class="container">
   <view class="header">
-    <text class="title">{{city}} - 签署前合同</text>
+    <text class="title">{{city}} - 合同中心</text>
   </view>
 
   <!-- 新增：顶部筛选 tabs -->
   <view class="tabs">
     <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
     <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
-    <!-- <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view> -->
+    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
     <!-- <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view> -->
   </view>
 
@@ -16,32 +16,47 @@
 
   <block wx:for="{{list}}" wx:key="_id">
     <view class="row">
-      <view class="meta">
+      <view class="row-main">
         <!-- 有文件：可点 -->
         <view
             wx:if="{{ item.file && (item.file.pdfFileID || item.file.docxFileID) }}"
-            class="primary clickable"
+            class="file-title clickable"
             bindtap="openDocFromRow"
             data-id="{{item._id}}"
         >
-          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
+            <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+            <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
         <!-- 无文件：禁用态 -->
-        <view wx:else class="primary disabled">
-          {{item.fields.clientName || '（未命名）'}} - {{item.fields.carPlate || '无牌照'}}
+        <view wx:else class="file-title disabled">
+          <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+          <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
+        <!-- 取消显示文件
         <view class="sub">
           {{item.fields.contractSerialNumberFormatted || '—'}}
         </view>
+         -->
         <view class="sub">
           {{item._createTime || '—'}}
-        </view>        
+        </view>
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-          签署状态：<!-- {{item._fddStatusText || '未生成电子签'}}-->
+            <view>签署状态：{{item._signStatusText|| '未获取'}}</view>
         </view>
+        <!-- 暂时取消司机详情页 
+        <view class="driver-action">
+          <button
+            class="mini-op"
+            size="mini"
+            type="default"
+            bindtap="onOpenDriverCenter"
+            data-client-id="{{item.fields.clientId}}"
+            data-name="{{item.fields.clientName}}"
+          >司机详情</button>
+        </view> -->
       </view>
 
       <!-- 右侧操作区保留 -->
@@ -50,10 +65,14 @@
             <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
             </view>
+            <!-- 暂时关闭软删除，隐藏删除按钮 -->
+            <!-- 
             <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
             </view>
+            --> 
         </view>
+
         <!-- 新增：发起签署并拿链接 -->
         <button
             class="mini-op"
@@ -62,12 +81,23 @@
             size="mini"
             type="primary"
             loading="{{runningId === item._id}}"
+            disabled="{{item._signFinished}}"
         >发起签署</button>
-        
+        <button
+            class="mini-op refresh-btn"
+            size="mini"
+            type="default"
+            bindtap="onRefreshSignTaskStatus"
+            data-id="{{item._id}}"
+            data-sign-task-id="{{item.esign.signTaskId}}"
+            loading="{{refreshingId === item._id}}"
+            disabled="{{item._refreshDisabled || item._signFinished}}"
+        >{{item._refreshButtonText || '刷新状态'}}</button>
         <button
             data-id="{{item._id}}"
             bindtap="onGetDownloadUrlFromRow"
             size="mini"
+            type="default"
             disabled="{{!item.esign || !item.esign.signTaskId}}"
         >获取下载</button>
       </view>

@@ -12,6 +12,6 @@ page {
 }
 
 .loading-image {
-  width: 320rpx;
+  width: 800rpx;
   height: auto;
 }
