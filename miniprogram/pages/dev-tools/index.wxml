@@ -1,0 +1,16 @@
+<!--pages/dev-tools/index.wxml-->
+<view class="container">
+  <view class="header">数据库维护工具</view>
+  
+  <view class="card">
+    <view class="title">车辆去重</view>
+    <view class="desc">
+      检测数据库中 `plate` (车牌) 相同的记录。
+      如果有重复，将保留“更新时间”最近的一条，自动删除其余旧数据。
+    </view>
+    <button type="warn" bindtap="onDeduplicateVehicles" loading="{{loading}}">
+      执行去重 (按车牌)
+    </button>
+  </view>
+
+  </view>

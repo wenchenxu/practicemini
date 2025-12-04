@@ -12,7 +12,14 @@ Page({
       lastCreatedAt: null,
       lastId: '',
       statusFilter: 'all',  // all / available / rented / maintenance
-      searchKeyword: ''     // 搜索关键字（车牌 / 司机名 / VIN）
+      searchKeyword: '',     // 搜索关键字（车牌 / 司机名 / VIN）
+      counts: {
+        all: 0,
+        available: 0,
+        rented: 0,
+        maintenance: 0,
+        misc: 0
+      }
     },
   
     _searchTimer: null,   // 搜索防抖定时器
@@ -87,9 +94,65 @@ Page({
         lastCreatedAt: null,
         lastId: ''
       });
+      // 并行执行，互不阻塞
+      this.fetchStats();
       await this.fetchList();
     },
   
+    // 3. 新增统计方法
+    async fetchStats() {
+        const { cityCode } = this.data;
+        if (!cityCode) return;
+        
+        const db = wx.cloud.database();
+        const _ = db.command;
+  
+        // 构造基础查询
+        const base = { cityCode };
+  
+        // 并发查询5个状态的数量
+        try {
+          const pAll = db.collection('vehicles').where(base).count();
+          
+          const pAvailable = db.collection('vehicles').where({
+            ...base,
+            rentStatus: 'available',
+            maintenanceStatus: 'none' // 闲置且无维修
+          }).count();
+  
+          const pRented = db.collection('vehicles').where({
+            ...base,
+            rentStatus: 'rented'
+          }).count();
+  
+          const pMaintenance = db.collection('vehicles').where({
+            ...base,
+            maintenanceStatus: 'in_maintenance'
+          }).count();
+  
+          const pMisc = db.collection('vehicles').where({
+            ...base,
+            rentStatus: 'misc'
+          }).count();
+  
+          const [rAll, rAvail, rRent, rMaint, rMisc] = await Promise.all([
+            pAll, pAvailable, pRented, pMaintenance, pMisc
+          ]);
+  
+          this.setData({
+            counts: {
+              all: rAll.total,
+              available: rAvail.total,
+              rented: rRent.total,
+              maintenance: rMaint.total,
+              misc: rMisc.total
+            }
+          });
+        } catch (e) {
+          console.error('[fetchStats] error', e);
+        }
+      },
+
     // 核心：分页拉车辆列表
     async fetchList() {
       if (this.data.loading || !this.data.hasMore) return;
@@ -124,6 +187,9 @@ Page({
       } 
       else if (statusFilter === 'maintenance') {
         baseWhere.maintenanceStatus = 'in_maintenance';
+      }
+      else if (statusFilter === 'misc') {
+        baseWhere.rentStatus = 'misc';
       }
       // 'all' 不加任何条件
 

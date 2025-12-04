@@ -26,9 +26,9 @@ const BASE_FIELDS = [
   { name:'clientEmergencyPhone', label:'紧急联系人电话', type:'string', requiredWhen:'prod', min:0, minLength: 11, maxLength: 11},
 
   // ---- Car ----
-  { name:'carModel', label:'车型', type:'string', disabled: true, requiredWhen:'prod', maxLength:50, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'carColor', label:'车身颜色', type:'string', disabled: true, requiredWhen:'prod', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'carPlate', label:'车牌号', type:'string', disabled: true, requiredWhen:'prod', minLength: 8, maxLength:8},
+  { name:'carModel', label:'车型', type:'string', disabled: true, requiredWhen:'never', maxLength:50, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'carColor', label:'车身颜色', type:'string', disabled: true, requiredWhen:'never', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'carPlate', label:'车牌号', type:'string', disabled: true, requiredWhen:'never', minLength: 8, maxLength:8, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'carVin', label:'车架号', type:'string', disabled: true, requiredWhen:'never', hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'carRentalCity', label:'租赁城市', type:'string', disabled: true, requiredWhen:'never', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 

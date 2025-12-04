@@ -21,6 +21,8 @@ exports.main = async (event, context) => {
     switch (action) {
       case 'updateStatus':
         return await updateStatus(payload);
+      case 'deduplicate': // <--- 新增这个 case
+        return await deduplicateVehicles(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -37,7 +39,7 @@ function formatStatusLabel(rentStatus, maintenanceStatus) {
     return rentStatus === 'rented' ? '已租' : '闲置';
   }
   
-  async function updateStatus(payload) {
+async function updateStatus(payload) {
     const { vehicleId, newStatus } = payload || {};
   
     if (!vehicleId) throw new Error('vehicleId-required');
@@ -264,3 +266,76 @@ async function updateStatus0(payload) {
       status
     };
 }
+
+// --- 新增：去重函数 ---
+async function deduplicateVehicles() {
+    const vehiclesCol = db.collection('vehicles');
+    const MAX_LIMIT = 1000;
+    
+    // 1. 拉取所有车辆 (循环分页)
+    let allVehicles = [];
+    let page = 0;
+    while(true) {
+      const res = await vehiclesCol.skip(page * MAX_LIMIT).limit(MAX_LIMIT).get();
+      const list = res.data;
+      if (!list || list.length === 0) break;
+      allVehicles = allVehicles.concat(list);
+      page++;
+      if (list.length < MAX_LIMIT) break;
+    }
+  
+    // 2. 内存中分组
+    const map = {}; // { "粤A12345": [record1, record2] }
+    const toDeleteIds = [];
+  
+    for (const v of allVehicles) {
+      const p = (v.plate || '').trim();
+      if (!p) continue; // 跳过无车牌的脏数据 (可选：也可以选择把它们删了)
+      if (!map[p]) map[p] = [];
+      map[p].push(v);
+    }
+  
+    // 3. 筛选出重复项 ID
+    for (const plate in map) {
+      const list = map[plate];
+      if (list.length > 1) {
+        // 排序：按 updatedAt 倒序 (如果没有 updatedAt 则按 createdAt，最后按 _id)
+        // 目的是：保留“最新”的那条，删除旧的
+        list.sort((a, b) => {
+          const tA = (a.updatedAt && new Date(a.updatedAt).getTime()) || (a.createdAt && new Date(a.createdAt).getTime()) || 0;
+          const tB = (b.updatedAt && new Date(b.updatedAt).getTime()) || (b.createdAt && new Date(b.createdAt).getTime()) || 0;
+          return tB - tA; 
+        });
+        
+        // 保留 list[0]，把 list[1]...list[n] 加入删除名单
+        for (let i = 1; i < list.length; i++) {
+          toDeleteIds.push(list[i]._id);
+        }
+      }
+    }
+  
+    // 4. 批量删除 (每批 100 条)
+    const BATCH_SIZE = 100;
+    let deletedCount = 0;
+    
+    if (toDeleteIds.length > 0) {
+      for (let i = 0; i < toDeleteIds.length; i += BATCH_SIZE) {
+        const batch = toDeleteIds.slice(i, i + BATCH_SIZE);
+        try {
+          await vehiclesCol.where({
+            _id: _.in(batch)
+          }).remove();
+          deletedCount += batch.length;
+        } catch(e) {
+          console.error('Delete batch failed', e);
+        }
+      }
+    }
+  
+    return { 
+      ok: true, 
+      totalScanned: allVehicles.length,
+      duplicateGroups: toDeleteIds.length, // 这里粗略表示删除了多少条
+      deleted: deletedCount 
+    };
+  }

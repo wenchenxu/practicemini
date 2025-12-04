@@ -42,5 +42,11 @@ Page({
 
   goVehicles() {
     wx.navigateTo({ url: '/pages/vehicles/index' });
-  }  
+  },
+
+  goDevTools() {
+    wx.navigateTo({
+      url: '/pages/dev-tools/index'
+    });
+  }
 });

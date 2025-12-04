@@ -67,7 +67,7 @@ addressRegistered
 addressCurrent
 emergencyContactName
 emergencyContactPhone
-status: 'active'
+status: '租车中'
 lastContractId
 createdAt
 updatedAt

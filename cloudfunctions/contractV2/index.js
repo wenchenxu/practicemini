@@ -187,7 +187,8 @@ exports.main = async (event, context) => {
             addressCurrent:      payload.clientAddressCurrent || '',
             emergencyContactName:  payload.clientEmergencyContact || '',
             emergencyContactPhone: payload.clientEmergencyContactPhone || '',
-            status: 'active',
+            branchCode: branchCode || '', // 新增：分公司代码
+            status: '租车中',
             lastContractId: null,
             createdAt: now,
             updatedAt: now
@@ -206,7 +207,8 @@ exports.main = async (event, context) => {
             addressCurrent:      payload.clientAddressCurrent || driverDoc.addressCurrent || '',
             emergencyContactName:  payload.clientEmergencyContact || driverDoc.emergencyContactName || '',
             emergencyContactPhone: payload.clientEmergencyContactPhone || driverDoc.emergencyContactPhone || '',
-            status: 'active',
+            branchCode: branchCode || driverDoc.branchCode || '', // 新增：更新 branchCode
+            status: '租车中',
             updatedAt: now
           }
         });
@@ -265,7 +267,8 @@ exports.main = async (event, context) => {
           fromStatus: fromStatusLabel,
           toStatus: toStatusLabel,
           driverClientId: clientId,
-          contractId: contractSerialNumberFormatted,
+          // contractId: contractSerialNumberFormatted, // apparently this is critically wrong?
+          contractId: serialFormatted,
           operator: payload.operator || null,
           createdAt: now
         }

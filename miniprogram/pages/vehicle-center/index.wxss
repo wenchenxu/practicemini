@@ -39,25 +39,44 @@
     padding: 8px 12px;
     gap: 8px;
     background: #f7f8fa;
+    /* 允许横向滚动，如果 pill 太多 */
+    overflow-x: auto;
   }
   
   .filter-pill {
     flex: 1;
     text-align: center;
-    padding: 6px 4px;
+    padding: 6px 2px;
     border-radius: 6px;
     font-size: 13px;
     border: 1px solid #ddd;
     background: #ffffff;
     color: #555;
+    /* 使用 Flex 垂直布局 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-width: 120rpx; /* 防止太窄 */
   }
   
+  .filter-pill .count {
+    font-size: 10px; /* 数字小一点 */
+    color: #999;
+    margin-top: 2px;
+  }
+
   .filter-pill.active {
     border-color: #1677ff;
     background: #1677ff;
     color: #ffffff;
   }
   
+  /* 选中状态下数字颜色也要变白 */
+.filter-pill.active .count {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
   /* 状态/空状态 */
   .loading,
   .empty {

@@ -24,28 +24,41 @@
       data-status="all"
       bindtap="onStatusFilterTap"
     >
-      全部
+      <view>全部</view>
+      <view class="count">{{counts.all || 0}}台车</view>
     </view>
+
     <view
       class="filter-pill {{statusFilter==='available' ? 'active' : ''}}"
       data-status="available"
       bindtap="onStatusFilterTap"
     >
-      闲置
+      <view>闲置</view>
+      <view class="count">{{counts.available || 0}}台车</view>
     </view>
     <view
       class="filter-pill {{statusFilter==='rented' ? 'active' : ''}}"
       data-status="rented"
       bindtap="onStatusFilterTap"
     >
-      已租
+      <view>已租</view>
+      <view class="count">{{counts.rented || 0}}台车</view>
     </view>
     <view
       class="filter-pill {{statusFilter==='maintenance' ? 'active' : ''}}"
       data-status="maintenance"
       bindtap="onStatusFilterTap"
     >
-      维修
+      <view>维修</view>
+      <view class="count">{{counts.maintenance || 0}}台车</view>
+    </view>
+    <view
+      class="filter-pill {{statusFilter==='misc' ? 'active' : ''}}"
+      data-status="misc"
+      bindtap="onStatusFilterTap"
+    >
+      <view>其他</view>
+      <view class="count">{{counts.misc || 0}}台车</view>
     </view>
   </view>
 
@@ -80,7 +93,7 @@
         </view>
       </view>
       <view class="row2">
-        <text class="model">{{item.model || '车型'}} {{item.color || '颜色'}}</text>
+        <text class="model">{{item.model || '车型'}} {{item.color}}</text>
       </view>
       <view class="row3">
         <text class="driver">
