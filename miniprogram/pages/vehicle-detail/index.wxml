@@ -36,11 +36,16 @@
 
     <view class="section">
       <text class="label">当前司机</text>
-      <text class="value">{{driverName || '无'}}</text>
+      <view wx:if="{{driverName || driverIdCard}}">
+        <view class="value">{{driverName || '未知姓名'}}</view>
+        <view class="sub-value" wx:if="{{driverIdCard}}">身份证：{{driverIdCard}}</view>
+        <view class="sub-value" wx:if="{{driverPhone}}">电话：{{driverPhone}}</view>
+      </view>
+      <view wx:else class="value">无</view>
     </view>
 
     <view class="section">
-      <text class="label">最近合同</text>
+      <text class="label">最近合同编号</text>
       <text class="value">{{contractId || '无'}}</text>
     </view>
 
@@ -62,7 +67,7 @@
           bindtap="onMarkMaintenance"
           disabled="{{opBusy}}"
         >
-          车辆维修
+            {{ maintenanceStatus === 'in_maintenance' ? '结束维修' : '车辆维修' }}
         </button>
         <button
           size="mini"

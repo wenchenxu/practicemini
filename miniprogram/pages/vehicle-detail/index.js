@@ -61,7 +61,7 @@ Page({
       // 3) 生成展示文案
 
       const rentStatusText = rentStatus === 'rented' ? '已租' : '闲置';
-      const maintenanceStatusText = rentStatus === 'in_maintenance' ? '维修中' : '正常';
+      const maintenanceStatusText = maintenanceStatus === 'in_maintenance' ? '维修中' : '正常';
 
       // 旧方法，不引用
       let statusText = '';
@@ -74,14 +74,29 @@ Page({
       }
 
       // 4) 查司机名字（如果有绑定）
-      let driverName = '';
-      if (veh.currentDriverClientId) {
-        const drvRes = await driversCol
-          .where({ clientId: veh.currentDriverClientId })
-          .limit(1)
-          .get();
-        if (drvRes.data && drvRes.data.length > 0) {
-          driverName = drvRes.data[0].name || '';
+      // A. 优先使用车辆记录里的“快照”信息 (兼容 CSV 导入的数据)
+      let driverName = veh.currentDriverName || '';
+      // 兼容两种字段名：系统生成的 currentDriverClientId 和 CSV 导入的 currentDriverId
+      let driverIdCard = veh.currentDriverClientId || veh.currentDriverId || '';
+      let driverPhone = '';
+
+      // B. 如果有身份证号，尝试去 drivers 集合查最新信息（主要是为了补全电话）
+      if (driverIdCard) {
+        try {
+          const drvRes = await driversCol
+            .where({ clientId: driverIdCard })
+            .limit(1)
+            .get();
+          
+          if (drvRes.data && drvRes.data.length > 0) {
+            const drv = drvRes.data[0];
+            // 如果司机表里有名字，优先用司机表的名字（通常更准确），当然如果司机表没名字就用车辆表的
+            driverName = drv.name || driverName; 
+            driverPhone = drv.phone || '';
+          }
+        } catch (err) {
+          console.error('Fetch driver info failed', err);
+          // 查不到也没关系，我们已经有 driverName 和 driverIdCard 了
         }
       }
 
@@ -100,12 +115,14 @@ Page({
       this.setData({
         vehicle: veh,
         driverName,
+        driverIdCard,
+        driverPhone,
         contractId,
         rentStatus,
         rentStatusText,
         maintenanceStatus,
         maintenanceStatusText,
-        statusText,
+        // statusText, // 旧字段好像没用了，可以不管
         loading: false
       });
     } catch (e) {
@@ -221,7 +238,7 @@ Page({
       this.setData({ opBusy: false });
     }
   },
-
+  // obsolete?
   async fetchDetail0() {
     this.setData({ loading: true });
 
@@ -266,7 +283,7 @@ Page({
       this.setData({ loading: false });
     }
   },
-
+  // obsolete?
   async changeStatus0(newStatus, label) {
     const { vehicle, opBusy, driverName} = this.data;
     if (!vehicle || opBusy) return;
@@ -344,11 +361,11 @@ Page({
       }
     });
   },
-
+  // obsolete?
   onMarkAvailable0() {
     this.changeStatus('available', '设为可出租');
   },
-
+  // obsolete?
   onMarkMaintenance0() {
     this.changeStatus('maintenance', '标记维修');
   },

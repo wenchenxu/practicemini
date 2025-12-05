@@ -23,6 +23,8 @@ exports.main = async (event, context) => {
         return await updateStatus(payload);
       case 'deduplicate': // <--- 新增这个 case
         return await deduplicateVehicles(payload);
+      case 'fixDates':
+        return await fixCreatedAt();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -338,4 +340,55 @@ async function deduplicateVehicles() {
       duplicateGroups: toDeleteIds.length, // 这里粗略表示删除了多少条
       deleted: deletedCount 
     };
+  }
+
+async function fixCreatedAt() {
+    const vehiclesCol = db.collection('vehicles');
+    const MAX_LIMIT = 100; // 每次处理 100 条防止超时
+    let page = 0;
+    let fixedCount = 0;
+    
+    // 正则匹配 yyyy-mm-dd 格式 (例如 2025-10-25)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  
+    while (true) {
+      // 分页拉取
+      const res = await vehiclesCol.skip(page * MAX_LIMIT).limit(MAX_LIMIT).get();
+      const list = res.data;
+      if (!list || list.length === 0) break;
+  
+      const tasks = [];
+  
+      for (const v of list) {
+        // 检查是否为字符串且符合格式
+        if (typeof v.createdAt === 'string' && dateRegex.test(v.createdAt)) {
+          // 解析日期
+          // 注意：new Date('2025-10-25') 默认为 UTC 0点。
+          // 如果想存为 Date 对象，直接 new Date(str) 即可，数据库会存为 ISO Date。
+          const d = new Date(v.createdAt);
+          
+          if (!isNaN(d.getTime())) {
+            // 发起更新
+            const task = vehiclesCol.doc(v._id).update({
+              data: {
+                createdAt: d,
+                // 如果 updatedAt 也是这种格式，顺便也修了（可选）
+                // updatedAt: (typeof v.updatedAt === 'string' && dateRegex.test(v.updatedAt)) ? new Date(v.updatedAt) : v.updatedAt
+              }
+            });
+            tasks.push(task);
+          }
+        }
+      }
+  
+      if (tasks.length > 0) {
+        await Promise.all(tasks);
+        fixedCount += tasks.length;
+      }
+  
+      page++;
+      if (list.length < MAX_LIMIT) break;
+    }
+  
+    return { ok: true, fixed: fixedCount, totalScanned: page * MAX_LIMIT + (list ? list.length : 0) }; // 简单估算
   }

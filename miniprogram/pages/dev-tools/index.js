@@ -50,5 +50,44 @@ Page({
         }
       }
     });
+  },
+
+  async onFixDates() {
+    const that = this;
+    wx.showModal({
+      title: '确认修复',
+      content: '将把所有 "yyyy-mm-dd" 格式的字符串转换为日期对象。',
+      success: async (res) => {
+        if (!res.confirm) return;
+        
+        that.setData({ loading: true });
+        wx.showLoading({ title: '修复中...', mask: true });
+
+        try {
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: { action: 'fixDates' }
+          });
+
+          wx.hideLoading();
+          that.setData({ loading: false });
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '修复完成',
+              content: `成功修复了 ${result.fixed} 条数据的日期格式。`,
+              showCancel: false
+            });
+          } else {
+            wx.showToast({ title: '操作失败', icon: 'none' });
+          }
+        } catch (e) {
+          console.error(e);
+          wx.hideLoading();
+          that.setData({ loading: false });
+          wx.showToast({ title: '调用异常', icon: 'none' });
+        }
+      }
+    });
   }
 });
