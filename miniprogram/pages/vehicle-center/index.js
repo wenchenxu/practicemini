@@ -117,7 +117,6 @@ Page({
           const pAvailable = db.collection('vehicles').where({
             ...base,
             rentStatus: 'available',
-            maintenanceStatus: 'none' // 闲置且无维修
           }).count();
   
           const pRented = db.collection('vehicles').where({
@@ -180,7 +179,6 @@ Page({
       // 按状态筛选（新版）
       if (statusFilter === 'available') {
         baseWhere.rentStatus = 'available';
-        baseWhere.maintenanceStatus = 'none';
       } 
       else if (statusFilter === 'rented') {
         baseWhere.rentStatus = 'rented';

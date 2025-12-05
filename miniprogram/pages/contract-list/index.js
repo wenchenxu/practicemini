@@ -223,7 +223,7 @@ Page({
     }
 
     if (!signTaskId) {
-      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+      return wx.showToast({ title: '暂无签署任务。请发起签署', icon: 'none' });
     }
 
     if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
@@ -297,7 +297,7 @@ Page({
     if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
 
     // 2) 组几个签署要用的字段
-    const signerPhone = item.fields?.clientPhone || '13725511890';   // 签署人手机号
+    const signerPhone = item.fields?.clientPhone;   // 签署人手机号
     const signerName  = item.fields?.clientName;         // 签署人姓名
     // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
     const actorId     = signerPhone;
@@ -508,7 +508,7 @@ Page({
   },
 
   mapSignTaskStatus(status) {
-    if (!status) return '未获取';
+    if (!status) return '未发起签署';
     return SIGN_TASK_STATUS_TEXT[status] || status;
   },
 

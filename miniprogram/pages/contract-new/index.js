@@ -603,7 +603,7 @@ Page({
         .orderBy('plate', 'asc')
         .get();
 
-        console.log('[contract-new] available vehicles =', data.length, data);
+        // console.log('[contract-new] available vehicles =', data.length, data);
 
         this.setData({
         // 整个对象列表备用

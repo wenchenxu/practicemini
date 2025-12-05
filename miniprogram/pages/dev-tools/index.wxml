@@ -12,5 +12,15 @@
       执行去重 (按车牌)
     </button>
   </view>
+  
+  <view class="card">
+    <view class="title">日期格式修复</view>
+    <view class="desc">
+      扫描所有车辆，将 `createdAt` 字段从字符串 (如 "2025-10-25") 转换为标准的数据库日期对象 (Date)，以便正确排序。
+    </view>
+    <button type="primary" bindtap="onFixDates" loading="{{loading}}">
+      修复日期格式
+    </button>
+  </view>
 
   </view>

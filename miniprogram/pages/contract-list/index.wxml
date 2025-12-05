@@ -44,7 +44,7 @@
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
         <view class="sub status-line">
-            <view>签署状态：{{item._signStatusText|| '未获取'}}</view>
+            <view>签署状态：{{item._signStatusText|| '未发起签署'}}</view>
         </view>
         <!-- 暂时取消司机详情页 
         <view class="driver-action">
