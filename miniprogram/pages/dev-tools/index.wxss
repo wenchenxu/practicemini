@@ -10,3 +10,30 @@
 }
 .title { font-size: 30rpx; font-weight: 600; margin-bottom: 16rpx; }
 .desc { font-size: 26rpx; color: #666; margin-bottom: 32rpx; line-height: 1.5; }
+.danger-zone {
+    border: 2rpx solid #ffccc7;
+    background: #fff1f0;
+  }
+  
+.danger-text {
+    color: #cf1322;
+  }
+  
+.input-group {
+    margin-bottom: 24rpx;
+  }
+  
+.input-group .label {
+    font-size: 24rpx;
+    color: #666;
+    margin-bottom: 8rpx;
+    display: block;
+  }
+  
+.input-group .input {
+    background: #fff;
+    border: 1rpx solid #d9d9d9;
+    padding: 16rpx;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+  }

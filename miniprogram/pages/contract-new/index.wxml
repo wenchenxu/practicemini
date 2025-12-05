@@ -1,121 +1,83 @@
-<!-- 仅广州显示：选择分公司（必选） -->
-<view wx:if="{{mode==='create' && showBranchPicker}}" class="form-item">
-  <view class="label-companyType">分公司</view>
-  <picker mode="selector" 
-          range="{{branchOptions}}" 
-          range-key="name" 
-          value="{{branchIndex}}" 
-          bindchange="onPickBranch">
-    <view class="picker-value-companyType">
-        {{ branchIndex>=0 ? branchOptions[branchIndex].name : '请选择' }}
-    </view>
-  </picker>
-</view>
-
-<!-- 合同类型：城市多类型则展示；仅一种则隐藏但会自动赋值 -->
-<view wx:if="{{mode==='create' && showTypePicker}}" class="form-item">
-  <view class="label-contractType">合同类型</view>
-  <picker mode="selector" 
-          range="{{typeOptions}}" 
-          range-key="name" 
-          value="{{typeIndex}}" 
-          bindchange="onPickType">
-    <view class="picker-value-contractType">
-        {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择' }}
-    </view>
-  </picker>
-</view>
-
-<!-- 可出租车辆 picker -->
-<view wx:if="{{mode==='create'}}" class="form-item">
-  <view class="label">车辆</view>
-  <picker
-    mode="selector"
-    range="{{vehiclePickerRange}}"
-    value="{{vehiclePickerIndex}}"
-    bindchange="onVehiclePickChange"
-  >
-    <view class="picker-value">
-      {{ vehiclePickerIndex >= 0 ? vehiclePickerRange[vehiclePickerIndex] : '请选择可用车辆' }}
-    </view>
-  </picker>
-</view>
-
-<!-- 编辑/查看模式：只读合同类型展示，不可交互 -->
-<view wx:elif="{{mode!=='create'}}" class="readonly-field">
-  <text class="label-contractType">合同类型</text>
-  <text class="value-contractType">{{ selectedTypeName || '—' }}</text>
-</view>
-
 <view class="container">
-  <view class="header">
-    <text class="city">{{city}}</text>
-    <text class="mode" wx:if="{{mode === 'view'}}">（查看）</text>
-    <text class="mode" wx:if="{{mode === 'edit'}}">（编辑）</text>
+  <view class="section-card" wx:if="{{mode==='create'}}">
+    <view class="card-title">合同基础配置</view>
+    
+    <view wx:if="{{showBranchPicker}}" class="row-picker">
+      <view class="row-label"><text class="req">*</text>分公司</view>
+      <picker mode="selector" range="{{branchOptions}}" range-key="name" value="{{branchIndex}}" bindchange="onPickBranch" class="picker-flex">
+        <view class="picker-text {{branchIndex>=0?'':'placeholder'}}">
+          {{ branchIndex>=0 ? branchOptions[branchIndex].name : '请选择分公司' }}
+        </view>
+      </picker>
+      <view class="row-arrow">›</view>
+    </view>
+
+    <view wx:if="{{showTypePicker}}" class="row-picker">
+      <view class="row-label"><text class="req">*</text>合同类型</view>
+      <picker mode="selector" range="{{typeOptions}}" range-key="name" value="{{typeIndex}}" bindchange="onPickType" class="picker-flex">
+        <view class="picker-text {{typeIndex>=0?'':'placeholder'}}">
+          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择合同类型' }}
+        </view>
+      </picker>
+      <view class="row-arrow">›</view>
+    </view>
+
+    <view class="row-picker no-border">
+      <view class="row-label"><text class="req">*</text>选择车辆</view>
+      <picker mode="selector" range="{{vehiclePickerRange}}" value="{{vehiclePickerIndex}}" bindchange="onVehiclePickChange" class="picker-flex">
+        <view class="picker-text {{vehiclePickerIndex>=0?'':'placeholder'}}">
+          {{ vehiclePickerIndex >= 0 ? vehiclePickerRange[vehiclePickerIndex] : '请选择可用车辆' }}
+        </view>
+      </picker>
+      <view class="row-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="header" wx:if="{{mode!=='create'}}">
+    <view class="header-tag">{{city}}</view>
+    <view class="header-info">
+      <text class="mode-text">{{mode === 'view' ? '查看详情' : '编辑合同'}}</text>
+      <text class="type-text">{{selectedTypeName || '标准合同'}}</text>
+    </view>
   </view>
 
   <form bindsubmit="onSubmit">
-    <block wx:for="{{visibleFields || []}}" wx:key="name">
-      <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
-        <view class="form-item">
-          <label class="label">
-            <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
-            <text class="tip" wx:if="{{item.help}}">（{{item.help}}）</text>
-          </label>
+    <view class="section-card form-card">
+      <view class="card-title" wx:if="{{mode==='create'}}">填写合同详情</view>
+      
+      <view class="form-wrap">
+        <block wx:for="{{visibleFields || []}}" wx:key="name">
+          <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
+            <view class="form-item item-{{item.name}}">
+              <label class="label">
+                <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
+                <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
+              </label>
 
-          <!-- string -->
-          <input
-            wx:if="{{item.type==='string'}}"
-            class="input"
-            placeholder="请输入{{item.label}}"
-            value="{{form[item.name] || ''}}"
-            bindinput="onInput"
-            data-name="{{item.name}}"
-            disabled="{{item.disabled || mode==='view'}}"
-            maxlength="{{item.maxLength || -1}}"
-          />
+              <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{form[item.name] || ''}}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
 
-          <!-- number -->
-          <input
-            wx:elif="{{item.type==='number'}}"
-            class="input"
-            type="number"
-            placeholder="请输入{{item.label}}"
-            value="{{form[item.name] !== undefined ? form[item.name] : ''}}"
-            bindinput="onInputNumber"
-            data-name="{{item.name}}"
-            disabled="{{item.disabled || mode==='view'}}"
-          />
+              <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form[item.name] !== undefined ? form[item.name] : ''}}" bindinput="onInputNumber" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" />
 
-          <!-- date -->
-          <picker
-            wx:elif="{{item.type==='date'}}"
-            mode="date"
-            value="{{form[item.name] || ''}}"
-            bindchange="onDateChange"
-            data-name="{{item.name}}"
-            disabled="{{item.disabled || mode==='view'}}"
-          >
-            <view class="picker">{{form[item.name] || ('请选择' + item.label)}}</view>
-          </picker>
-        </view>
-      </block>
-    </block>
-
-    <!---
-    <view class="btn-row" wx:if="{{mode!=='view'}}">
-      <button formType="submit" type="primary" class="btn">保存</button>
+              <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{form[item.name] || ''}}" bindchange="onDateChange" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}">
+                <view class="input-box picker-box {{form[item.name]?'':'ph'}}">
+                  {{form[item.name] || '请选择日期'}}
+                  <text class="date-icon" wx:if="{{mode!=='view'}}">📅</text>
+                </view>
+              </picker>
+            </view>
+          </block>
+        </block>
+      </view>
     </view>
-    --->
 
     <view wx:if="{{mode!=='view'}}" class="footer-actions">
-      <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}">
-        {{ mode==='create' ? '生成合同': '保存并生成' }}
+      <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}" class="submit-btn">
+        {{ mode==='create' ? '生成合同' : '保存修改并重新生成' }}
       </button>
     </view>
   </form>
-  
+
   <view class="btn-row" wx:if="{{mode==='view'}}">
-    <button type="default" class="btn" bindtap="toEdit">修改</button>
+    <button type="default" class="btn-edit" bindtap="toEdit">修改合同信息</button>
   </view>
 </view>
