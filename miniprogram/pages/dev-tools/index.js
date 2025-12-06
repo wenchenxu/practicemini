@@ -3,7 +3,10 @@ const { ensureAdmin } = require('../../utils/guard');
 
 Page({
   data: {
-    loading: false
+    loading: false,
+    delCity: '',
+    delConfirm: '',
+    canDelete: false
   },
 
   onLoad() {
@@ -84,6 +87,81 @@ Page({
         } catch (e) {
           console.error(e);
           wx.hideLoading();
+          that.setData({ loading: false });
+          wx.showToast({ title: '调用异常', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  // 监听城市输入
+  onInputDeleteCity(e) {
+    const val = e.detail.value.trim();
+    this.setData({ delCity: val }, this.checkDeleteBtn);
+  },
+
+  // 监听口令输入
+  onInputDeleteConfirm(e) {
+    const val = e.detail.value.trim();
+    this.setData({ delConfirm: val }, this.checkDeleteBtn);
+  },
+
+  // 检查是否可以启用删除按钮
+  checkDeleteBtn() {
+    const { delCity, delConfirm } = this.data;
+    // 规则：口令必须是 "confirmDelete" + 首字母大写的城市名 (或者直接全拼接，看你喜好)
+    // 这里为了简单且符合你要求：直接比对 'confirmDelete' + delCity (忽略大小写可能更方便，或者严格匹配)
+    
+    // 让我们做严格匹配： confirmDelete + delCity (例如 suzhou -> confirmDeleteSuzhou)
+    // 首字母大写处理
+    const expected = 'confirmDelete' + delCity.charAt(0).toUpperCase() + delCity.slice(1);
+    
+    // 或者如果你想简单点，直接全小写匹配也可以，这里按你描述的 CamelCase 来
+    this.setData({
+      canDelete: delCity && delConfirm === expected
+    });
+  },
+
+  async onDeleteByCity() {
+    const { delCity } = this.data;
+    const that = this;
+
+    wx.showModal({
+      title: '最后警告',
+      content: `确定要删除 [${delCity}] 的所有车辆吗？此操作无法恢复！`,
+      confirmColor: '#d93025',
+      confirmText: '删！',
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        that.setData({ loading: true });
+        
+        try {
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: { 
+              action: 'deleteByCity',
+              payload: { cityCode: delCity }
+            }
+          });
+
+          that.setData({ loading: false });
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '删除成功',
+              content: `已清理 ${delCity} 共 ${result.deleted} 条数据。`,
+              showCancel: false,
+              success: () => {
+                // 清空输入框
+                that.setData({ delCity: '', delConfirm: '', canDelete: false });
+              }
+            });
+          } else {
+            wx.showToast({ title: '删除失败', icon: 'none' });
+          }
+        } catch (e) {
+          console.error(e);
           that.setData({ loading: false });
           wx.showToast({ title: '调用异常', icon: 'none' });
         }

@@ -23,4 +23,25 @@
     </button>
   </view>
 
+  <view class="card danger-zone">
+    <view class="title danger-text">⚠️ 删库 (按城市)</view>
+    <view class="desc">
+      输入城市代码 (如 suzhou)，并输入确认口令，将<text style="font-weight:bold;">永久删除</text>该城市下的所有车辆数据。
+    </view>
+    
+    <view class="input-group">
+      <view class="label">目标城市 (cityCode):</view>
+      <input class="input" placeholder="cityCode" bindinput="onInputDeleteCity" value="{{delCity}}"/>
+    </view>
+
+    <view class="input-group">
+      <view class="label">确认口令:</view>
+      <input class="input" placeholder="are you sure?" bindinput="onInputDeleteConfirm" value="{{delConfirm}}"/>
+    </view>
+
+    <button type="warn" bindtap="onDeleteByCity" loading="{{loading}}" disabled="{{!canDelete}}">
+      确认彻底删除
+    </button>
+  </view>
+
   </view>

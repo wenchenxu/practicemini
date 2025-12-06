@@ -593,7 +593,12 @@ Page({
     const where = {
         cityCode,
         rentStatus: 'available',
-        maintenanceStatus: _.or(_.eq('none'), _.exists(false))
+        maintenanceStatus: _.or([
+            _.eq('none'), 
+            _.eq(''),     // 兼容 CSV 导入的空字符串
+            _.eq(null),   // 兼容空值
+            _.exists(false)
+        ])
     };
 
     try {
@@ -601,6 +606,7 @@ Page({
         .collection('vehicles')
         .where(where)
         .orderBy('plate', 'asc')
+        .limit(20) //微信小程序硬性限制：前端直接调用数据库，一次最多只能取 20 条数据
         .get();
 
         // console.log('[contract-new] available vehicles =', data.length, data);

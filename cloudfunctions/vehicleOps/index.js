@@ -25,6 +25,8 @@ exports.main = async (event, context) => {
         return await deduplicateVehicles(payload);
       case 'fixDates':
         return await fixCreatedAt();
+      case 'deleteByCity':
+        return await deleteByCity(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -79,20 +81,20 @@ async function updateStatus(payload) {
     if (newStatus === 'available') {
       // 你的语义：结束租赁，车辆恢复可出租，解绑司机
       eventType = 'rent_end';
-  
       newRentStatus = 'available';
-      // 维修轴保持不变
+
       // 如果有司机，解绑
-      if (veh.currentDriverClientId) {
-        updateData.currentDriverClientId = _.remove();
-        updateData.driverClientId =_.remove();
-      }
+      // 1. 标准字段
+      updateData.currentDriverClientId = _.remove();
+      // 2. CSV 导入的兼容字段
+      updateData.currentDriverId = _.remove();
+      updateData.currentDriverName = _.remove();
+      // 3. 可能存在的旧冗余字段
+      updateData.driverClientId = _.remove();
     } else if (newStatus === 'maintenance') {
       // 切维修状态：toggle
       eventType = 'maintenance_toggle';
-  
-      newMaintenanceStatus =
-        oldMaintenanceStatus === 'in_maintenance' ? 'none' : 'in_maintenance';
+      newMaintenanceStatus = oldMaintenanceStatus === 'in_maintenance' ? 'none' : 'in_maintenance';
       // 这里不动租赁轴，也不碰 currentDriverClientId
     }
   
@@ -106,6 +108,7 @@ async function updateStatus(payload) {
     });
   
     // 4) 记录车辆历史（保证有 fromStatus / toStatus）
+    const driverSnapshot = veh.currentDriverClientId || veh.currentDriverId || null;
     const fromStatusLabel = formatStatusLabel(oldRentStatus, oldMaintenanceStatus);
     const toStatusLabel   = formatStatusLabel(newRentStatus, newMaintenanceStatus);
   
@@ -116,7 +119,7 @@ async function updateStatus(payload) {
         eventType,
         fromStatus: fromStatusLabel,
         toStatus: toStatusLabel,
-        driverClientId: veh.currentDriverClientId || null, // 记录变化发生时的司机
+        driverClientId: driverSnapshot,     // 记录变化发生时的司机，是谁退的租
         contractId: null,                                  // 这里通常是「结束租赁/维修」操作，没有新合同
         operator: payload.operator || null,
         createdAt: now
@@ -130,144 +133,6 @@ async function updateStatus(payload) {
       maintenanceStatus: newMaintenanceStatus
     };
   }
-
-async function updateStatus0(payload) {
-    const { vehicleId, newStatus } = payload || {};
-  
-    if (!vehicleId) throw new Error('vehicleId-required');
-    if (!newStatus || !['available', 'maintenance'].includes(newStatus)) {
-      throw new Error('invalid-status');
-    }
-  
-    const vehicles = db.collection('vehicles');
-    const history  = db.collection('vehicle_history');
-  
-    // 1) 取当前车辆
-    const res = await vehicles.doc(vehicleId).get();
-    if (!res.data) throw new Error('vehicle-not-found');
-  
-    const veh = res.data;
-    const now = db.serverDate();
-  
-    // 2) 当前双轴状态（不再从 status 推导）
-    let oldRentStatus        = veh.rentStatus || 'available';
-    let oldMaintenanceStatus = veh.maintenanceStatus || 'none';
-  
-    let rentStatus        = oldRentStatus;
-    let maintenanceStatus = oldMaintenanceStatus;
-  
-    // 记录用：变化前的展示 status
-    const displayBefore = deriveStatus(oldRentStatus, oldMaintenanceStatus);
-  
-    // ============================================================
-    // 分支 1：进入维修（newStatus === 'maintenance'）
-    // ============================================================
-    if (newStatus === 'maintenance') {
-      // 只有从非维修 → 维修 时才写一条 maintenance_start
-      if (oldMaintenanceStatus !== 'in_maintenance') {
-        await history.add({
-          data: {
-            vehicleId,
-            plate: veh.plate || '',
-            eventType: 'maintenance_start',
-            fromStatus: displayBefore,
-            toStatus:   'maintenance',
-            driverClientId: veh.currentDriverClientId || null,
-            contractId: null,
-            operator: null,
-            createdAt: now
-          }
-        });
-      }
-  
-      maintenanceStatus = 'in_maintenance';
-      // 注意：不动 rentStatus，不解绑司机
-    }
-  
-    // ============================================================
-    // 分支 2：设为可出租（newStatus === 'available'）
-    //   这里要分两种：
-    //   A. 当前在维修 → 结束维修（只动维修轴，不结束租赁）
-    //   B. 当前不在维修 → 结束租赁（租赁轴变 available，并解绑司机）
-    // ============================================================
-    if (newStatus === 'available') {
-  
-      if (oldMaintenanceStatus === 'in_maintenance') {
-        // A. 从维修状态退出来（不管是 rented+maintenance 还是 available+maintenance）
-  
-        // 写 maintenance_end
-        await history.add({
-          data: {
-            vehicleId,
-            plate: veh.plate || '',
-            eventType: 'maintenance_end',
-            fromStatus: displayBefore,                   // 一定是 'maintenance'
-            toStatus:   deriveStatus(oldRentStatus, 'none'),
-            driverClientId: veh.currentDriverClientId || null,
-            contractId: null,
-            operator: null,
-            createdAt: now
-          }
-        });
-  
-        maintenanceStatus = 'none';
-        // 注意：租赁轴 rentStatus 保持不变（rented 或 available）
-        // 也不解绑司机 —— 你说“修好车之后再决定要不要取消租赁”
-  
-      } else {
-        // B. 不在维修中，此时“设为可出租” = 结束租赁
-  
-        if (oldRentStatus === 'rented') {
-          // 写 rent_end
-          await history.add({
-            data: {
-              vehicleId,
-              plate: veh.plate || '',
-              eventType: 'rent_end',
-              fromStatus: displayBefore,                 // 一般是 'rented'
-              toStatus:   deriveStatus('available', oldMaintenanceStatus),
-              driverClientId: veh.currentDriverClientId || null,
-              contractId: null,
-              operator: null,
-              createdAt: now
-            }
-          });
-        }
-  
-        rentStatus = 'available';
-  
-        // 结束租赁时，解绑司机 —— 对应你说的“第二条 rented -> available 司机名字应该清除”
-        // maintenanceStatus 保持为 none（按我们约定，既然不在维修中 oldMaintenanceStatus 就是 'none'）
-      }
-    }
-  
-    // 3) 推导展示用 status（给 vehicle-center / vehicle-detail 用）
-    const status = deriveStatus(rentStatus, maintenanceStatus);
-  
-    // 4) 写回 vehicles
-    const updateData = {
-      rentStatus,
-      maintenanceStatus,
-      status,
-      updatedAt: now
-    };
-  
-    // 只有在“结束租赁”的那个分支才解绑司机
-    if (newStatus === 'available' && oldMaintenanceStatus === 'none') {
-      updateData.currentDriverClientId = _.remove(); // 真正解绑
-    }
-  
-    await vehicles.doc(vehicleId).update({ data: updateData });
-  
-    return {
-      ok: true,
-      vehicleId,
-      newStatus,
-      rentStatus,
-      maintenanceStatus,
-      status
-    };
-}
 
 // --- 新增：去重函数 ---
 async function deduplicateVehicles() {
@@ -391,4 +256,35 @@ async function fixCreatedAt() {
     }
   
     return { ok: true, fixed: fixedCount, totalScanned: page * MAX_LIMIT + (list ? list.length : 0) }; // 简单估算
+  }
+
+async function deleteByCity(payload) {
+    const { cityCode } = payload || {};
+    if (!cityCode) throw new Error('cityCode required');
+  
+    const vehiclesCol = db.collection('vehicles');
+    let deletedCount = 0;
+  
+    // 这里的逻辑是：循环查找并删除，直到删光为止
+    // 这种方式比一次性 where().remove() 更稳健，避免因数据量过大导致数据库操作超时或部分失败
+    while (true) {
+      // 每次查 1000 条 ID
+      const res = await vehiclesCol.where({ cityCode }).limit(1000).field({ _id: true }).get();
+      const list = res.data;
+      
+      if (!list || list.length === 0) {
+        break; // 删完了
+      }
+  
+      const ids = list.map(v => v._id);
+      
+      // 批量删
+      await vehiclesCol.where({
+        _id: _.in(ids)
+      }).remove();
+  
+      deletedCount += list.length;
+    }
+  
+    return { ok: true, cityCode, deleted: deletedCount };
   }

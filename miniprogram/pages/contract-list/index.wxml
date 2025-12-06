@@ -2,8 +2,29 @@
   <view class="header">
     <text class="title">{{city}} - 合同中心</text>
   </view>
+  
+  <view class="tools-bar">
+    <picker mode="date" fields="month" value="{{selectedMonth}}" bindchange="onDateChange">
+      <view class="date-picker {{selectedMonth ? 'active' : ''}}">
+        <text>{{selectedMonth || '按月筛选'}}</text>
+        <text class="arrow">▼</text>
+      </view>
+    </picker>
+    <view class="date-clear" wx:if="{{selectedMonth}}" bindtap="onClearDate">✕</view>
 
-  <!-- 新增：顶部筛选 tabs -->
+    <view class="search-box">
+      <icon type="search" size="14"></icon>
+      <input 
+        class="search-input" 
+        placeholder="搜姓名/车牌/手机" 
+        confirm-type="search" 
+        bindinput="onSearchInput" 
+        value="{{searchKeyword}}"
+      />
+      <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">✕</view>
+    </view>
+  </view>
+  <!-- 顶部筛选 tabs -->
   <view class="tabs">
     <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
     <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
