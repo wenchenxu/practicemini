@@ -135,13 +135,20 @@ onSearchInput(e) {
       // 3. 日期筛选条件 (按月)
       if (selectedMonth) {
         // selectedMonth 格式 "2025-10"
-        const start = new Date(`${selectedMonth}-01 00:00:00`);
+        // iOS 不支持 "2025-10-01 00:00:00"，需转换为 "2025/10/01 00:00:00"
+        const startStr = `${selectedMonth}-01 00:00:00`.replace(/-/g, '/');
+        const start = new Date(startStr);
+
         const y = start.getFullYear();
         const m = start.getMonth() + 1; // 0-11 -> 1-12
+
         // 下个月 1号
         const nextMonth = m === 12 ? 1 : m + 1;
         const nextYear = m === 12 ? y + 1 : y;
-        const end = new Date(`${nextYear}-${String(nextMonth).padStart(2,'0')}-01 00:00:00`);
+
+        // 结束时间同理，用斜杠拼接
+        const endStr = `${nextYear}/${String(nextMonth).padStart(2,'0')}/01 00:00:00`;
+        const end = new Date(endStr);
 
         whereBase = _.and([
           whereBase,
