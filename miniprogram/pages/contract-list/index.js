@@ -30,9 +30,13 @@ Page({
       filter: 'all',
       runningId: '',
       refreshingId: '',
+      searchKeyword: '',
+      selectedMonth: '', // 格式 'YYYY-MM'
       // 为了调试
       lastEsignUrl: ''
     },
+
+    _searchTimer: null, // 防抖定时器
 
   onLoad(query) {
     const app = getApp();
@@ -76,17 +80,82 @@ Page({
       } */
   },
 
+// 新增：搜索输入（防抖）
+onSearchInput(e) {
+    const val = e.detail.value;
+    this.setData({ searchKeyword: val });
+    
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(() => {
+      this.refresh();
+    }, 500); // 500ms 防抖
+  },
+
+  onSearchClear() {
+    this.setData({ searchKeyword: '' });
+    this.refresh();
+  },
+
+  // 新增：日期选择
+  onDateChange(e) {
+    this.setData({ selectedMonth: e.detail.value }); // YYYY-MM
+    this.refresh();
+  },
+
+  onClearDate() {
+    this.setData({ selectedMonth: '' });
+    this.refresh();
+  },
+
   async fetch() {
     if (!this.data.hasMore || this.data.loading) return;
     this.setData({ loading: true });
 
     try {
-      const whereBase = { cityCode: this.data.cityCode, deleted: _.neq(true) };
+      const { cityCode, searchKeyword, selectedMonth, lastCreatedAt, lastId } = this.data;
+      
+      // 1. 基础条件：城市 + 未删除
+      let whereBase = { cityCode: cityCode, deleted: _.neq(true) };
+      // 2. 搜索条件 (模糊查询)
+      if (searchKeyword && searchKeyword.trim()) {
+        const key = searchKeyword.trim();
+        const reg = db.RegExp({ regexp: key, options: 'i' });
+        // 在基础条件上叠加 OR 查询
+        whereBase = _.and([
+          whereBase,
+          _.or([
+            { 'fields.clientName': reg },  // 搜姓名
+            { 'fields.carPlate': reg },    // 搜车牌
+            { 'fields.clientPhone': reg }, // 搜电话
+            { 'fields.contractSerialNumberFormatted': reg } // 搜合同号
+          ])
+        ]);
+      }
 
+      // 3. 日期筛选条件 (按月)
+      if (selectedMonth) {
+        // selectedMonth 格式 "2025-10"
+        const start = new Date(`${selectedMonth}-01 00:00:00`);
+        const y = start.getFullYear();
+        const m = start.getMonth() + 1; // 0-11 -> 1-12
+        // 下个月 1号
+        const nextMonth = m === 12 ? 1 : m + 1;
+        const nextYear = m === 12 ? y + 1 : y;
+        const end = new Date(`${nextYear}-${String(nextMonth).padStart(2,'0')}-01 00:00:00`);
+
+        whereBase = _.and([
+          whereBase,
+          {
+            createdAt: _.gte(start).and(_.lt(end))
+          }
+        ]);
+      } 
+
+      // 4. 构建带分页的查询
       let condition = COL.where(whereBase);
   
       // 分页游标（createdAt < lastCreatedAt，或时间相同则 _id < lastId）
-      if (this.data.lastCreatedAt) {
+      if (lastCreatedAt) {
         condition = COL.where(
           _.and([
             whereBase,
@@ -115,7 +184,7 @@ Page({
       );
 
       const rawList = this.data.rawList.concat(page);
-      const newList = this.applyFilter(rawList);
+      const newList = this.applyFilter(rawList); // 应用客户端的状态Tab过滤
   
       // 记录新的游标
       const tail = res.data[res.data.length - 1];
@@ -144,7 +213,10 @@ Page({
       filter,
       list: this.applyFilter(rawList, filter)
     });
-    if (!rawList.length) this.refresh();
+    // 如果当前列表为空且还有更多，尝试自动加载下一页
+    if (this.data.list.length === 0 && this.data.hasMore) {
+        this.loadMore();
+    }
   },
 
   async onGetDownloadUrlFromRow(e) {
