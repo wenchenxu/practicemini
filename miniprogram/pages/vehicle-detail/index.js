@@ -76,7 +76,7 @@ Page({
       // 4) 查司机名字（如果有绑定）
       // A. 优先使用车辆记录里的“快照”信息 (兼容 CSV 导入的数据)
       let driverName = veh.currentDriverName || '';
-      let driverIdCard =  veh.currentDriverId || '';
+      let driverId =  veh.currentDriverId || '';
       let driverPhone = veh.currentDriverPhone || '';
 
       // B. 如果有身份证号，尝试去 drivers 集合查最新信息（主要是为了补全电话）
