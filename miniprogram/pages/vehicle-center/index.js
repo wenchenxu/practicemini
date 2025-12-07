@@ -206,7 +206,7 @@ Page({
             _.or(
                 { plate: regex },
                 { currentDriverName: regex }, // 修改：支持搜 currentDriverName
-                { driverName: regex },   // 兼容旧字段，已淘汰
+                { driverName: regex },   // 兼容旧字段，已淘汰?
                 { vin: regex }           // 顺便支持按 VIN 搜
             )
         ]);

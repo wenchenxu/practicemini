@@ -80,22 +80,22 @@ Page({
       let driverPhone = veh.currentDriverPhone || '';
 
       // B. 如果有身份证号，尝试去 drivers 集合查最新信息（主要是为了补全电话）
-      if (driverIdCard) {
+      if (driverId) {
         try {
           const drvRes = await driversCol
-            .where({ clientId: driverIdCard })
+            .where({ clientId: driverId })
             .limit(1)
             .get();
           
           if (drvRes.data && drvRes.data.length > 0) {
             const drv = drvRes.data[0];
             // 如果司机表里有名字，优先用司机表的名字（通常更准确），当然如果司机表没名字就用车辆表的
-            driverName = drv.name || driverName; 
-            driverPhone = drv.phone || '';
+            driverName = drv.name || currentDriverName; 
+            driverPhone = drv.phone || currentDriverPhone || '';
           }
         } catch (err) {
           console.error('Fetch driver info failed', err);
-          // 查不到也没关系，我们已经有 driverName 和 driverIdCard 了
+          // 查不到也没关系，我们已经有 driverName 和 driverId 了
         }
       }
 
@@ -114,7 +114,7 @@ Page({
       this.setData({
         vehicle: veh,
         driverName,
-        driverIdCard,
+        driverId,
         driverPhone,
         contractId,
         rentStatus,

@@ -36,9 +36,9 @@
 
     <view class="section">
       <text class="label">当前司机</text>
-      <view wx:if="{{driverName || driverIdCard}}">
+      <view wx:if="{{driverName || driverId}}">
         <view class="value">{{driverName || '未知姓名'}}</view>
-        <view class="sub-value" wx:if="{{driverIdCard}}">身份证：{{driverIdCard}}</view>
+        <view class="sub-value" wx:if="{{driverId}}">身份证：{{driverId}}</view>
         <view class="sub-value" wx:if="{{driverPhone}}">电话：{{driverPhone}}</view>
       </view>
       <view wx:else class="value">无</view>
