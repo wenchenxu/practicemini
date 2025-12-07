@@ -266,7 +266,7 @@ Page({
         // 批量补充司机姓名，避免依赖车辆文档中的旧 driverName 缓存
         const driverIds = Array.from(new Set(
           normalized
-            .map(item => item.currentDriverClientId || item.currentDriverId)
+            .map(item => item.currentDriverId)
             .filter(Boolean)
         ));
 
@@ -290,15 +290,10 @@ Page({
 
         const enriched = normalized.map(item => {
           // 优先级：
-          // 1. 查表得到的最新名字 (标准ID)
-          // 2. 查表得到的最新名字 (CSV ID)
-          // 3. 车辆表自带的 CSV 导入名字 (currentDriverName)
-          // 4. 车辆表自带的废弃旧字段 (driverName)
+          // 1. 查表得到的最新名字 (标准ID) - 车辆表自带的 CSV 导入名字 (currentDriverName)
           
-          const stdId = item.currentDriverClientId;
-          const csvId = item.currentDriverId;
-          
-          const driverInfo = driverMap[stdId] || driverMap[csvId] || {};
+          const stdId = item.currentDriverId;
+          const driverInfo = driverMap[stdId] || {};
 
           const resolvedName = 
             driverInfo.name ||

@@ -241,7 +241,7 @@ exports.main = async (event, context) => {
         data: {
           rentStatus: newRentStatus,
           maintenanceStatus: newMaintenanceStatus,
-          currentDriverClientId: clientId,
+          currentDriverId: clientId,
           updatedAt: now
         }
       });

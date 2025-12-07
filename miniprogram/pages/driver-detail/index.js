@@ -56,9 +56,9 @@ Page({
         latestContract.createdAtFmt = `${y}-${m}-${day}`;
       }
 
-      // 3）当前车辆：按 currentDriverClientId === clientId 查询 1 条
+      // 3）当前车辆：按 currentDriverId === clientId 查询 1 条
       const vRes = await COL_VEHICLES
-        .where({ currentDriverClientId: clientId })
+        .where({ currentDriverId: clientId })
         .limit(1)
         .get();
       const currentVehicle = vRes.data && vRes.data[0] ? vRes.data[0] : null;

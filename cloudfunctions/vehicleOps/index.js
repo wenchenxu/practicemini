@@ -84,18 +84,15 @@ async function updateStatus(payload) {
       newRentStatus = 'available';
 
       // 如果有司机，解绑
-      // 1. 标准字段
-      updateData.currentDriverClientId = _.remove();
-      // 2. CSV 导入的兼容字段
+      // 1. 标准字段 + CSV 导入的兼容字段
       updateData.currentDriverId = _.remove();
       updateData.currentDriverName = _.remove();
-      // 3. 可能存在的旧冗余字段
-      updateData.driverClientId = _.remove();
+      updateData.currentDriverPhone = _.remove();
     } else if (newStatus === 'maintenance') {
       // 切维修状态：toggle
       eventType = 'maintenance_toggle';
       newMaintenanceStatus = oldMaintenanceStatus === 'in_maintenance' ? 'none' : 'in_maintenance';
-      // 这里不动租赁轴，也不碰 currentDriverClientId
+      // 这里不动租赁轴，也不碰 currentDriverId
     }
   
     // 3) 更新车辆，只写 rentStatus / maintenanceStatus（不再写 status 字段）
@@ -108,7 +105,7 @@ async function updateStatus(payload) {
     });
   
     // 4) 记录车辆历史（保证有 fromStatus / toStatus）
-    const driverSnapshot = veh.currentDriverClientId || veh.currentDriverId || null;
+    const driverSnapshot = veh.currentDriverId || veh.currentDriverName || null;
     const fromStatusLabel = formatStatusLabel(oldRentStatus, oldMaintenanceStatus);
     const toStatusLabel   = formatStatusLabel(newRentStatus, newMaintenanceStatus);
   
