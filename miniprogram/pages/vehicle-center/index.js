@@ -205,7 +205,8 @@ Page({
             baseWhere,
             _.or(
                 { plate: regex },
-                { driverName: regex },   // 如果你有存 driverName
+                { currentDriverName: regex }, // 修改：支持搜 currentDriverName
+                { driverName: regex },   // 兼容旧字段，已淘汰
                 { vin: regex }           // 顺便支持按 VIN 搜
             )
         ]);
@@ -265,27 +266,56 @@ Page({
         // 批量补充司机姓名，避免依赖车辆文档中的旧 driverName 缓存
         const driverIds = Array.from(new Set(
           normalized
-            .map(item => item.currentDriverClientId)
+            .map(item => item.currentDriverClientId || item.currentDriverId)
             .filter(Boolean)
         ));
 
         let driverMap = {};
         if (driverIds.length > 0) {
-          const { data: drivers } = await db
-            .collection('drivers')
-            .where({ clientId: _.in(driverIds) })
-            .get();
-
-          driverMap = (drivers || []).reduce((acc, cur) => {
-            acc[cur.clientId] = cur.name || '';
-            return acc;
-          }, {});
+            try {
+                const { data: drivers } = await db
+                  .collection('drivers')
+                  .where({ clientId: _.in(driverIds) })
+                  .get();
+    
+                driverMap = (drivers || []).reduce((acc, cur) => {
+                  acc[cur.clientId] = {
+                      name: cur.name || '',
+                      phone: cur.phone || ''
+                  };
+                  return acc;
+                }, {});
+              } catch(e) { console.error('fetch drivers failed', e); }
         }
 
-        const enriched = normalized.map(item => ({
-          ...item,
-          driverName: driverMap[item.currentDriverClientId] || item.driverName || ''
-        }));
+        const enriched = normalized.map(item => {
+          // 优先级：
+          // 1. 查表得到的最新名字 (标准ID)
+          // 2. 查表得到的最新名字 (CSV ID)
+          // 3. 车辆表自带的 CSV 导入名字 (currentDriverName)
+          // 4. 车辆表自带的废弃旧字段 (driverName)
+          
+          const stdId = item.currentDriverClientId;
+          const csvId = item.currentDriverId;
+          
+          const driverInfo = driverMap[stdId] || driverMap[csvId] || {};
+
+          const resolvedName = 
+            driverInfo.name ||
+            item.currentDriverName || 
+            '';
+
+          const resolvedPhone = 
+            driverInfo.phone || 
+            item.currentDriverPhone || // 如果车辆表自带
+            '';
+
+          return {
+            ...item,
+            driverName: resolvedName,
+            currentDriverPhone: resolvedPhone
+          };
+        });
 
         const newList = this.data.list.concat(enriched);
   

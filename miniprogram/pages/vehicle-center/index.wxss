@@ -160,3 +160,23 @@
     padding: 4rpx 12rpx;
     border-radius: 999rpx;
   }
+
+  /* 新增样式 */
+.driver-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    /* 已经在 .row3 定义了 margin-top: 4px; font-size: 12px; color: #666; */
+  }
+  
+.driver-col-name {
+    width: 280rpx; /* 【关键】给名字列一个固定宽度，保证右侧电话对齐 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+.driver-col-phone {
+    flex: 1;
+    /* margin-left: 10rpx; 可选 */
+  }
