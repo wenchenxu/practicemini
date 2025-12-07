@@ -95,10 +95,13 @@
       <view class="row2">
         <text class="model">{{item.model || '车型'}} {{item.color}}</text>
       </view>
-      <view class="row3">
-        <text class="driver">
+      <view class="row3 driver-row" >
+        <view class="driver-col-name">
           {{ item.driverName ? ('当前司机：' + item.driverName) : '当前无司机' }}
-        </text>
+        </view>
+        <view class="driver-col-phone">
+          {{ item.currentDriverPhone ? ('电话：' + item.currentDriverPhone) : (item.driverName ? '无手机号' : '') }}
+        </view>
       </view>
     </view>
   </block>

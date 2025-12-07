@@ -76,9 +76,8 @@ Page({
       // 4) 查司机名字（如果有绑定）
       // A. 优先使用车辆记录里的“快照”信息 (兼容 CSV 导入的数据)
       let driverName = veh.currentDriverName || '';
-      // 兼容两种字段名：系统生成的 currentDriverClientId 和 CSV 导入的 currentDriverId
-      let driverIdCard = veh.currentDriverClientId || veh.currentDriverId || '';
-      let driverPhone = '';
+      let driverIdCard =  veh.currentDriverId || '';
+      let driverPhone = veh.currentDriverPhone || '';
 
       // B. 如果有身份证号，尝试去 drivers 集合查最新信息（主要是为了补全电话）
       if (driverIdCard) {
@@ -138,7 +137,7 @@ Page({
     if (opBusy) return;
     if (!vehicle || !vehicle._id) return;
 
-    const hasDriver = !!vehicle.currentDriverClientId;
+    const hasDriver = !!vehicle.currentDriverId;
 
     // 之后优化，暂时添加接口允许没有司机的车辆恢复闲置状态，方便工作流程
     /*
@@ -253,9 +252,9 @@ Page({
       let contractId = '';
 
       // 2. 司机
-      if (vehicle.currentDriverClientId) {
+      if (vehicle.currentDriverId) {
         const drv = await db.collection('drivers')
-          .where({ clientId: vehicle.currentDriverClientId })
+          .where({ clientId: vehicle.currentDriverId })
           .limit(1)
           .get();
         driverName = drv.data?.[0]?.name || '';
@@ -348,7 +347,7 @@ Page({
           // 本地也同步一下状态和司机信息
           this.setData({
             'vehicle.status': newStatus,
-            'vehicle.currentDriverClientId': null,
+            'vehicle.currentDriverId': null,
             driverName: ''
           });
         } catch (e) {

@@ -78,7 +78,7 @@ updatedAt
 
 rentStatus: 'available' | 'rented'
 maintenanceStatus: 'none' | 'in_maintenance'
-currentDriverClientId: string|null
+currentDriverId: string|null
 plate
 vin
 model
