@@ -33,7 +33,7 @@ const BASE_FIELDS = [
   { name:'carRentalCity', label:'租赁城市', type:'string', disabled: true, requiredWhen:'never', maxLength:20, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
 
   // ---- Contract / Rent ----
-  { name:'rentDurationMonth', label:'租期（月）', type:'number', requiredWhen:'always', min:1, max:60 },
+  { name:'rentDurationMonth', label:'租期（个月）', type:'number', requiredWhen:'always', min:1, max:60 },
   { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', requiredWhen:'prod' },
   { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', requiredWhen:'prod' },
   { name:'rentMonthly', label:'月租金', type:'number', requiredWhen:'always', min:0 },
@@ -509,7 +509,16 @@ Page({
         }
   
         // 修改合同后返回上一页
-        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
+        setTimeout(() => {
+            // 获取当前的城市信息
+            const { cityCode, city } = this.data;
+            
+            // 修改跳转目标：不再去 city/index，而是去 contract-list/index
+            // 使用 reLaunch 可以清空页面栈，避免用户点“返回”又回到表单页
+            wx.reLaunch({
+              url: `/pages/contract-list/index?cityCode=${encodeURIComponent(cityCode || '')}&city=${encodeURIComponent(city || '')}`
+            });
+          }, 1500);
       }
   
     } catch (e) {

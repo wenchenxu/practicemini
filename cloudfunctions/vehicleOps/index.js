@@ -338,10 +338,6 @@ async function upsertVehiclesFromCsv(payload) {
       // 如果 CSV 里有 _id 或者是空字符串的 _id，一定要删掉，否则会冲突
       delete updateData._id; 
   
-      // 兼容处理：统一字段名
-      if (updateData.currentDriverClientId && !updateData.currentDriverId) {
-          updateData.currentDriverId = updateData.currentDriverClientId;
-      }
       // 删除旧字段键（如果存在），保持数据库整洁
       delete updateData.currentDriverClientId;
   
