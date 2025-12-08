@@ -43,5 +43,16 @@
       确认彻底删除
     </button>
   </view>
+  <view class="card" style="border: 2rpx solid #1677ff; background:#e6f7ff;">
+    <view class="title" style="color:#1677ff;">CSV 智能导入 (Upsert)</view>
+    <view class="desc">
+      上传 CSV 文件。系统会自动根据 <text style="font-weight:bold;">车牌号 (plate)</text> 匹配：
+      <view>• 如果车牌存在 -> 更新该车辆信息 (保留历史ID)</view>
+      <view>• 如果车牌不存在 -> 创建新车辆</view>
+    </view>
+    <button type="primary" bindtap="onImportCsvUpsert" loading="{{loading}}">
+      选择文件并导入
+    </button>
+  </view>
 
   </view>

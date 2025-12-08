@@ -1,5 +1,6 @@
 // 云函数入口文件
 const cloud = require('wx-server-sdk');
+const Papa = require('papaparse');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
@@ -27,6 +28,8 @@ exports.main = async (event, context) => {
         return await fixCreatedAt();
       case 'deleteByCity':
         return await deleteByCity(payload);
+      case 'importCsv':
+        return await upsertVehiclesFromCsv(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -284,4 +287,94 @@ async function deleteByCity(payload) {
     }
   
     return { ok: true, cityCode, deleted: deletedCount };
+  }
+
+async function upsertVehiclesFromCsv(payload) {
+    const { fileID } = payload;
+    if (!fileID) throw new Error('fileID required');
+  
+    // 1. 下载 CSV 文件
+    const downloadRes = await cloud.downloadFile({ fileID });
+    const csvContent = downloadRes.fileContent.toString('utf8');
+  
+    // 2. 使用 PapaParse 解析
+    // header: true 表示第一行是标题，会自动转成对象数组
+    // skipEmptyLines: true 自动跳过空行
+    const parseResult = Papa.parse(csvContent, {
+      header: true,
+      skipEmptyLines: true
+    });
+  
+    if (parseResult.errors.length > 0) {
+      console.warn('[CSV Parse Warning]', parseResult.errors);
+    }
+  
+    const rows = parseResult.data; // 这是一个对象数组
+    if (!rows || rows.length === 0) return { ok: false, msg: 'empty-csv' };
+  
+    const vehiclesCol = db.collection('vehicles');
+    const now = db.serverDate();
+    
+    let updatedCount = 0;
+    let insertedCount = 0;
+    let errorCount = 0;
+  
+    // 3. 逐条 Upsert
+    for (const row of rows) {
+      // PapaParse 解析出来的对象，key 是表头，value 是单元格内容
+      // 空单元格默认是 "" (空字符串)，完全符合你的需求，无需转 null
+  
+      const plate = row.plate ? row.plate.trim() : '';
+      if (!plate) continue; // 跳过没车牌的行
+  
+      // 强制更新时间
+      // 注意：这里我们构造一个新的 updateData 对象，而不是直接污染 row，
+      // 这样可以避免把 _id 等不该更新的字段带进去
+      const updateData = { ...row };
+      
+      updateData.updatedAt = now;
+      
+      // 清理不需要写入数据库的字段 (比如 CSV 里可能有的空列或者序号)
+      // 如果 CSV 里有 _id 或者是空字符串的 _id，一定要删掉，否则会冲突
+      delete updateData._id; 
+  
+      // 兼容处理：统一字段名
+      if (updateData.currentDriverClientId && !updateData.currentDriverId) {
+          updateData.currentDriverId = updateData.currentDriverClientId;
+      }
+      // 删除旧字段键（如果存在），保持数据库整洁
+      delete updateData.currentDriverClientId;
+  
+      try {
+        // 先查
+        const exist = await vehiclesCol.where({ plate }).get();
+        
+        if (exist.data.length > 0) {
+          // --- 更新 ---
+          const docId = exist.data[0]._id;
+          await vehiclesCol.doc(docId).update({
+            data: updateData
+          });
+          updatedCount++;
+        } else {
+          // --- 新增 ---
+          updateData.createdAt = now;
+          await vehiclesCol.add({
+            data: updateData
+          });
+          insertedCount++;
+        }
+      } catch (e) {
+        console.error(`Error processing plate ${plate}:`, e);
+        errorCount++;
+      }
+    }
+  
+    return { 
+      ok: true, 
+      total: rows.length, 
+      updated: updatedCount, 
+      inserted: insertedCount, 
+      errors: errorCount 
+    };
   }
