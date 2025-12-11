@@ -27,15 +27,21 @@ exports.main = async (event, context) => {
 
   // 2) 审核模式（仅在你开启时）
   // 期待 whitelist_setting 集合里有一条记录：
-  const stDoc = await ST.limit(1).get();
+  // 改进：按更新时间倒序取最新的一条，防止有多条记录干扰
+  const stDoc = await ST.orderBy('updatedAt', 'desc').limit(1).get();
   const st = stDoc.data?.[0] || {};
-  if (st.auditMode === true && auditToken && auditToken === st.auditCode) {
+
+  // 改进：使用 String() 确保类型一致，并 trim() 去除首尾空格
+  const dbCode = String(st.auditCode || '').trim();
+  const inputCode = String(auditToken || '').trim();
+
+  if (st.auditMode === true && inputCode && inputCode === dbCode) {
     // 审核放行：不写白名单，返回临时票据信息
     return {
       allowed: true,
       role: 'staff',
       auditGrant: true,
-      ttlHours: st.ttlHours || 24
+      ttlHours: Number(st.ttlHours) || 24
     };
   }
 
