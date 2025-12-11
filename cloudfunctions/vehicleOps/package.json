@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "papaparse": "^5.5.3",
     "wx-server-sdk": "~3.0.1"
   }
 }

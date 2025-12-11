@@ -376,8 +376,14 @@ onSearchInput(e) {
     if (!fileID) return wx.showToast({ title: '此合同暂无文件', icon: 'none' });
 
     // 2) 组几个签署要用的字段
-    const signerPhone = item.fields?.clientPhone;   // 签署人手机号
-    const signerName  = item.fields?.clientName;         // 签署人姓名
+    const rawName = item.fields?.clientName || '';
+    const rawPhone = item.fields?.clientPhone || '';
+    // 强力净化：去掉所有 回车(\r)、换行(\n) 和 首尾空格
+    const signerName = rawName.replace(/[\r\n]/g, '').trim();
+    const signerPhone = rawPhone.replace(/[\r\n]/g, '').trim();
+    // 兜底保护：如果名字被洗空了，给个默认值防止文件名为空
+    const safeFileName = signerName ? `${signerName}.pdf` : `contract_${id.slice(-4)}.pdf`;
+
     // 这个是你 ECS /sign-task/create 里要的 actorId，可以用手机号
     const actorId     = signerPhone;
     // 这个是你刚才特别强调“不要为空”的 clientUserId
@@ -405,7 +411,7 @@ onSearchInput(e) {
           action: 'uploadFileByUrl',
           payload: {
             url: tempUrl,
-            fileName: `${signerName}.pdf`,
+            fileName: safeFileName,
             fileType: 'doc' //这是正确的 fileType
           }
         }
@@ -414,7 +420,12 @@ onSearchInput(e) {
       const fddFileUrl =
         up?.result?.data?.result?.data?.fddFileUrl ||
         up?.result?.data?.data?.fddFileUrl;
+      console.log('=== 准备调用 convertFddUrlToFileId ===');
+      console.log('fddFileUrl:', fddFileUrl);
+      console.log('fileName:', `${signerName}.pdf`);
+      console.log('fileType:', 'doc');
       if (!fddFileUrl) throw new Error('未拿到 fddFileUrl');
+      await new Promise(r => setTimeout(r, 1000));
 
       // C. 文件处理 → 拿到 fileId
       const conv = await wx.cloud.callFunction({
@@ -425,7 +436,7 @@ onSearchInput(e) {
             // 这里 ECS 那条路由是按官方写的 fileType=doc 来处理的
             fddFileUrl,
             fileType: 'doc',
-            fileName: `${signerName}.pdf`
+            fileName: safeFileName
           }
         }
       });

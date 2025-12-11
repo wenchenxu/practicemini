@@ -29,11 +29,11 @@
         <button class="admin-btn" style="background:#444;" bindtap="goDevTools">开发者工具</button>
         </view>
     </view>
-    <!-- 法大大测试入口（你可以把这段放到任何合适的位置)
+    <!-- 法大大测试入口（你可以把这段放到任何合适的位置)    -->
     <view wx:if="{{isAdmin}}" class="fadada-test-entry">
         <button type="default" bindtap="goFadadaTest">法大大测试</button>
     </view>
-    -->
+
 
   </view>
   <view class="beian-footer">
