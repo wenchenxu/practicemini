@@ -457,6 +457,29 @@ Page({
   
     if (this.data.saving) return;
 
+    // 必须在 validate() 和 toPersistObject() 之前执行
+    // 这里的原理是：修改 form 对象的属性，因为它是引用类型，
+    // 所以后续的 validate/toPersistObject 读取 this.data.form 时都能读到清洗后的值。
+    const { form } = this.data; 
+    if (form) {
+      let changed = false;
+      if (typeof form.clientName === 'string') {
+        const clean = form.clientName.replace(/[\r\n]/g, '').trim();
+        if (form.clientName !== clean) { form.clientName = clean; changed = true; }
+      }
+      if (typeof form.clientPhone === 'string') {
+        const clean = form.clientPhone.replace(/[\r\n]/g, '').trim();
+        if (form.clientPhone !== clean) { form.clientPhone = clean; changed = true; }
+      }
+      if (typeof form.carPlate === 'string') {
+        const clean = form.carPlate.replace(/[\r\n]/g, '').trim().toUpperCase();
+        if (form.carPlate !== clean) { form.carPlate = clean; changed = true; }
+      }
+      
+      // (可选) 用户看到输入框里的回车立刻消失
+      if (changed) { this.setData({ form }); }
+    }
+
     const err = this.validate && this.validate();
     if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
   

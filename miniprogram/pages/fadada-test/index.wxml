@@ -21,6 +21,10 @@
   <button bindtap="onCheckCorpAuthStatus">查询企业授权状态</button>-->
   <view class="split"></view>
   <button bindtap="onUploadPdf">上传PDF获取fileId</button>
+  <view class="split"></view>
+  <button type="warn" bindtap="onDebugFileProcess" style="margin-top:20rpx;">
+  诊断：文件处理接口 (convertFddUrl)
+  </button>
 
   <view class="split"></view>
   <view class="subtitle">当前 fileId：</view>

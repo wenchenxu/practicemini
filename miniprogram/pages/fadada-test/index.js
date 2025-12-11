@@ -491,5 +491,112 @@ Page({
         const check = () => { ensureAccess(); };
         if (app.globalData.initialized) check();
         else app.$whenReady(check);
-      }
+      },
+
+    async onDebugFileProcess() {
+    try {
+        this.appendLog('=== 开始诊断文件处理接口 ===');
+        
+        // 1. 选择文件
+        const choose = await wx.chooseMessageFile({ count: 1, type: 'file', extension: ['pdf'] });
+        const file = choose?.tempFiles?.[0];
+        if (!file) return;
+
+        this.appendLog(`1. 选中文件: ${file.name}, 大小: ${(file.size/1024).toFixed(2)}KB`);
+        wx.showLoading({ title: '上传云存储...', mask: true });
+
+        // 2. 上传到云存储 (模拟业务流程)
+        const cloudPath = `debug_fdd/${Date.now()}_debug.pdf`;
+        const up = await wx.cloud.uploadFile({ cloudPath, filePath: file.path });
+        this.appendLog(`2. 云存储上传成功: ${up.fileID}`);
+
+        // 3. 获取临时链接
+        const temp = await wx.cloud.getTempFileURL({ fileList: [up.fileID] });
+        const url = temp?.fileList?.[0]?.tempFileURL;
+        if (!url) throw new Error('无法获取临时URL');
+        this.appendLog(`3. 临时URL获取成功 (长度:${url.length})`);
+
+        // 4. 第一步：uploadFileByUrl (传给法大大)
+        wx.showLoading({ title: '调用 uploadFileByUrl...' });
+        const r1 = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: { 
+            action: 'uploadFileByUrl', 
+            payload: { url, fileName: 'debug.pdf', fileType: 'doc' } 
+        }
+        });
+        
+        this.appendLog('>>> uploadFileByUrl 原始返回:');
+        this.appendLog(r1);
+
+        // 提取 fddFileUrl
+        const body1 = r1.result;
+        const fddFileUrl = 
+        body1?.data?.result?.data?.fddFileUrl ||
+        body1?.data?.data?.fddFileUrl ||
+        body1?.result?.data?.fddFileUrl ||
+        body1?.result?.fddFileUrl;
+
+        if (!fddFileUrl) {
+        throw new Error('第一步失败：未返回 fddFileUrl。请检查上方日志的 code/msg');
+        }
+        this.appendLog(`4. 拿到 fddFileUrl: ${fddFileUrl.slice(0, 30)}...`);
+
+        // 5. 第二步：convertFddUrlToFileId (文件处理) —— 这是最容易报错的地方
+        wx.showLoading({ title: '调用 convertFddUrl...' });
+        
+        // 模拟一点延迟，防止法大大那边还没落盘
+        await new Promise(r => setTimeout(r, 500));
+
+        const r2 = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+            action: 'convertFddUrlToFileId',
+            payload: {
+                fddFileUrl,
+                fileType: 'doc',
+                fileName: 'debug_convert.pdf'
+            }
+        }
+        });
+
+        this.appendLog('>>> convertFddUrlToFileId 原始返回:');
+        this.appendLog(r2); // ★★★ 重点看这里的日志 ★★★
+
+        const body2 = r2.result;
+        // 尝试提取 fileId
+        const fileId = 
+        body2?.data?.result?.data?.fieldList?.fileId ||
+        body2?.data?.result?.data?.fileIdList?.[0]?.fileId ||
+        body2?.data?.data?.fileIdList?.[0]?.fileId ||
+        body2?.result?.data?.fileIdList?.[0]?.fileId ||
+        body2?.result?.fileIdList?.[0]?.fileId ||
+        body2?.fileId;
+
+        if (fileId) {
+        this.setData({ fileId }); // 回填到界面
+        wx.showModal({
+            title: '诊断成功',
+            content: `成功获取 fileId: ${fileId}`,
+            showCancel: false
+        });
+        } else {
+        // 尝试解析错误原因
+        const code = body2?.data?.code || body2?.code || '未知';
+        const msg = body2?.data?.msg || body2?.msg || '未知错误';
+        wx.showModal({
+            title: '文件处理失败',
+            content: `Code: ${code}\nMsg: ${msg}\n(详情请看下方滚动日志)`,
+            showCancel: false
+        });
+        }
+
+    } catch (e) {
+        console.error(e);
+        this.appendLog(`ERROR: ${e.message}`);
+        wx.showModal({ title: '流程异常', content: e.message, showCancel: false });
+    } finally {
+        wx.hideLoading();
+    }
+    }
 });
