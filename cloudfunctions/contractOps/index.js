@@ -10,6 +10,20 @@ const COL = db.collection('contracts');
 // —— 公用工具（与 createContract 保持一致）——
 function pad(n, width=2){ return String(n).padStart(width,'0'); }
 
+function sanitizePathComponent(input) {
+    if (!input) return '';
+    return String(input).trim().replace(/[\\/]/g, '-');
+  }
+  
+  function buildContractFolderPath(opts) {
+    const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
+    const branchFolder = branchCode || 'default';
+    const typeFolder = contractType || 'default';
+    const safeName = sanitizePathComponent(driverName);
+    const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
+    return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
+  }
+
 function numberToCN(n) {
     // 与前端一致的版本（可复用/精简）
     if (n === null || n === undefined || n === '') return '';
@@ -90,6 +104,14 @@ async function renderDocxForContract(doc) {
     // 修正这里的命名
     const { y, m, d } = nowInTZ(BIZ_TZ);
   
+    const folderBase = buildContractFolderPath({
+        cityCode,
+        branchCode,
+        contractType,
+        serialFormatted,
+        driverName: fields.clientName
+      });
+
     // 1) 选模板并渲染 DOCX
     const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({ cityCode, branchCode, contractType });
     const zip = new PizZip(content);
@@ -143,11 +165,8 @@ async function renderDocxForContract(doc) {
     const outBuf = docx.getZip().generate({ type:'nodebuffer' });
   
     // 2) 覆盖上传 DOCX
-    const folderBranch = branchCode || 'default';
-    const folderType = contractType || 'default';
-    const basePath = `contracts/${cityCode}/${folderBranch}/${folderType}/${serialFormatted}`;
     const upDocx = await cloud.uploadFile({
-      cloudPath: `${basePath}.docx`,
+      cloudPath: `${folderBase}/contract.docx`,
       fileContent: outBuf,
     });
     const docxFileID = upDocx.fileID;
@@ -193,7 +212,7 @@ async function renderDocxForContract(doc) {
   
     // 4) 上传 PDF 并回写
     const upPdf = await cloud.uploadFile({
-      cloudPath: `${basePath}.pdf`,
+      cloudPath: `${folderBase}/contract.pdf`,
       fileContent: pdfBuf,
     });
     const pdfFileID = upPdf.fileID;
@@ -201,13 +220,19 @@ async function renderDocxForContract(doc) {
   
     await COL.doc(_id).update({
       data: {
-        file: { docxFileID, pdfFileID },
+        file: { pdfFileID },
         updatedAt: db.serverDate()
       }
     });
   
+    try {
+        await cloud.deleteFile({ fileList: [docxFileID] });
+      } catch (e) {
+        console.warn('[render] delete docx after pdf upload failed', e);
+      }
+
     // 5) 返回给前端：优先 pdf
-    return { ok:true, fileID: pdfFileID, pdfFileID, docxFileID };
+    return { ok:true, fileID: pdfFileID, pdfFileID};
   }
 
 exports.main = async (event, context) => {

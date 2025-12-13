@@ -19,6 +19,20 @@ function pad(n, width = 2) {
   return String(n).padStart(width, '0');
 }
 
+function sanitizePathComponent(input) {
+    if (!input) return '';
+    return String(input).trim().replace(/[\\/]/g, '-');
+  }
+  
+function buildContractFolderPath(opts) {
+    const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
+    const branchFolder = branchCode || 'default';
+    const typeFolder = contractType || 'default';
+    const safeName = sanitizePathComponent(driverName);
+    const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
+    return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
+  }
+
 function numberToCN(n) {
   if (n === null || n === undefined || n === '') return '';
   const units = '仟佰拾亿仟佰拾万仟佰拾元角分';
@@ -377,12 +391,16 @@ exports.main = async (event, context) => {
 
     const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
 
-    const branchFolder = branchCode || 'default';
-    const typeFolder   = contractType || 'default';
-    const basePath     = `contracts/${cityCode}/${branchFolder}/${typeFolder}/${serialFormatted}`;
+    const basePath = buildContractFolderPath({
+        cityCode,
+        branchCode,
+        contractType,
+        serialFormatted,
+        driverName: finalFields.clientName
+      });
 
     const uploadDocxRes = await cloud.uploadFile({
-      cloudPath: `${basePath}.docx`,
+      cloudPath: `${basePath}/contract.docx`,
       fileContent: outBuf
     });
     const docxFileID = uploadDocxRes.fileID;
@@ -415,14 +433,20 @@ exports.main = async (event, context) => {
         });
       } else {
         const upPdf = await cloud.uploadFile({
-          cloudPath: `${basePath}.pdf`,
+          cloudPath: `${basePath}/contract.pdf`,
           fileContent: buf,
         });
         pdfFileID = upPdf.fileID;
 
         await COL_CONTRACTS.doc(contractId).update({
-          data: { file: { docxFileID, pdfFileID }, updatedAt: db.serverDate() }
+          data: { file: { pdfFileID }, updatedAt: db.serverDate() }
         });
+
+        try {
+            await cloud.deleteFile({ fileList: [docxFileID] });
+          } catch (delErr) {
+            console.warn('[createWithDriverVehicle] delete docx after pdf upload failed', delErr);
+          }
 
         return {
           ok: true,
@@ -438,6 +462,12 @@ exports.main = async (event, context) => {
     }
 
     // PDF 挂掉就只返回 DOCX
+    await COL_CONTRACTS.doc(contractId).update({
+        data: { file: { docxFileID }, updatedAt: db.serverDate() }
+      }).catch(err => {
+        console.error('[createWithDriverVehicle] update docx fallback failed', err);
+      });
+
     return {
       ok: true,
       _id: contractId,
