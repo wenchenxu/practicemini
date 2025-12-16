@@ -11,7 +11,17 @@ const db   = cloud.database();
 const COL_CONTRACTS = db.collection('contracts');
 const COL_DRIVERS   = db.collection('drivers');
 const COL_VEHICLES  = db.collection('vehicles');
+const COL_HISTORY = db.collection('vehicle_history');
 const BIZ_TZ        = 'Asia/Shanghai';
+
+// 法大大附件配置，这里的 key 对应 cityCode，value 是 contractTemplate/cities/{cityCode}/ 下的文件名
+const CITY_ATTACHMENTS = {
+    guangzhou: [], // 广州暂无，可按需添加
+    huizhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
+    foshan: [],
+    suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
+    // ... 其他城市
+  };
 
 // ========== 公共工具（直接复用你现有的） ==========
 
@@ -101,6 +111,49 @@ async function pickTemplateBuffer(opts) {
   }
   throw new Error('no-template-available');
 }
+
+// 处理单个 DOCX 附件：渲染变量 -> 上传云存储
+async function generateAttachmentDocx(opts) {
+    const { fileName, cityCode, dataForDocx, basePath, serialFormatted, index } = opts;
+    
+    // 1. 下载模板
+    const tplFileID = `${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${fileName}`;
+    let tplBuf;
+    try {
+      const res = await cloud.downloadFile({ fileID: tplFileID });
+      tplBuf = res.fileContent;
+    } catch (e) {
+      console.warn(`[Attachment] Template missing: ${tplFileID}`);
+      return null; 
+    }
+  
+    // 2. 渲染变量
+    const zip = new PizZip(tplBuf);
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      delimiters: { start: '[[', end: ']]' },
+    });
+    doc.render(dataForDocx);
+    const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
+  
+    // 3. 构造新文件名 (主合同名-attachN.docx)
+    // 例如：TSFZX-HZ-20231215-001-attach1.docx
+    const newFileName = `${serialFormatted}-attach${index + 1}.docx`;
+    const cloudPath = `${basePath}/${newFileName}`;
+  
+    // 4. 上传到与主合同相同的文件夹
+    const upRes = await cloud.uploadFile({
+      cloudPath: cloudPath,
+      fileContent: outBuf
+    });
+  
+    return {
+      key: `attach${index + 1}FileId`, // 对应数据库字段名 file.attach1FileId
+      fileId: upRes.fileID,
+      fileName: newFileName
+    };
+  }
 
 // ========== 主入口 ==========
 
@@ -300,7 +353,8 @@ exports.main = async (event, context) => {
           fields,
           deleted: false,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
+          attachments: []
         }
       });
 
@@ -323,22 +377,9 @@ exports.main = async (event, context) => {
     const { contractId, serialFormatted, finalFields } = txResult;
 
     // === 事务外：渲染 DOCX + PDF（直接复用你原 createContract 的逻辑） ===
-
-    const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({
-      cityCode,
-      branchCode,
-      contractType
-    });
-
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: '[[', end: ']]' },
-    });
-
     const dataForDocx = {
       contractNo: serialFormatted,
+      cNo: serialFormatted,
       contractDate: `${yyyy}-${mm}-${dd}`,
       cityName,
       branchName: branchName || '',
@@ -377,6 +418,70 @@ exports.main = async (event, context) => {
       depositRemaining: finalFields.depositRemaining,
     };
 
+    const basePath = buildContractFolderPath({
+        cityCode,
+        branchCode,
+        contractType,
+        serialFormatted,
+        driverName: finalFields.clientName
+      });
+
+    // ========== 3. 处理附件 (并行处理以提高速度) ==========
+    const attachFiles = CITY_ATTACHMENTS[cityCode] || [];
+    const fileUpdates = {}; // 用于更新 file 字段
+
+    if (attachFiles.length > 0) {
+      console.log(`[ContractV2] Generating ${attachFiles.length} attachments for ${cityCode}`);
+      
+      const results = await Promise.all(attachFiles.map((fileName, index) => 
+        generateAttachmentDocx({
+          fileName,
+          cityCode,
+          dataForDocx,
+          basePath,
+          serialFormatted,
+          index
+        })
+      ));
+
+      // 收集生成的 FileID
+      results.forEach(res => {
+        if (res) {
+          fileUpdates[res.key] = res.fileId;
+        }
+      });
+
+      // 更新数据库 file 字段 (保留原有的 docxFileID/pdfFileID)
+      if (Object.keys(fileUpdates).length > 0) {
+        // 使用 .file.key 的形式进行局部更新
+        const updateData = {};
+        for (const [key, val] of Object.entries(fileUpdates)) {
+          updateData[`file.${key}`] = val;
+        }
+        await COL_CONTRACTS.doc(contractId).update({
+          data: { 
+             ...updateData,
+             updatedAt: db.serverDate() 
+          }
+        });
+      }
+    }
+
+    // === 主合同渲染与生成 (保持原有逻辑) ===
+
+    const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({
+      cityCode,
+      branchCode,
+      contractType
+    });
+
+    const zip = new PizZip(content);
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      delimiters: { start: '[[', end: ']]' },
+    });
+
     try {
       doc.render(dataForDocx);
     } catch (e) {
@@ -390,14 +495,6 @@ exports.main = async (event, context) => {
     }
 
     const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
-
-    const basePath = buildContractFolderPath({
-        cityCode,
-        branchCode,
-        contractType,
-        serialFormatted,
-        driverName: finalFields.clientName
-      });
 
     const uploadDocxRes = await cloud.uploadFile({
       cloudPath: `${basePath}/contract.docx`,
@@ -442,6 +539,7 @@ exports.main = async (event, context) => {
           data: { file: { pdfFileID }, updatedAt: db.serverDate() }
         });
 
+        // 只有成功生成PDF后才删除 DOCX，节省空间
         try {
             await cloud.deleteFile({ fileList: [docxFileID] });
           } catch (delErr) {
@@ -454,26 +552,21 @@ exports.main = async (event, context) => {
           contractSerialNumberFormatted: serialFormatted,
           fileID: pdfFileID,
           docxFileID,
-          pdfFileID
+          pdfFileID,
+          attachments: fileUpdates
         };
       }
     } catch (e) {
       console.error('[createWithDriverVehicle] PDF convert fail:', e);
     }
 
-    // PDF 挂掉就只返回 DOCX
-    await COL_CONTRACTS.doc(contractId).update({
-        data: { file: { docxFileID }, updatedAt: db.serverDate() }
-      }).catch(err => {
-        console.error('[createWithDriverVehicle] update docx fallback failed', err);
-      });
-
     return {
       ok: true,
       _id: contractId,
       contractSerialNumberFormatted: serialFormatted,
       fileID: docxFileID,
-      docxFileID
+      docxFileID,
+      attachments: fileUpdates
     };
 
   } catch (err) {

@@ -362,7 +362,7 @@ onSearchInput(e) {
   },
 
   // 发起签署：一口气做完  upload -> process -> create task -> actor url -> 复制
-  async onSignFromRow(e) {
+  async onSignFromRowOld(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
     if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
@@ -542,6 +542,176 @@ onSearchInput(e) {
     } finally {
       wx.hideLoading();
       this.setData({ runningId: '' });
+    }
+  },
+
+  // 发起签署（包含附件懒加载上传）
+  async onSignFromRow(e) {
+    console.log('按钮被点击了，dataset:', e.currentTarget.dataset);
+    const { item } = e.currentTarget.dataset;
+    if (!item) {
+        console.error('错误：没有拿到 item 数据'); 
+        return;
+    }
+
+    wx.showLoading({ title: '准备附件...', mask: true });
+    console.log('[Sign] Start processing:', item.contractSerialNumberFormatted);
+
+    try {
+      const contractId = item._id;
+      const fileData = item.file || {};
+      const esignData = item.esign || {};
+      
+      // 1. 识别有哪些附件需要处理 (attach1FileId, attach2FileId...)
+      // 我们遍历 file 对象里所有以 attach 开头且以 FileId 结尾的 key
+      const attachKeys = Object.keys(fileData).filter(k => k.startsWith('attach') && k.endsWith('FileId'));
+      
+      console.log('[Sign] Found attachments in DB:', attachKeys);
+
+      const fddAttachs = []; // 最终传给 createSignTask 的数组
+      const updatesToDb = {}; // 待回写到数据库 esign 字段的数据
+
+      // 2. 循环处理每个附件
+      for (const key of attachKeys) {
+        // key 类似 'attach1FileId'
+        // 提取序号索引，比如 '1'
+        const match = key.match(/attach(\d+)FileId/);
+        const indexStr = match ? match[1] : '0';
+        const attachName = `attach${indexStr}`; // 作为传给法大大的 attachName 和 attachId
+
+        // 检查 esign 里是否已经上传过 (esign.attach1FileId)
+        let fddFileId = esignData[key];
+
+        if (fddFileId) {
+          console.log(`[Sign] ${attachName} already uploaded:`, fddFileId);
+        } else {
+          // --- 懒加载上传流程 ---
+          const wxFileId = fileData[key];
+          console.log(`[Sign] Uploading ${attachName} (wxFileId: ${wxFileId})...`);
+
+          // A. 获取临时链接
+          const tempRes = await wx.cloud.getTempFileURL({ fileList: [wxFileId] });
+          const tempUrl = tempRes.fileList[0].tempFileURL;
+
+          // B. 上传到法大大 (fileType: 'attach')
+          const upRes = await wx.cloud.callFunction({
+            name: 'api-fadada',
+            data: {
+              action: 'uploadFileByUrl',
+              payload: {
+                url: tempUrl,
+                fileName: `${attachName}.docx`, 
+                fileType: 'attach' // <--- 关键：用户要求用 attach
+              }
+            }
+          });
+          
+          console.log(`[Debug] api-fadada 上传返回结果 (${attachName}):`, upRes);
+          // 打印 result 里的具体数据，方便直接看结构
+          const remoteData = upRes.result;
+          console.log(`[Debug] remoteData:`, remoteData);
+
+          // 解析 URL (根据你 server.js 的返回结构适配)
+          const fddFileUrl = remoteData?.data?.result?.data?.fddFileUrl;
+          // if (!fddFileUrl) throw new Error(`上传附件 ${attachName} 失败`);
+          if (!fddFileUrl) {
+            // 抛出错误前，把整个返回体打出来看看
+            console.error(`[Fatal] 无法解析 fddFileUrl。完整返回:`, JSON.stringify(remoteData));
+            throw new Error(`上传附件 ${attachName} 失败: 未能获取 fddFileUrl`);
+         }
+
+          // C. 处理文件转 ID (convertFddUrlToFileId)
+          const cvRes = await wx.cloud.callFunction({
+            name: 'api-fadada',
+            data: {
+              action: 'convertFddUrlToFileId',
+              payload: {
+                fddFileUrl: fddFileUrl,
+                fileType: 'doc',
+                fileName: `${attachName}.docx`
+              }
+            }
+          });
+
+          const cvRemoteResult = cvRes.result;
+          fddFileId = cvRemoteResult?.data?.result?.data?.fileIdList?.[0]?.fileId;
+
+          if (!fddFileId) {
+             console.error(`[Fatal] 无法解析 fddFileId。cvRemoteResult:`, cvRemoteResult);
+             throw new Error(`附件 ${attachName} 转换ID失败 - 未找到 fileIdList`);
+          }
+          
+          console.log(`[Sign] 转换成功: ${attachName} -> ${fddFileId}`);
+
+          // 记录需要更新到数据库
+          updatesToDb[`esign.${key}`] = fddFileId;
+        }
+
+        // 添加到参数数组
+        fddAttachs.push({
+          attachId: attachName,
+          attachName: attachName,
+          attachFileId: fddFileId
+        });
+      }
+
+      // 3. 更新数据库 (如果有新上传的附件)
+      if (Object.keys(updatesToDb).length > 0) {
+        console.log('[Sign] Saving new fddFileIds to DB:', updatesToDb);
+        await wx.cloud.callFunction({
+          name: 'api-fadada',
+          data: {
+            action: 'saveContractEsign', // 确保你 server.js 或 cloud 有这个处理逻辑(简单的 db.update)
+            payload: {
+              contractId: contractId,
+              ...updatesToDb // 传入类似 { 'esign.attach1FileId': 'xxx' }
+            }
+          }
+        });
+        // 也可以直接在前端调 db.collection('contracts').doc(contractId).update(...) 如果有权限的话
+      }
+
+      // 4. 处理主合同 (假设 docFileId 已存在，逻辑同理，此处略过，专注附件)
+      // 如果你需要主合同也在这里上传，请告诉我，目前假设主合同已经 ready
+      const docFileId = esignData.docFileId || esignData.fileId; 
+      if (!docFileId) throw new Error('主合同尚未上传至法大大，请先处理主合同');
+
+      // 5. 发起签署
+      wx.showLoading({ title: '发起签署...', mask: true });
+      const taskPayload = {
+        docFileId: docFileId,
+        subject: `${item.fields.clientName}-租车合同`,
+        signerName: item.fields.clientName,
+        signerId: item.fields.clientId,
+        signerPhone: item.fields.clientPhone,
+        cityCode: item.cityCode,
+        attachs: fddAttachs // <--- 传入附件列表
+      };
+      
+      console.log('[Sign] Calling createSignTaskV51 with:', taskPayload);
+
+      const taskRes = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'createSignTaskV51',
+          payload: taskPayload
+        }
+      });
+
+      console.log('[Sign] Task Result:', taskRes.result);
+
+      if (taskRes.result?.ok || taskRes.result?.success) {
+        wx.showToast({ title: '已发起签署', icon: 'success' });
+        // 刷新列表...
+        this.onPullDownRefresh();
+      } else {
+        throw new Error(taskRes.result?.msg || '发起失败');
+      }
+
+    } catch (err) {
+      console.error('[Sign Error]', err);
+      wx.hideLoading();
+      wx.showModal({ title: '错误', content: err.message, showCancel: false });
     }
   },
 

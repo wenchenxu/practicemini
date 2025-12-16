@@ -98,6 +98,7 @@
         <button
             class="mini-op"
             data-id="{{item._id}}"
+            data-item="{{item}}"
             bindtap="onSignFromRow"
             size="mini"
             type="primary"
