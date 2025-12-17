@@ -16,10 +16,9 @@ const BIZ_TZ        = 'Asia/Shanghai';
 
 // 法大大附件配置，这里的 key 对应 cityCode，value 是 contractTemplate/cities/{cityCode}/ 下的文件名
 const CITY_ATTACHMENTS = {
-    guangzhou: [], // 广州暂无，可按需添加
+    // guangzhou: [],
     huizhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
-    foshan: [],
-    suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
+    // suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
     // ... 其他城市
   };
 
