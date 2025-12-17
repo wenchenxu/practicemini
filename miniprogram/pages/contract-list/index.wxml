@@ -99,7 +99,7 @@
             class="mini-op"
             data-id="{{item._id}}"
             data-item="{{item}}"
-            bindtap="onSignFromRow"
+            bindtap="onSignFromRowV2"
             size="mini"
             type="primary"
             loading="{{runningId === item._id}}"
