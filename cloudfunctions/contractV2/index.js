@@ -308,6 +308,7 @@ exports.main = async (event, context) => {
           rentStatus: newRentStatus,
           maintenanceStatus: newMaintenanceStatus,
           currentDriverId: clientId,
+          currentDriverName: clientName,
           updatedAt: now
         }
       });
