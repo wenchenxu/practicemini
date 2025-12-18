@@ -47,7 +47,11 @@ App({
 
       // 访问者以及审核人员授权流程
       try {
-        const { result } = await wx.cloud.callFunction({ name: 'auth_checkAccess' });
+        // const { result } = await wx.cloud.callFunction({ name: 'auth_checkAccess' });
+        const { result } = await wx.cloud.callFunction({
+            name: 'auth-service',
+            data: { action: 'checkAccess' } // 告诉它执行 checkAccess 逻辑
+          });
         const { allowed, role = 'guest' } = result || {};
         this.globalData.allowed = !!allowed;
         this.globalData.role = role;

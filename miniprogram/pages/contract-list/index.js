@@ -115,7 +115,7 @@ onSearchInput(e) {
       const { cityCode, searchKeyword, selectedMonth, lastCreatedAt, lastId } = this.data;
       
       // 1. 基础条件：城市 + 未删除
-      let whereBase = { cityCode: cityCode, deleted: _.neq(true) };
+      let whereBase = { cityCode: cityCode, deleted: false };
       // 2. 搜索条件 (模糊查询)
       if (searchKeyword && searchKeyword.trim()) {
         const key = searchKeyword.trim();
