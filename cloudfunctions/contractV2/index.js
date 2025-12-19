@@ -27,21 +27,12 @@ function getEnvBase() {
   return 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
 }
 
-
-// 法大大附件配置，这里的 key 对应 cityCode，value 是 contractTemplate/cities/{cityCode}/ 下的文件名
-const CITY_ATTACHMENTS = {
-  guangzhou: ['责任书.docx', '司机合规运营承诺书.docx'],
-  huizhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
-  // suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
-  // ... 其他城市
-};
-
 // [修改] 附件配置表
 const ATTACHMENT_CONFIG = {
   // 惠州：城市级通用 (假设它们的文件名就是叫 attach1...)
   huizhou: {
     type: 'city',
-    files: ['attach1.docx', 'attach2.docx', 'attach3.docx']
+    files: ['网约车驾驶员安全生产责任书.docx', '租车告知函.docx', '承诺函.docx']
   },
 
   // 广州分公司 A：特有附件
@@ -53,6 +44,36 @@ const ATTACHMENT_CONFIG = {
   // 广州分公司 B：特有附件
   gzh_b: {
     type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  foshan: {
+      type: 'city',
+      files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  changzhou: {
+    type: 'city',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  nantong: {
+    type: 'city',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  shaoxing: {
+    type: 'city',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  jiaxing: {
+    type: 'city',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  suzhou: {
+    type: 'city',
     files: ['责任书.docx', '司机合规运营承诺函.docx']
   }
 };
