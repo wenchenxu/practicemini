@@ -454,6 +454,13 @@ Page({
       selectedBranchCode, selectedBranchName,
       selectedTypeCode, selectedTypeName
     } = this.data;
+
+    // 1) 防抖/节流：防止快速双击 (2秒内只能点一次)
+    const now = Date.now();
+    if (now - (this.lastSubmitTime || 0) < 2000) {
+        return; 
+    }
+    this.lastSubmitTime = now;
   
     if (this.data.saving) return;
 

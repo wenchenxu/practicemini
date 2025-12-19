@@ -7,20 +7,47 @@ const fetch = require('node-fetch');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
-const db   = cloud.database();
+const db = cloud.database();
 const COL_CONTRACTS = db.collection('contracts');
-const COL_DRIVERS   = db.collection('drivers');
-const COL_VEHICLES  = db.collection('vehicles');
+const COL_DRIVERS = db.collection('drivers');
+const COL_VEHICLES = db.collection('vehicles');
 const COL_HISTORY = db.collection('vehicle_history');
-const BIZ_TZ        = 'Asia/Shanghai';
+const BIZ_TZ = 'Asia/Shanghai';
 
 // 法大大附件配置，这里的 key 对应 cityCode，value 是 contractTemplate/cities/{cityCode}/ 下的文件名
 const CITY_ATTACHMENTS = {
-    // guangzhou: [],
-    huizhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
-    // suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
-    // ... 其他城市
-  };
+  guangzhou: ['责任书.docx', '司机合规运营承诺书.docx'],
+  huizhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
+  // suzhou: ['attach1.docx', 'attach2.docx', 'attach3.docx'],
+  // ... 其他城市
+};
+
+// [修改] 附件配置表
+const ATTACHMENT_CONFIG = {
+  // 惠州：城市级通用 (假设它们的文件名就是叫 attach1...)
+  huizhou: {
+    type: 'city',
+    files: ['attach1.docx', 'attach2.docx', 'attach3.docx']
+  },
+
+  // 广州分公司 A：特有附件
+  gzh_a: {
+    type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺书.docx']
+  },
+
+  // 广州分公司 B：特有附件
+  gzh_b: {
+    type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺书.docx']
+  },
+
+  // 苏州：如果没有分公司，直接配这里
+  suzhou: {
+    type: 'city',
+    files: ['租车须知.docx', '交车单.docx']
+  }
+};
 
 // ========== 公共工具（直接复用你现有的） ==========
 
@@ -29,18 +56,18 @@ function pad(n, width = 2) {
 }
 
 function sanitizePathComponent(input) {
-    if (!input) return '';
-    return String(input).trim().replace(/[\\/]/g, '-');
-  }
-  
+  if (!input) return '';
+  return String(input).trim().replace(/[\\/]/g, '-');
+}
+
 function buildContractFolderPath(opts) {
-    const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
-    const branchFolder = branchCode || 'default';
-    const typeFolder = contractType || 'default';
-    const safeName = sanitizePathComponent(driverName);
-    const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
-    return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
-  }
+  const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
+  const branchFolder = branchCode || 'default';
+  const typeFolder = contractType || 'default';
+  const safeName = sanitizePathComponent(driverName);
+  const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
+  return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
+}
 
 function numberToCN(n) {
   if (n === null || n === undefined || n === '') return '';
@@ -83,10 +110,10 @@ function nowInTZ(tz) {
 const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
 
 const TPL_DIR = {
-  branch:  'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
-  city:    'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx
-  type:    'contractTemplate/types',    // types/<contractType>.docx
-  def:     'contractTemplate/defaults/default.docx'
+  branch: 'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
+  city: 'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx
+  type: 'contractTemplate/types',    // types/<contractType>.docx
+  def: 'contractTemplate/defaults/default.docx'
 };
 
 async function pickTemplateBuffer(opts) {
@@ -113,46 +140,71 @@ async function pickTemplateBuffer(opts) {
 
 // 处理单个 DOCX 附件：渲染变量 -> 上传云存储
 async function generateAttachmentDocx(opts) {
-    const { fileName, cityCode, dataForDocx, basePath, serialFormatted, index } = opts;
-    
-    // 1. 下载模板
-    const tplFileID = `${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${fileName}`;
-    let tplBuf;
-    try {
-      const res = await cloud.downloadFile({ fileID: tplFileID });
-      tplBuf = res.fileContent;
-    } catch (e) {
-      console.warn(`[Attachment] Template missing: ${tplFileID}`);
-      return null; 
-    }
-  
-    // 2. 渲染变量
-    const zip = new PizZip(tplBuf);
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: '[[', end: ']]' },
-    });
-    doc.render(dataForDocx);
-    const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
-  
-    // 3. 构造新文件名 (主合同名-attachN.docx)
-    // 例如：TSFZX-HZ-20231215-001-attach1.docx
-    const newFileName = `${serialFormatted}-attach${index + 1}.docx`;
-    const cloudPath = `${basePath}/${newFileName}`;
-  
-    // 4. 上传到与主合同相同的文件夹
-    const upRes = await cloud.uploadFile({
-      cloudPath: cloudPath,
-      fileContent: outBuf
-    });
-  
-    return {
-      key: `attach${index + 1}FileId`, // 对应数据库字段名 file.attach1FileId
-      fileId: upRes.fileID,
-      fileName: newFileName
-    };
+  const {
+    fileName,
+    regionCode,
+    sourceType,
+    dataForDocx,
+    basePath,
+    serialFormatted,
+    index
+  } = opts;
+
+  // 1. 下载模板
+  // const tplFileID = `${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${fileName}`;
+
+  // 1. 动态构建下载路径
+  // 如果是 city:   contractTemplate/cities/<cityCode>/<fileName>
+  // 如果是 branch: contractTemplate/branches/<branchCode>/<fileName>
+  const folder = sourceType === 'branch' ? TPL_DIR.branch : TPL_DIR.city;
+  const tplFileID = `${ENV_BASE}/${folder}/${regionCode}/${fileName}`;
+
+  let tplBuf;
+  try {
+    const res = await cloud.downloadFile({ fileID: tplFileID });
+    tplBuf = res.fileContent;
+  } catch (e) {
+    console.warn(`[Attachment] Template missing: ${tplFileID}`);
+    return null;
   }
+
+  // 2. 渲染变量
+  const zip = new PizZip(tplBuf);
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+    delimiters: { start: '[[', end: ']]' },
+  });
+  doc.render(dataForDocx);
+  const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
+
+  // 3. 构造新文件名 (主合同名-attachN.docx)
+  // 例如：TSFZX-HZ-20231215-001-attach1.docx
+  // const newFileName = `${serialFormatted}-attach${index + 1}.docx`;
+
+  // A. 去掉后缀 .docx (忽略大小写)
+  const realName = fileName.replace(/\.docx$/i, '');
+
+  // B. (可选) 清洗一下文件名，防止包含 / 或 \ 等非法字符
+  const safeRealName = sanitizePathComponent(realName);
+
+  // C. 拼接
+  const newFileName = `${serialFormatted}-${safeRealName}.docx`;
+
+  const cloudPath = `${basePath}/${newFileName}`;
+
+  // 4. 上传到与主合同相同的文件夹
+  const upRes = await cloud.uploadFile({
+    cloudPath: cloudPath,
+    fileContent: outBuf
+  });
+
+  return {
+    key: `attach${index + 1}FileId`, // 对应数据库字段名 file.attach1FileId
+    fileId: upRes.fileID,
+    fileName: newFileName
+  };
+}
 
 // ========== 主入口 ==========
 
@@ -178,25 +230,25 @@ exports.main = async (event, context) => {
     const AA_BY_BRANCH = { gzh_a: 'GZ1', gzh_b: 'GZ2' };
     const AA_DEFAULT_PER_CITY = {
       guangzhou: 'GZ',
-      foshan:    'FS',
-      huizhou:   'HZ',
-      jiaxing:   'JX',
-      shaoxing:  'SX',
+      foshan: 'FS',
+      huizhou: 'HZ',
+      jiaxing: 'JX',
+      shaoxing: 'SX',
       changzhou: 'CZ',
-      nantong:   'NT',
-      suzhou:    'SZ'
+      nantong: 'NT',
+      suzhou: 'SZ'
     };
     const aa = (branchCode && AA_BY_BRANCH[branchCode]) ||
-               AA_DEFAULT_PER_CITY[cityCode] || 'XX';
-    const scopeKey  = branchCode || cityCode;
+      AA_DEFAULT_PER_CITY[cityCode] || 'XX';
+    const scopeKey = branchCode || cityCode;
     const serialKey = 'SERIAL#' + scopeKey + '#' + dateStr;
 
     // === 事务：生成合同 + 更新/创建司机 + 更新车辆 ===
     const txResult = await db.runTransaction(async tx => {
-      const serialCol   = tx.collection('serials');
+      const serialCol = tx.collection('serials');
       const contractsTx = tx.collection('contracts');
-      const driversTx   = tx.collection('drivers');
-      const vehiclesTx  = tx.collection('vehicles');
+      const driversTx = tx.collection('drivers');
+      const vehiclesTx = tx.collection('vehicles');
       const vehiclesHistoryTx = tx.collection('vehicle_history');
       const now = db.serverDate();
 
@@ -213,30 +265,30 @@ exports.main = async (event, context) => {
       const serialFormatted = `TSFZX-${aa}-${dateStr}-${seqStr}`;
 
       // 2) 解析金额并计算各种字段（与原 createContract 一致）
-      const rentMonthlyNum     = toNum(payload.rentMonthly);
-      const depositTodayNum    = toNum(payload.depositToday);
-      const depositRemaining   = rentMonthlyNum - depositTodayNum;
+      const rentMonthlyNum = toNum(payload.rentMonthly);
+      const depositTodayNum = toNum(payload.depositToday);
+      const depositRemaining = rentMonthlyNum - depositTodayNum;
 
       const fields = Object.assign({}, payload, {
-        rentMonthlyFormal:        numberToCN(payload.rentMonthly || 0),
-        rentTodayFormal:          numberToCN(payload.rentToday || 0),
-        depositFormal:            numberToCN(payload.deposit || 0),
-        depositTodayFormal:       numberToCN(payload.depositToday || 0),
-        depositServiceFeeFormal:  numberToCN(payload.depositServiceFee || 0),
+        rentMonthlyFormal: numberToCN(payload.rentMonthly || 0),
+        rentTodayFormal: numberToCN(payload.rentToday || 0),
+        depositFormal: numberToCN(payload.deposit || 0),
+        depositTodayFormal: numberToCN(payload.depositToday || 0),
+        depositServiceFeeFormal: numberToCN(payload.depositServiceFee || 0),
         depositRemaining,
-        contractSerialNumber:            seq,
-        contractSerialNumberFormatted:   serialFormatted
+        contractSerialNumber: seq,
+        contractSerialNumberFormatted: serialFormatted
       });
 
       // ★ 关键字段：
-      const clientId   = payload.clientId;     // 身份证号
+      const clientId = payload.clientId;     // 身份证号
       const clientName = payload.clientName;
-      const clientPhone= payload.clientPhone;
-      const carPlate   = payload.carPlate;
-      const carVin     = payload.carVin;
+      const clientPhone = payload.clientPhone;
+      const carPlate = payload.carPlate;
+      const carVin = payload.carVin;
 
-      if (!clientId)  throw new Error('driver-clientId-required');
-      if (!carPlate)  throw new Error('vehicle-plate-required');
+      if (!clientId) throw new Error('driver-clientId-required');
+      if (!carPlate) throw new Error('vehicle-plate-required');
 
       // 3) 司机 upsert（按 clientId）
       const drvRes = await driversTx.where({ clientId }).get();
@@ -245,13 +297,13 @@ exports.main = async (event, context) => {
         await driversTx.add({
           data: {
             clientId,
-            name:   clientName || '',
-            phone:  clientPhone || '',
+            name: clientName || '',
+            phone: clientPhone || '',
             cityCode,
             cityName,
-            addressRegistered:   payload.clientAddress || '',
-            addressCurrent:      payload.clientAddressCurrent || '',
-            emergencyContactName:  payload.clientEmergencyContact || '',
+            addressRegistered: payload.clientAddress || '',
+            addressCurrent: payload.clientAddressCurrent || '',
+            emergencyContactName: payload.clientEmergencyContact || '',
             emergencyContactPhone: payload.clientEmergencyContactPhone || '',
             branchCode: branchCode || '', // 新增：分公司代码
             status: '租车中',
@@ -265,13 +317,13 @@ exports.main = async (event, context) => {
         const driverDoc = drvRes.data[0];
         await driversTx.doc(driverDoc._id).update({
           data: {
-            name:   clientName || driverDoc.name || '',
-            phone:  clientPhone || driverDoc.phone || '',
+            name: clientName || driverDoc.name || '',
+            phone: clientPhone || driverDoc.phone || '',
             cityCode,
             cityName,
-            addressRegistered:   payload.clientAddress || driverDoc.addressRegistered || '',
-            addressCurrent:      payload.clientAddressCurrent || driverDoc.addressCurrent || '',
-            emergencyContactName:  payload.clientEmergencyContact || driverDoc.emergencyContactName || '',
+            addressRegistered: payload.clientAddress || driverDoc.addressRegistered || '',
+            addressCurrent: payload.clientAddressCurrent || driverDoc.addressCurrent || '',
+            emergencyContactName: payload.clientEmergencyContact || driverDoc.emergencyContactName || '',
             emergencyContactPhone: payload.clientEmergencyContactPhone || driverDoc.emergencyContactPhone || '',
             branchCode: branchCode || driverDoc.branchCode || '', // 新增：更新 branchCode
             status: '租车中',
@@ -286,22 +338,22 @@ exports.main = async (event, context) => {
         throw new Error('vehicle-not-found');
       }
       const vehicle = vehRes.data[0];
-      
+
       // 旧状态轴（兼容老数据，没值就默认闲置 + 不在维修）
       const oldRentStatus =
         vehicle.rentStatus || 'available';          // 'available' | 'rented'
       const oldMaintenanceStatus =
         vehicle.maintenanceStatus || 'none';        // 'none' | 'in_maintenance'
-      
+
       // 只要这车已经在「已租」，就不允许再新签合同
       if (oldRentStatus === 'rented') {
         throw new Error('vehicle-not-available');
       }
-      
+
       // 新合同生效 = 标记为已租，维修轴保持不变
       const newRentStatus = 'rented';
       const newMaintenanceStatus = oldMaintenanceStatus;
-      
+
       // 更新车辆（注意：不再写 status）
       await vehiclesTx.doc(vehicle._id).update({
         data: {
@@ -312,7 +364,7 @@ exports.main = async (event, context) => {
           updatedAt: now
         }
       });
-      
+
       // ===== 4.5 写一条车辆历史（只写一条，不要再重复） =====
       // 小工具：把 rentStatus + maintenanceStatus 转成一句中文
       function formatStatusLabel(rentStatus, maintenanceStatus) {
@@ -321,10 +373,10 @@ exports.main = async (event, context) => {
         }
         return rentStatus === 'rented' ? '已租' : '闲置';
       }
-      
+
       const fromStatusLabel = formatStatusLabel(oldRentStatus, oldMaintenanceStatus);
-      const toStatusLabel   = formatStatusLabel(newRentStatus, newMaintenanceStatus);
-      
+      const toStatusLabel = formatStatusLabel(newRentStatus, newMaintenanceStatus);
+
       // 没有的话先写 null，以后再补。
       await vehiclesHistoryTx.add({
         data: {
@@ -419,24 +471,58 @@ exports.main = async (event, context) => {
     };
 
     const basePath = buildContractFolderPath({
-        cityCode,
-        branchCode,
-        contractType,
-        serialFormatted,
-        driverName: finalFields.clientName
-      });
+      cityCode,
+      branchCode,
+      contractType,
+      serialFormatted,
+      driverName: finalFields.clientName
+    });
 
     // ========== 3. 处理附件 (并行处理以提高速度) ==========
+    /*
     const attachFiles = CITY_ATTACHMENTS[cityCode] || [];
     const fileUpdates = {}; // 用于更新 file 字段
 
     if (attachFiles.length > 0) {
       console.log(`[ContractV2] Generating ${attachFiles.length} attachments for ${cityCode}`);
-      
-      const results = await Promise.all(attachFiles.map((fileName, index) => 
+
+      const results = await Promise.all(attachFiles.map((fileName, index) =>
         generateAttachmentDocx({
           fileName,
           cityCode,
+          dataForDocx,
+          basePath,
+          serialFormatted,
+          index
+        })
+      ));
+    */
+    // End of 3. 
+
+    // ========== 3. 处理附件 (升级版) ==========
+    // A. 先尝试找分公司配置
+    let attachConfig = ATTACHMENT_CONFIG[branchCode];
+    let targetCode = branchCode;
+
+    // B. 如果分公司没配，再找城市配置
+    if (!attachConfig) {
+      attachConfig = ATTACHMENT_CONFIG[cityCode];
+      targetCode = cityCode;
+    }
+
+    const attachFiles = attachConfig ? attachConfig.files : [];
+    const sourceType = attachConfig ? attachConfig.type : 'city'; // 默认为 city
+
+    const fileUpdates = {};
+
+    if (attachFiles.length > 0) {
+      console.log(`[ContractV2] Generating ${attachFiles.length} attachments for ${targetCode} (${sourceType})`);
+
+      const results = await Promise.all(attachFiles.map((fileName, index) =>
+        generateAttachmentDocx({
+          fileName,
+          regionCode: targetCode, // 传入 cityCode 或 branchCode
+          sourceType,             // 传入 'city' 或 'branch'
           dataForDocx,
           basePath,
           serialFormatted,
@@ -459,9 +545,9 @@ exports.main = async (event, context) => {
           updateData[`file.${key}`] = val;
         }
         await COL_CONTRACTS.doc(contractId).update({
-          data: { 
-             ...updateData,
-             updatedAt: db.serverDate() 
+          data: {
+            ...updateData,
+            updatedAt: db.serverDate()
           }
         });
       }
@@ -497,7 +583,7 @@ exports.main = async (event, context) => {
     const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
 
     const uploadDocxRes = await cloud.uploadFile({
-      cloudPath: `${basePath}/contract.docx`,
+      cloudPath: `${basePath}/${serialFormatted}.docx`,
       fileContent: outBuf
     });
     const docxFileID = uploadDocxRes.fileID;
@@ -509,6 +595,7 @@ exports.main = async (event, context) => {
 
     // 再尝试 CI → PDF
     let pdfFileID = '';
+    /*
     try {
       const tmp = await cloud.getTempFileURL({ fileList: [docxFileID] });
       const docxUrl = tmp?.fileList?.[0]?.tempFileURL;
@@ -519,10 +606,10 @@ exports.main = async (event, context) => {
 
       const resp = await fetch(ciUrl);
       const ctype = resp.headers.get('content-type') || '';
-      const buf   = await resp.buffer();
+      const buf = await resp.buffer();
 
       if (!resp.ok || !/application\/pdf/i.test(ctype) ||
-          buf.length < 10 || buf.slice(0, 5).toString() !== '%PDF-') {
+        buf.length < 10 || buf.slice(0, 5).toString() !== '%PDF-') {
 
         console.error('[createWithDriverVehicle] CI not pdf:', {
           ok: resp.ok, status: resp.status, ctype,
@@ -530,7 +617,7 @@ exports.main = async (event, context) => {
         });
       } else {
         const upPdf = await cloud.uploadFile({
-          cloudPath: `${basePath}/contract.pdf`,
+          cloudPath: `${basePath}/${serialFormatted}.pdf`,
           fileContent: buf,
         });
         pdfFileID = upPdf.fileID;
@@ -541,10 +628,10 @@ exports.main = async (event, context) => {
 
         // 只有成功生成PDF后才删除 DOCX，节省空间
         try {
-            await cloud.deleteFile({ fileList: [docxFileID] });
-          } catch (delErr) {
-            console.warn('[createWithDriverVehicle] delete docx after pdf upload failed', delErr);
-          }
+          await cloud.deleteFile({ fileList: [docxFileID] });
+        } catch (delErr) {
+          console.warn('[createWithDriverVehicle] delete docx after pdf upload failed', delErr);
+        }
 
         return {
           ok: true,
@@ -567,6 +654,99 @@ exports.main = async (event, context) => {
       fileID: docxFileID,
       docxFileID,
       attachments: fileUpdates
+    };
+    */
+    try {
+      // 1. 获取带有签名的临时连接 (设置较长有效期以防超时)
+      const tmp = await cloud.getTempFileURL({
+        fileList: [docxFileID],
+        maxAge: 60 * 60, // 1小时有效期
+      });
+      const docxUrl = tmp?.fileList?.[0]?.tempFileURL;
+
+      if (!docxUrl) throw new Error('无法获取 DOCX 临时链接');
+
+      // 2. 构造 CI 请求 URL
+      // 注意：确保参数拼接正确，不破坏原有的签名参数
+      const separator = docxUrl.includes('?') ? '&' : '?';
+      const ciUrl = `${docxUrl}${separator}ci-process=doc-preview&dstType=pdf`;
+
+      console.log('[ContractV2] Requesting CI:', ciUrl); // 调试日志
+
+      // 3. 发起请求
+      const resp = await fetch(ciUrl);
+
+      // 4. 关键检查：CI 是否报错？
+      // 如果 CI 没开通或参数错，通常返回 XML 格式的错误信息，Content-Type 是 application/xml
+      const ctype = resp.headers.get('content-type') || '';
+
+      if (!resp.ok) {
+        console.error('[ContractV2] CI request failed, status:', resp.status);
+        throw new Error(`CI HTTP Error: ${resp.status}`);
+      }
+
+      // 如果返回的不是 PDF (比如是 xml 报错)
+      if (!ctype.includes('pdf')) {
+        const textBody = await resp.text(); // 读出错误信息
+        console.error('[ContractV2] CI returned non-PDF:', ctype, textBody);
+        throw new Error(`CI conversion failed: returned ${ctype}`);
+      }
+
+      const buf = await resp.buffer();
+
+      // 5. 双重检查文件头 (PDF 应该以 %PDF 开头)
+      if (buf.length < 10 || buf.slice(0, 4).toString() !== '%PDF') {
+        console.error('[ContractV2] Invalid PDF header:', buf.slice(0, 20).toString());
+        throw new Error('Invalid PDF content received');
+      }
+
+      // 6. 构造规范的 PDF 文件名 (流水号+姓名.pdf)
+      // 这一步修复了之前 .docx.pdf 的问题
+      const safeClientName = (finalFields.clientName || 'customer').replace(/[\\/]/g, '');
+      const finalPdfName = `${serialFormatted}-${safeClientName}.pdf`;
+
+      // 7. 上传 PDF
+      const upPdf = await cloud.uploadFile({
+        cloudPath: `${basePath}/${finalPdfName}`,
+        fileContent: buf,
+      });
+      pdfFileID = upPdf.fileID;
+
+      // 8. 更新数据库
+      await COL_CONTRACTS.doc(contractId).update({
+        data: { file: { pdfFileID }, updatedAt: db.serverDate() }
+      });
+
+      // 9. 成功后删除 DOCX (节省空间)
+      try {
+        await cloud.deleteFile({ fileList: [docxFileID] });
+      } catch (e) { /* ignore */ }
+
+      return {
+        ok: true,
+        _id: contractId,
+        contractSerialNumberFormatted: serialFormatted,
+        fileID: pdfFileID, // 兼容前端逻辑，优先返回 PDF
+        docxFileID,
+        pdfFileID,
+        attachments: fileUpdates
+      };
+
+    } catch (e) {
+      console.error('[createWithDriverVehicle] PDF convert fail:', e);
+      // 转换失败时，不中断流程，而是返回 DOCX 让用户至少能用
+      // 此时 fileID 返回 docxFileID
+    }
+
+    // 降级返回 (CI 失败的情况)
+    return {
+      ok: true,
+      _id: contractId,
+      contractSerialNumberFormatted: serialFormatted,
+      fileID: docxFileID, // 只能给 DOCX 了
+      docxFileID,
+      attachments: fileUpdates,
+      error: 'pdf-gen-failed' //以此告知前端有异常
     };
 
   } catch (err) {
