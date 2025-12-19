@@ -14,6 +14,20 @@ const COL_VEHICLES = db.collection('vehicles');
 const COL_HISTORY = db.collection('vehicle_history');
 const BIZ_TZ = 'Asia/Shanghai';
 
+
+// [修改] 动态获取当前环境的云存储根路径
+// 这样可以同时兼容 Dev 和 Prod 环境，不会因为写死 ID 而找不到文件
+function getEnvBase() {
+  const { ENV } = cloud.getWXContext();
+  // 这里填入你两个环境的实际 Cloud Base ID
+  if (ENV === 'dev-4gzrr3qf9d8c8caa') {
+    return 'cloud://dev-4gzrr3qf9d8c8caa.6465-dev-4gzrr3qf9d8c8caa-1379075990';
+  }
+  // 默认为 Prod (旧环境)
+  return 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
+}
+
+
 // 法大大附件配置，这里的 key 对应 cityCode，value 是 contractTemplate/cities/{cityCode}/ 下的文件名
 const CITY_ATTACHMENTS = {
   guangzhou: ['责任书.docx', '司机合规运营承诺书.docx'],
@@ -33,19 +47,13 @@ const ATTACHMENT_CONFIG = {
   // 广州分公司 A：特有附件
   gzh_a: {
     type: 'branch',
-    files: ['责任书.docx', '司机合规运营承诺书.docx']
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
   },
 
   // 广州分公司 B：特有附件
   gzh_b: {
     type: 'branch',
-    files: ['责任书.docx', '司机合规运营承诺书.docx']
-  },
-
-  // 苏州：如果没有分公司，直接配这里
-  suzhou: {
-    type: 'city',
-    files: ['租车须知.docx', '交车单.docx']
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
   }
 };
 
@@ -105,19 +113,9 @@ function nowInTZ(tz) {
   return { y, m, d, ymd: `${y}${m}${d}` };
 }
 
-// ===== 模板映射（和你现有 createContract 完全一致） =====
-
-const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
-
-const TPL_DIR = {
-  branch: 'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
-  city: 'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx
-  type: 'contractTemplate/types',    // types/<contractType>.docx
-  def: 'contractTemplate/defaults/default.docx'
-};
-
 async function pickTemplateBuffer(opts) {
   const { cityCode, branchCode, contractType } = opts;
+  const ENV_BASE = getEnvBase();
   const candidates = [];
 
   if (branchCode) {
@@ -127,9 +125,12 @@ async function pickTemplateBuffer(opts) {
   candidates.push(`${ENV_BASE}/${TPL_DIR.type}/${contractType}.docx`);
   candidates.push(`${ENV_BASE}/${TPL_DIR.def}`);
 
+  console.log('[Template Debug] Looking for main contract in:', candidates);
+
   for (const fileID of candidates) {
     try {
       const res = await cloud.downloadFile({ fileID });
+      console.log('[Template Debug] Found main template:', fileID);
       return { fileID, buffer: res.fileContent };
     } catch (e) {
       // miss，继续下一候选
@@ -149,6 +150,8 @@ async function generateAttachmentDocx(opts) {
     serialFormatted,
     index
   } = opts;
+
+  const ENV_BASE = getEnvBase();
 
   // 1. 下载模板
   // const tplFileID = `${ENV_BASE}/${TPL_DIR.city}/${cityCode}/${fileName}`;
@@ -206,9 +209,23 @@ async function generateAttachmentDocx(opts) {
   };
 }
 
+// ===== 模板映射（和你现有 createContract 完全一致） =====
+
+// const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
+
+const TPL_DIR = {
+  branch: 'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
+  city: 'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx
+  type: 'contractTemplate/types',    // types/<contractType>.docx
+  def: 'contractTemplate/defaults/default.docx'
+};
+
 // ========== 主入口 ==========
 
 exports.main = async (event, context) => {
+  const { ENV } = cloud.getWXContext;
+  console.log(`[ContractV2] Running in ENV: ${ENV}`); // 确认当前环境
+
   try {
     const {
       cityCode,
