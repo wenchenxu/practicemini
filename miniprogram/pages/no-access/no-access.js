@@ -9,7 +9,11 @@ Page({
     async onLoad() {
       try {
         // 取 openid 用于复制（方便你加白名单）
-        const { result: idRet } = await wx.cloud.callFunction({ name: 'auth_getOpenid' });
+        // const { result: idRet } = await wx.cloud.callFunction({ name: 'auth_getOpenid' });
+        const { result: idRet } = await wx.cloud.callFunction({
+            name: 'auth-service',
+            data: { action: 'getOpenid' }
+          });
         this.setData({ openid: idRet?.openid || '' });
       } catch (e) {}
     },
@@ -27,10 +31,20 @@ Page({
       if (!auditToken) return wx.showToast({ title: '请输入审核口令', icon: 'none' });
   
       try {
-        const { result } = await wx.cloud.callFunction({
+        // 旧函数
+        /*const { result } = await wx.cloud.callFunction({
           name: 'auth_checkAccess',
           data: { auditToken }
-        });
+        });*/
+
+        const { result } = await wx.cloud.callFunction({
+            name: 'auth-service',
+            data: {
+              action: 'checkAccess',
+              // 之前是直接传 { auditToken }，现在作为 payload 包裹起来
+              payload: { auditToken } 
+            }
+          });
   
         if (result?.allowed) {
           // 通过：写入全局 + 可选写入本地“有效期”

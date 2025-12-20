@@ -26,10 +26,19 @@ Page({
   async reload() {
     try {
       const { page, pageSize, keyword } = this.data;
+      /* 旧函数
       const { result } = await wx.cloud.callFunction({
         name: 'auth_listWhitelist',
         data: { page, pageSize, keyword }
+      }); */
+      const { result } = await wx.cloud.callFunction({
+        name: 'auth-service',
+        data: {
+          action: 'listWhitelist',
+          payload: { page, pageSize, keyword }
+        }
       });
+
       if (result && result.ok) {
         this.setData({ list: result.data || [], count: result.count || 0 });
       } else {
@@ -45,10 +54,20 @@ Page({
     if (!openid) return wx.showToast({ title: '请输入 OpenID', icon: 'none' });
 
     try {
+      /* 旧函数
       const { result } = await wx.cloud.callFunction({
         name: 'auth_grantByOpenid',
         data: { targetOpenid: openid, name, role }
+      }); */
+      // [修改后] 注意 action 叫 'grant'
+      const { result } = await wx.cloud.callFunction({
+        name: 'auth-service',
+        data: {
+        action: 'grant',
+        payload: { targetOpenid: openid, name, role }
+        }
       });
+
       if (result?.ok) {
         wx.showToast({ title: result.msg === 'already-exists' ? '已存在' : '已添加', icon: 'none' });
         this.setData({ openid: '', name: '' });
@@ -69,10 +88,20 @@ Page({
       success: async (ret) => {
         if (!ret.confirm) return;
         try {
+          /* 旧函数
           const { result } = await wx.cloud.callFunction({
             name: 'auth_removeWhitelist',
             data: { targetOpenid: openid }
+          }); */
+          // [修改后] 注意 action 叫 'remove'
+          const { result } = await wx.cloud.callFunction({
+            name: 'auth-service',
+            data: {
+            action: 'remove',
+            payload: { targetOpenid: openid }
+            }
           });
+
           if (result?.ok) {
             wx.showToast({ title: '已删除', icon: 'none' });
             this.reload();

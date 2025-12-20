@@ -1,5 +1,4 @@
 <view class="container">
-  <image class="img" src="/assets/lock.png" mode="aspectFit"></image>
   <view class="title">无访问权限</view>
   <view class="desc">此小程序仅限公司内部人员使用</view>
 

@@ -101,6 +101,8 @@ eventType            // rent_start | rent_end | maintenance_toggle | status_chan
 fromStatus           // 文案，如 '闲置'、'已租 · 维修中'
 toStatus
 driverClientId
+driverClientName
+driverClientPhone
 contractId
 operator
 createdAt
@@ -151,7 +153,7 @@ toStatus = format(newRentStatus, newMaintenanceStatus)
 app.post('/api/esign/getToken')
 app.post('/api/esign/uploadFileByUrl')
 app.post('/api/esign/convertFddUrlToFileId')
-app.post('/api/esign/createTaskV51')     ← 最复杂（带盖章控件、骑缝章、企业 actor、个人 actor）
+app.post('/api/esign/createTaskV51')     ← 最复杂（带附件、盖章控件、骑缝章、企业 actor、个人 actor）
 app.post('/api/esign/getActorUrl')
 app.post('/api/esign/getOwnerDownloadUrl')
 app.post('/api/esign/corpEntityList')    ← 取企业主体
@@ -163,7 +165,7 @@ app.post('/api/esign/corpEntityList')    ← 取企业主体
 业务流程：
 
 临时文件 URL → upload-by-url → fddFileUrl
-fddFileUrl → file/process → fileId
+fddFileUrl → file/process → fileId （主合同+附件）
 fileId + actor + sealFields → createTaskV51
 signTaskId → actor/get-url → actorSignTaskEmbedUrl
 owner/get-download-url → 下载合同 PDF
@@ -266,7 +268,6 @@ ECS createTaskV51 必须完全遵守法大大 Pre-request Script 规则
 
 When generating code:
 
-- Always use rentStatus + maintenanceStatus
 - Don't write “status” field into DB for vehicles, use rentStatus and maintenanceStatus instead
 - Always append vehicle_history entries
 - All contract creation must invoke contractV2
