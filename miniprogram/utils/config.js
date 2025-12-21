@@ -22,14 +22,14 @@ export const CITY_CODE_MAP = {
   // 合同类型：广州两种，其它城市默认 rent_std
   export const TYPE_OPTIONS_BY_CITY = {
     guangzhou: [
-        { code: 'rent_std',  name: '标准租赁合同' },
-        { code: 'rent_zeroDown', name: '零押金租赁合同' },
+        { code: 'rent_std',  name: '纯租租赁' },
+        { code: 'rent_zeroDown', name: '零押金租赁' },
     ],
     foshan: [
-        { code: 'rent_std',  name: '标准租赁合同' },
-        { code: 'rent_zeroDown', name: '零押金租赁合同' },
+        { code: 'rent_std',  name: '纯租租赁' },
+        { code: 'rent_zeroDown', name: '零押金租赁' },
     ],
-    default: [{ code: 'rent_std', name: '标准租赁合同' }],
+    default: [{ code: 'rent_std', name: '纯租租赁' }],
   };
   
   // 编号中的 aa：广州按分公司映射 GZ1/GZ2，其他城市按城市默认

@@ -16,7 +16,7 @@
       <view class="row-label"><text class="req">*</text>合同类型</view>
       <picker mode="selector" range="{{typeOptions}}" range-key="name" value="{{typeIndex}}" bindchange="onPickType" class="picker-flex">
         <view class="picker-text {{typeIndex>=0?'':'placeholder'}}">
-          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择合同类型' }}
+          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '纯租/零押金' }}
         </view>
       </picker>
       <view class="row-arrow">›</view>
@@ -37,7 +37,7 @@
     <view class="header-tag">{{city}}</view>
     <view class="header-info">
       <text class="mode-text">{{mode === 'view' ? '查看详情' : '编辑合同'}}</text>
-      <text class="type-text">{{selectedTypeName || '标准合同'}}</text>
+      <text class="type-text">{{selectedTypeName || '纯租租赁'}}</text>
     </view>
   </view>
 

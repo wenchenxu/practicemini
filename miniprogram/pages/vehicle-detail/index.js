@@ -50,28 +50,12 @@ Page({
       }
 
       // 2) 推导 rentStatus / maintenanceStatus（兼容旧数据）
-      const rentStatus =
-        veh.rentStatus ||
-        (veh.status === 'rented' ? 'rented' : 'available');
-
-      const maintenanceStatus =
-        veh.maintenanceStatus ||
-        (veh.status === 'maintenance' ? 'in_maintenance' : 'none');
+      const rentStatus = veh.rentStatus || (veh.status === 'rented' ? 'rented' : 'available');
+      const maintenanceStatus = veh.maintenanceStatus || (veh.status === 'maintenance' ? 'in_maintenance' : 'none');
 
       // 3) 生成展示文案
-
       const rentStatusText = rentStatus === 'rented' ? '已租' : '闲置';
       const maintenanceStatusText = maintenanceStatus === 'in_maintenance' ? '维修中' : '正常';
-
-      // 旧方法，不引用
-      let statusText = '';
-      if (maintenanceStatus === 'in_maintenance') {
-        statusText = rentStatus === 'rented'
-          ? '已租 · 维修中'
-          : '闲置 · 维修中';
-      } else {
-        statusText = rentStatus === 'rented' ? '已租' : '闲置';
-      }
 
       // 4) 查司机名字（如果有绑定）
       // A. 优先使用车辆记录里的“快照”信息 (兼容 CSV 导入的数据)
@@ -90,8 +74,8 @@ Page({
           if (drvRes.data && drvRes.data.length > 0) {
             const drv = drvRes.data[0];
             // 如果司机表里有名字，优先用司机表的名字（通常更准确），当然如果司机表没名字就用车辆表的
-            driverName = drv.name || currentDriverName; 
-            driverPhone = drv.phone || currentDriverPhone || '';
+            driverName = drv.name || driverName; 
+            driverPhone = drv.phone || driverPhone || '';
           }
         } catch (err) {
           console.error('Fetch driver info failed', err);
@@ -101,15 +85,17 @@ Page({
 
       // 5)（可选）查最近合同，你原来有就保留；没有可以不填
       let contractId = '';
-      const { data: contracts } = await contractsCol
-        .where({ 'fields.carPlate': veh.plate })
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
-      if (contracts && contracts.length > 0) {
-        const latestContract = contracts[0];
-        contractId = latestContract.fields?.contractSerialNumberFormatted || latestContract._id || '';
-      }
+      try {
+        const { data: contracts } = await contractsCol
+            .where({ 'fields.carPlate': veh.plate })
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+        if (contracts && contracts.length > 0) {
+            const latestContract = contracts[0];
+            contractId = latestContract.fields?.contractSerialNumberFormatted || latestContract._id || '';
+        } 
+      } catch (e) { /* ignore */ }
 
       this.setData({
         vehicle: veh,
@@ -121,7 +107,6 @@ Page({
         rentStatusText,
         maintenanceStatus,
         maintenanceStatusText,
-        // statusText, // 旧字段好像没用了，可以不管
         loading: false
       });
     } catch (e) {
@@ -140,11 +125,11 @@ Page({
     const hasDriver = !!vehicle.currentDriverId;
 
     // 之后优化，暂时添加接口允许没有司机的车辆恢复闲置状态，方便工作流程
-    /*
-    if (!hasDriver) {
-      wx.showToast({ title: '当前无司机，无需结束租赁', icon: 'none' });
+    // 如果已经是闲置状态，且没有司机，直接提示即可，不需要弹窗
+    if (rentStatus === 'available' && !hasDriver) {
+      wx.showToast({ title: '车辆已是闲置状态', icon: 'none' });
       return;
-    } */
+    }
 
     let content = '';
     if (maintenanceStatus === 'in_maintenance') {
@@ -153,6 +138,7 @@ Page({
       content = `该操作会结束当前租赁，并解绑司机「${driverName || '未知'}」，并将车辆设为可出租。是否继续？`;
     } else {
       // rentStatus 已经是 available 但仍有司机（理论上很少见）
+      // 只有当 rentStatus == 'available' 且 hasDriver == true 时才会走到这里
       content = `当前车辆已标记为「闲置」，但仍绑定司机「${driverName || '未知'}」。此操作会解绑司机。是否继续？`;
     }
 
@@ -236,137 +222,6 @@ Page({
     } finally {
       this.setData({ opBusy: false });
     }
-  },
-  // obsolete?
-  async fetchDetail0() {
-    this.setData({ loading: true });
-
-    try {
-      const { id } = this.data;
-
-      // 1. 车辆
-      const veh = await db.collection('vehicles').doc(id).get();
-      const vehicle = veh.data;
-
-      let driverName = '';
-      let contractId = '';
-
-      // 2. 司机
-      if (vehicle.currentDriverId) {
-        const drv = await db.collection('drivers')
-          .where({ clientId: vehicle.currentDriverId })
-          .limit(1)
-          .get();
-        driverName = drv.data?.[0]?.name || '';
-      }
-
-      // 3. 最近合同（按 createdAt desc 找 1 条）
-      const c = await db.collection('contracts')
-        .where({
-          'fields.carPlate': vehicle.plate
-        })
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
-      contractId = c.data?.[0]?.fields.contractSerialNumberFormatted || '';
-
-      this.setData({
-        vehicle,
-        driverName,
-        contractId,
-        loading: false
-      });
-    } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '加载失败', icon: 'none' });
-      this.setData({ loading: false });
-    }
-  },
-  // obsolete?
-  async changeStatus0(newStatus, label) {
-    const { vehicle, opBusy, driverName} = this.data;
-    if (!vehicle || opBusy) return;
-
-    const currentStatus = vehicle.status || '';
-    const statusText = newStatus === 'available' ? '可出租' : '维修';
-    const currentDriverName = driverName || '（当前无司机）';
-
-    // 1）无效操作：状态没变
-    if (newStatus === 'maintenance' && currentStatus === 'maintenance') {
-        wx.showToast({ title: '车辆已在维护中！', icon: 'none' });
-        return;
-      }
-      if (newStatus === 'available' && currentStatus === 'available') {
-        wx.showToast({ title: '车辆正在闲置中！', icon: 'none' });
-        return;
-      }
-
-    // 2）根据当前状态组装不同提示文案
-    let content = '';
-
-    if (currentStatus === 'rented') {
-      // 只有在已租状态下，才说“解绑当前司机 xxx”
-      content = `该操作会解绑当前司机「${currentDriverName}」，并将车辆状态设为「${statusText}」。`;
-    } else if (currentStatus === 'maintenance' && newStatus === 'available') {
-      // 从维护 → 可出租
-      content = `确认车辆维修完成，将车辆状态设为「${statusText}」`;
-    } else {
-      // 其它情况兜底（比如闲置 → 维修）
-      content = `确认将车辆状态设为「${statusText}」`;
-    }
-
-    wx.showModal({
-      title: `确认设为${statusText}?`,
-      content,
-      confirmText: '确认',
-      cancelText: '取消',
-      success: async (res) => {
-        if (!res.confirm) return;
-
-        try {
-          this.setData({ opBusy: true });
-          wx.showLoading({ title: '提交中...', mask: true });
-
-          const { result } = await wx.cloud.callFunction({
-            name: 'vehicleOps',
-            data: {
-              action: 'updateStatus',
-              payload: {
-                vehicleId: vehicle._id,
-                newStatus
-              }
-            }
-          });
-
-          if (!result || !result.ok) {
-            throw new Error(result?.error || '更新失败');
-          }
-
-          wx.showToast({ title: '已更新', icon: 'success' });
-
-          // 本地也同步一下状态和司机信息
-          this.setData({
-            'vehicle.status': newStatus,
-            'vehicle.currentDriverId': null,
-            driverName: ''
-          });
-        } catch (e) {
-          console.error(e);
-          wx.showToast({ title: e.message || '更新失败', icon: 'none' });
-        } finally {
-          this.setData({ opBusy: false });
-          wx.hideLoading();
-        }
-      }
-    });
-  },
-  // obsolete?
-  onMarkAvailable0() {
-    this.changeStatus('available', '设为可出租');
-  },
-  // obsolete?
-  onMarkMaintenance0() {
-    this.changeStatus('maintenance', '标记维修');
   },
 
   toHistory() {

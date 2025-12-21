@@ -254,7 +254,7 @@ exports.main = async (event, context) => {
       branchCode = null,
       branchName = '',
       contractType = 'rent_std',
-      contractTypeName = '标准租赁合同',
+      contractTypeName = '纯租租赁',
       payload = {}
     } = event || {};
 

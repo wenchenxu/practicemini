@@ -31,6 +31,12 @@ App({
             this.globalData.isProd = false;
         }
 
+        // 警告：直连生产服务器，操作需谨慎！！
+        /*
+        envId = ENV_PROD; 
+        this.globalData.isProd = true;
+        console.warn('🚨🚨🚨 当前已强制连接到【生产环境 Prod】，请小心操作！ 🚨🚨🚨'); */
+
         console.log(`[onLaunch] Current envVersion: ${envVersion}, using env: ${envId}`);
         
         } catch (e) {

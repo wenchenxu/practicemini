@@ -625,7 +625,7 @@ Page({
 
         // const attachName = `attach${indexStr}.docx`; 
         const attachName = currentAttachName;
-
+        
         let fddFileId = esignData[key];
 
         if (fddFileId) {
