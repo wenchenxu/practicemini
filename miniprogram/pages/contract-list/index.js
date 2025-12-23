@@ -559,274 +559,462 @@ Page({
     }
   },
 
-  // 增加附件，单线程稳定版：上传附件 -> 上传主合同 -> 创建任务 -> 获取链接 -> 复制
+  // 单线程稳定版：智能复用 signTaskId (无调试日志)
   async onSignFromRowV1(e) {
-    console.log('按钮被点击了，dataset:', e.currentTarget.dataset);
-    // 1. 获取并校验 item
     const { item } = e.currentTarget.dataset;
-    if (!item) {
-      console.error('错误：没有拿到 item 数据');
-      return;
+    if (!item) return;
+
+    // 0. 如果已经签署完成，直接拦截
+    const esignData = item.esign || {};
+    if (this.isSignTaskFinished && this.isSignTaskFinished(esignData.signTaskStatus)) {
+      return wx.showToast({ title: '该合同签署已完成', icon: 'none' });
     }
 
-    // 2. 准备关键变量 (从旧版逻辑移植回来)
-    // -----------------------------------------------------
+    // 1. 准备变量
     const rawName = item.fields?.clientName || '';
     const rawPhone = item.fields?.clientPhone || '';
-
-    // 强力清洗：去掉回车、换行、首尾空格
     const signerName = rawName.replace(/[\r\n]/g, '').trim();
     const signerPhone = rawPhone.replace(/[\r\n]/g, '').trim();
-
-    // 校验必要信息
+    
     if (!signerPhone) return wx.showToast({ title: '缺少客户手机号', icon: 'none' });
     if (!signerName) return wx.showToast({ title: '缺少客户姓名', icon: 'none' });
 
-    // 构造 ID
     const actorId = signerPhone;
     const clientUserId = `driver:${signerPhone}`;
-    // -----------------------------------------------------
+    const updatesToDb = {}; 
+    const contractId = item._id;
 
-    wx.showLoading({ title: '准备附件...', mask: true });
-    console.log('[Sign] Start processing:', item.contractSerialNumberFormatted);
+    wx.showLoading({ title: '处理中...', mask: true });
 
     try {
-      const contractId = item._id;
       const fileData = item.file || {};
-      const esignData = item.esign || {};
+      
+      // ▼▼▼▼▼ 核心逻辑：复用 signTaskId ▼▼▼▼▼
+      let signTaskId = esignData.signTaskId;
 
-      // 3. 识别有哪些附件需要处理
-      const attachKeys = Object.keys(fileData).filter(k => k.startsWith('attach') && k.endsWith('FileId'));
-      console.log('[Sign] Found attachments in DB:', attachKeys);
+      if (signTaskId) {
+        // 【情况 A】已有任务：直接跳过创建，复用 ID
+        console.log('复用已有签署任务:', signTaskId);
+      } else {
+        // 【情况 B】新任务：上传附件 -> 上传合同 -> 创建任务
+        wx.showLoading({ title: '准备文件...', mask: true });
 
-      const fddAttachs = [];
-      const updatesToDb = {};
-
-      // 4. 循环处理每个附件 (单线程串行)
-      for (const key of attachKeys) {
-        const match = key.match(/attach(\d+)FileId/);
-        const indexStr = match ? match[1] : '0';
-
-        const wxFileId = fileData[key]; // 例如 cloud://.../TSFZX-GZ-001-责任书.docx
-
-        // 使用正则提取最后一个斜杠后的内容
-        let realFileName = `attach${indexStr}.docx`; // 兜底默认值
-        if (wxFileId && typeof wxFileId === 'string') {
-          const parts = wxFileId.split('/');
-          if (parts.length > 0) {
-            realFileName = parts[parts.length - 1]; // 拿到 "TSFZX-GZ-001-责任书.docx"
-          }
-        }
-
-        // 你的附件 ID (attachId) 依然可以用 attach1, attach2 这种简单的内部代号
-        // 但展示给用户的名字 (attachName) 用真实文件名
-        const currentAttachId = `attach${indexStr}`;
-        const currentAttachName = realFileName;
-
-        // const attachName = `attach${indexStr}.docx`; 
-        const attachName = currentAttachName;
+        // --- B1. 处理附件 ---
+        const attachKeys = Object.keys(fileData).filter(k => k.startsWith('attach') && k.endsWith('FileId'));
+        const fddAttachs = []; 
         
-        let fddFileId = esignData[key];
+        for (const key of attachKeys) {
+          const match = key.match(/attach(\d+)FileId/);
+          const indexStr = match ? match[1] : '0';
 
-        if (fddFileId) {
-          console.log(`[Sign] ${attachName} already uploaded:`, fddFileId);
-        } else {
-          const wxFileId = fileData[key];
-          console.log(`[Sign] Uploading ${attachName}...`);
-
-          // A. 获取临时链接
-          const tempRes = await wx.cloud.getTempFileURL({ fileList: [wxFileId] });
-          const tempUrl = tempRes.fileList[0].tempFileURL;
-
-          // B. 上传到法大大
-          const upRes = await wx.cloud.callFunction({
-            name: 'api-fadada',
-            data: {
-              action: 'uploadFileByUrl',
-              payload: {
-                url: tempUrl,
-                fileName: currentAttachName,
-                fileType: 'attach'
-              }
-            }
-          });
-
-          const remoteData = upRes.result;
-          const fddFileUrl = remoteData?.data?.result?.data?.fddFileUrl || remoteData?.data?.result?.fddFileUrl;
-
-          if (!fddFileUrl) {
-            throw new Error(`上传附件 ${currentAttachName} 失败`);
+          const wxFileId = fileData[key]; 
+          // 提取真实文件名
+          let realFileName = `attach${indexStr}.docx`;
+          if (wxFileId && typeof wxFileId === 'string') {
+             const parts = wxFileId.split('/');
+             if (parts.length > 0) realFileName = parts[parts.length - 1];
           }
+          
+          const currentAttachId = `attach${indexStr}`; 
+          const currentAttachName = realFileName; 
+          const attachName = currentAttachName; // 兼容旧变量名
 
-          // C. 转换 ID
-          const cvRes = await wx.cloud.callFunction({
-            name: 'api-fadada',
-            data: {
-              action: 'convertFddUrlToFileId',
-              payload: {
-                fddFileUrl,
-                fileType: 'doc',
-                fileName: currentAttachName
-              }
-            }
-          });
-
-          const cvRemoteResult = cvRes.result;
-          fddFileId = cvRemoteResult?.data?.result?.data?.fileIdList?.[0]?.fileId ||
-            cvRemoteResult?.data?.fileIdList?.[0]?.fileId;
+          let fddFileId = esignData[key];
 
           if (!fddFileId) {
-            console.error(`[Fatal] ${currentAttachName} ID转换失败返回:`, cvRemoteResult);
-            throw new Error(`附件 ${currentAttachName} ID转换失败`);
+            const tempRes = await wx.cloud.getTempFileURL({ fileList: [wxFileId] });
+            const tempUrl = tempRes.fileList[0].tempFileURL;
+
+            // 上传
+            const upRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'uploadFileByUrl',
+                payload: { url: tempUrl, fileName: currentAttachName, fileType: 'attach' }
+              }
+            });
+            const fddFileUrl = upRes.result?.data?.result?.data?.fddFileUrl || upRes.result?.data?.result?.fddFileUrl;
+            if (!fddFileUrl) throw new Error(`附件 ${currentAttachName} 上传失败`);
+
+            // 转换 ID
+            const cvRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'convertFddUrlToFileId',
+                payload: { fddFileUrl, fileType: 'doc', fileName: currentAttachName }
+              }
+            });
+            fddFileId = cvRes.result?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRes.result?.data?.fileIdList?.[0]?.fileId;
+            if (!fddFileId) throw new Error(`附件 ${currentAttachName} ID转换失败`);
+            
+            updatesToDb[`esign.${key}`] = fddFileId; 
           }
 
-          updatesToDb[`esign.${key}`] = fddFileId;
+          fddAttachs.push({
+            attachId: currentAttachId,
+            attachName: currentAttachName,
+            attachFileId: fddFileId
+          });
         }
 
-        fddAttachs.push({
-          attachId: currentAttachId, // 内部ID: attach1
-          attachName: currentAttachName, // 显示名: TSFZX-...-责任书.docx
-          attachFileId: fddFileId
-        });
-      }
+        // --- B2. 处理主合同 ---
+        let docFileId = esignData.docFileId || esignData.fileId; 
+        if (!docFileId) {
+          const mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
+          if (!mainWxFileId) throw new Error('未找到主合同文件');
 
-      // 5. 中途存档
-      if (Object.keys(updatesToDb).length > 0) {
-        console.log('[Sign] Checkpoint: Saving attachments to DB...');
-        await wx.cloud.callFunction({
-          name: 'api-fadada',
-          data: {
-            action: 'saveContractEsign',
-            payload: { contractId, ...updatesToDb }
-          }
-        });
-      }
+          const tempRes = await wx.cloud.getTempFileURL({ fileList: [mainWxFileId] });
+          const tempUrl = tempRes.fileList[0].tempFileURL;
 
-      // 6. 处理主合同
-      let docFileId = esignData.docFileId || esignData.fileId;
+          const safeName = signerName || `contract_${item._id.slice(-4)}`;
+          const fileName = `${safeName}.pdf`;
 
-      if (!docFileId) {
-        console.log('[Sign] 主合同未上传，开始补传...');
-        const mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
-        if (!mainWxFileId) throw new Error('未找到主合同文件');
-
-        const tempRes = await wx.cloud.getTempFileURL({ fileList: [mainWxFileId] });
-        const tempUrl = tempRes.fileList[0].tempFileURL;
-
-        // 这里使用了刚才提取并清洗过的 signerName
-        const safeName = signerName || `contract_${item._id.slice(-4)}`;
-        const fileName = `${safeName}.pdf`;
-
-        const upRes = await wx.cloud.callFunction({
-          name: 'api-fadada',
-          data: {
-            action: 'uploadFileByUrl',
-            payload: { url: tempUrl, fileName, fileType: 'doc' }
-          }
-        });
-
-        const remoteData = upRes.result;
-        const fddFileUrl = remoteData?.data?.result?.data?.fddFileUrl || remoteData?.data?.result?.fddFileUrl;
-        if (!fddFileUrl) throw new Error('主合同上传失败');
-
-        const cvRes = await wx.cloud.callFunction({
-          name: 'api-fadada',
-          data: {
-            action: 'convertFddUrlToFileId',
-            payload: { fddFileUrl, fileType: 'doc', fileName }
-          }
-        });
-        const cvRemote = cvRes.result;
-        docFileId = cvRemote?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRemote?.data?.fileIdList?.[0]?.fileId;
-
-        if (!docFileId) throw new Error('主合同ID转换失败');
-
-        console.log(`[Sign] 主合同补传成功 -> ${docFileId}`);
-        updatesToDb['esign.docFileId'] = docFileId;
-      }
-
-      // 7. 发起签署
-      wx.showLoading({ title: '创建签署任务...', mask: true });
-
-      const taskPayload = {
-        docFileId: docFileId,
-        subject: `${signerName}-租车合同`, // 清洗过的变量
-        signerName: signerName,
-        signerId: actorId,
-        signerPhone: signerPhone,
-        cityCode: item.cityCode,
-        attachs: fddAttachs // 这里面现在包含了真实的文件名
-      };
-
-      console.log('[Sign] Calling createSignTaskV51 with:', taskPayload);
-      const taskRes = await wx.cloud.callFunction({
-        name: 'api-fadada',
-        data: {
-          action: 'createSignTaskV51',
-          payload: taskPayload
+          const upRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'uploadFileByUrl',
+                payload: { url: tempUrl, fileName, fileType: 'doc' }
+              }
+          });
+          const fddUrl = upRes.result?.data?.result?.data?.fddFileUrl || upRes.result?.data?.result?.fddFileUrl;
+          
+          const cvRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                  action: 'convertFddUrlToFileId',
+                  payload: { fddFileUrl: fddUrl, fileType: 'doc', fileName }
+              }
+          });
+          docFileId = cvRes.result?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRes.result?.data?.fileIdList?.[0]?.fileId;
+          
+          updatesToDb['esign.docFileId'] = docFileId; 
         }
-      });
 
-      const taskData = taskRes.result;
-      if (!taskData?.success && !taskData?.ok) {
-        throw new Error(taskData?.msg || '创建任务失败');
-      }
+        // --- B3. 创建任务 ---
+        wx.showLoading({ title: '创建签署任务...', mask: true });
+        
+        const taskPayload = {
+          docFileId: docFileId,
+          subject: `${signerName}-租车合同`,
+          signerName: signerName,
+          signerId: actorId,
+          signerPhone: signerPhone,
+          cityCode: item.cityCode,
+          attachs: fddAttachs
+        };
 
-      const signTaskId = taskData.data?.signTaskId || taskData.signTaskId || taskData.data?.data?.signTaskId;
-      if (!signTaskId) throw new Error('未返回 signTaskId');
+        const taskRes = await wx.cloud.callFunction({
+          name: 'api-fadada',
+          data: { action: 'createSignTaskV51', payload: taskPayload }
+        });
 
-      updatesToDb['esign.signTaskId'] = signTaskId;
-      updatesToDb['esign.signTaskStatus'] = 'sent';
+        const taskData = taskRes.result;
+        if (!taskData?.success && !taskData?.ok) throw new Error(taskData?.msg || '创建任务失败');
+        
+        signTaskId = taskData.data?.signTaskId || taskData.signTaskId || taskData.data?.data?.signTaskId;
+        if (!signTaskId) throw new Error('未返回 signTaskId');
 
-      // 8. 获取签署链接
-      wx.showLoading({ title: '获取签署链接...', mask: true });
+        updatesToDb['esign.signTaskId'] = signTaskId;
+        updatesToDb['esign.signTaskStatus'] = 'sent';
+      } 
 
+      // -----------------------------------------------------------
+      // 2. 获取签署链接 (公共步骤)
+      // -----------------------------------------------------------
+      wx.showLoading({ title: '获取链接...', mask: true });
+      
       const actorRes = await wx.cloud.callFunction({
-        name: 'api-fadada',
-        data: {
-          action: 'getActorUrl',
-          payload: {
-            signTaskId,
-            actorId: actorId,
-            clientUserId: clientUserId,
+          name: 'api-fadada',
+          data: {
+              action: 'getActorUrl',
+              payload: { signTaskId, actorId, clientUserId }
           }
-        }
       });
-
       const actorData = actorRes.result;
-      const actorUrl = actorData?.data?.actorSignTaskEmbedUrl ||
-        actorData?.actorSignTaskEmbedUrl ||
-        actorData?.data?.data?.actorSignTaskEmbedUrl;
+      const actorUrl = actorData?.data?.actorSignTaskEmbedUrl || actorData?.actorSignTaskEmbedUrl || actorData?.data?.data?.actorSignTaskEmbedUrl;
 
       if (!actorUrl) throw new Error('未返回签署链接');
 
       updatesToDb['esign.lastActorUrl'] = actorUrl;
 
-      // 9. 最终保存
-      console.log('[Sign] Saving final updates to DB:', updatesToDb);
-      await wx.cloud.callFunction({
-        name: 'api-fadada',
-        data: {
-          action: 'saveContractEsign',
-          payload: {
-            contractId,
-            ...updatesToDb
-          }
-        }
-      });
+      // 3. 最终保存
+      if (Object.keys(updatesToDb).length > 0) {
+        await wx.cloud.callFunction({
+            name: 'api-fadada',
+            data: {
+                action: 'saveContractEsign',
+                payload: { contractId, ...updatesToDb }
+            }
+        });
+      }
 
-      // 10. 成功与复制
       wx.hideLoading();
+      
+      // 4. 复制链接
       wx.setClipboardData({
         data: actorUrl,
         success: () => {
-          wx.showModal({
-            title: '发起成功',
-            content: '签署链接已复制。',
-            showCancel: false,
-            confirmText: '好的',
-            success: () => this.onPullDownRefresh()
+             wx.showModal({
+                title: '准备就绪',
+                content: '签署链接已刷新并复制。请司机使用此链接签署。',
+                showCancel: false,
+                confirmText: '好的',
+                success: () => this.onPullDownRefresh() 
+            });
+        }
+      });
+
+    } catch (err) {
+      console.error('[Sign Error]', err);
+      wx.hideLoading();
+      wx.showModal({ title: '操作失败', content: err.message, showCancel: false });
+    }
+  },
+
+  // 单线程稳定版：智能复用 signTaskId + 详细调试日志
+  async onSignFromRowV2(e) {
+    console.log('[Debug] 按钮被点击了，开始 onSignFromRowV1');
+    console.log('[Debug] dataset:', e.currentTarget.dataset);
+
+    // 1. 获取并校验 item
+    const { item } = e.currentTarget.dataset;
+    if (!item) {
+        console.error('[Debug] 错误：没有拿到 item 数据'); 
+        return;
+    }
+
+    // 打印一下当前的 esign 数据，看看里面到底有啥
+    const esignData = item.esign || {};
+    console.log('[Debug] 当前数据库里的 esign 数据:', esignData);
+
+    // 0. 如果已经签署完成，直接拦截
+    if (this.isSignTaskFinished && this.isSignTaskFinished(esignData.signTaskStatus)) {
+      console.log('[Debug] 检测到合同已完成签署，拦截操作');
+      return wx.showToast({ title: '该合同签署已完成', icon: 'none' });
+    }
+
+    // 2. 准备关键变量
+    const rawName = item.fields?.clientName || '';
+    const rawPhone = item.fields?.clientPhone || '';
+    const signerName = rawName.replace(/[\r\n]/g, '').trim();
+    const signerPhone = rawPhone.replace(/[\r\n]/g, '').trim();
+    
+    if (!signerPhone) return wx.showToast({ title: '缺少客户手机号', icon: 'none' });
+    if (!signerName) return wx.showToast({ title: '缺少客户姓名', icon: 'none' });
+
+    const actorId = signerPhone;
+    const clientUserId = `driver:${signerPhone}`;
+
+    const updatesToDb = {}; 
+    const contractId = item._id;
+
+    wx.showLoading({ title: '处理中...', mask: true });
+
+    try {
+      const fileData = item.file || {};
+      
+      // ▼▼▼▼▼ 核心逻辑：检查是否已有 signTaskId ▼▼▼▼▼
+      let signTaskId = esignData.signTaskId;
+
+      if (signTaskId) {
+        // 【情况 A】已有任务：直接复用
+        console.log('=============================================');
+        console.log('[Debug] ✅ 命中复用逻辑！发现已有 signTaskId:', signTaskId);
+        console.log('=============================================');
+        wx.showToast({ title: '复用已有任务...', icon: 'none' });
+        // 这里不需要做任何上传操作，直接跳到后面去获取链接
+
+      } else {
+        // 【情况 B】新任务：走完整的创建流程
+        console.log('=============================================');
+        console.log('[Debug] 🚀 未发现 signTaskId，开始创建新任务...');
+        console.log('=============================================');
+        
+        wx.showLoading({ title: '准备附件...', mask: true });
+
+        // --- B1. 处理附件 ---
+        const attachKeys = Object.keys(fileData).filter(k => k.startsWith('attach') && k.endsWith('FileId'));
+        console.log('[Debug] 需要处理的附件 Key:', attachKeys);
+
+        const fddAttachs = []; 
+        
+        for (const key of attachKeys) {
+          const match = key.match(/attach(\d+)FileId/);
+          const indexStr = match ? match[1] : '0';
+
+          const wxFileId = fileData[key]; 
+          let realFileName = `attach${indexStr}.docx`;
+          if (wxFileId && typeof wxFileId === 'string') {
+             const parts = wxFileId.split('/');
+             if (parts.length > 0) realFileName = parts[parts.length - 1];
+          }
+          
+          const currentAttachId = `attach${indexStr}`; 
+          const currentAttachName = realFileName; 
+          const attachName = currentAttachName; 
+
+          let fddFileId = esignData[key];
+
+          if (!fddFileId) {
+            console.log(`[Debug] 附件 [${currentAttachName}] 未上传，开始上传...`);
+            const tempRes = await wx.cloud.getTempFileURL({ fileList: [wxFileId] });
+            const tempUrl = tempRes.fileList[0].tempFileURL;
+
+            const upRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'uploadFileByUrl',
+                payload: { url: tempUrl, fileName: currentAttachName, fileType: 'attach' }
+              }
+            });
+            const fddFileUrl = upRes.result?.data?.result?.data?.fddFileUrl || upRes.result?.data?.result?.fddFileUrl;
+            if (!fddFileUrl) throw new Error(`附件 ${currentAttachName} 上传失败`);
+
+            const cvRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'convertFddUrlToFileId',
+                payload: { fddFileUrl, fileType: 'doc', fileName: currentAttachName }
+              }
+            });
+            fddFileId = cvRes.result?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRes.result?.data?.fileIdList?.[0]?.fileId;
+            if (!fddFileId) throw new Error(`附件 ${currentAttachName} ID转换失败`);
+            
+            console.log(`[Debug] 附件 [${currentAttachName}] 上传完毕, ID:`, fddFileId);
+            updatesToDb[`esign.${key}`] = fddFileId; 
+          } else {
+            console.log(`[Debug] 附件 [${currentAttachName}] 已存在，ID:`, fddFileId);
+          }
+
+          fddAttachs.push({
+            attachId: currentAttachId,
+            attachName: currentAttachName,
+            attachFileId: fddFileId
           });
+        }
+
+        // --- B2. 处理主合同 ---
+        let docFileId = esignData.docFileId || esignData.fileId; 
+        if (!docFileId) {
+          console.log('[Debug] 主合同未上传，开始补传...');
+          const mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
+          if (!mainWxFileId) throw new Error('未找到主合同文件');
+
+          const tempRes = await wx.cloud.getTempFileURL({ fileList: [mainWxFileId] });
+          const tempUrl = tempRes.fileList[0].tempFileURL;
+
+          const safeName = signerName || `contract_${item._id.slice(-4)}`;
+          const fileName = `${safeName}.pdf`;
+
+          const upRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                action: 'uploadFileByUrl',
+                payload: { url: tempUrl, fileName, fileType: 'doc' }
+              }
+          });
+          const fddUrl = upRes.result?.data?.result?.data?.fddFileUrl || upRes.result?.data?.result?.fddFileUrl;
+          
+          const cvRes = await wx.cloud.callFunction({
+              name: 'api-fadada',
+              data: {
+                  action: 'convertFddUrlToFileId',
+                  payload: { fddFileUrl: fddUrl, fileType: 'doc', fileName }
+              }
+          });
+          docFileId = cvRes.result?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRes.result?.data?.fileIdList?.[0]?.fileId;
+          
+          console.log('[Debug] 主合同上传完毕, ID:', docFileId);
+          updatesToDb['esign.docFileId'] = docFileId; 
+        } else {
+          console.log('[Debug] 主合同已存在, ID:', docFileId);
+        }
+
+        // --- B3. 创建任务 ---
+        wx.showLoading({ title: '创建签署任务...', mask: true });
+        console.log('[Debug] 准备调用 createSignTaskV51...');
+        
+        const taskPayload = {
+          docFileId: docFileId,
+          subject: `${signerName}-租车合同`,
+          signerName: signerName,
+          signerId: actorId,
+          signerPhone: signerPhone,
+          cityCode: item.cityCode,
+          attachs: fddAttachs
+        };
+
+        const taskRes = await wx.cloud.callFunction({
+          name: 'api-fadada',
+          data: { action: 'createSignTaskV51', payload: taskPayload }
+        });
+
+        const taskData = taskRes.result;
+        if (!taskData?.success && !taskData?.ok) throw new Error(taskData?.msg || '创建任务失败');
+        
+        signTaskId = taskData.data?.signTaskId || taskData.signTaskId || taskData.data?.data?.signTaskId;
+        if (!signTaskId) throw new Error('未返回 signTaskId');
+
+        console.log('[Debug] 新任务创建成功！signTaskId:', signTaskId);
+
+        updatesToDb['esign.signTaskId'] = signTaskId;
+        updatesToDb['esign.signTaskStatus'] = 'sent';
+      } 
+
+      // -----------------------------------------------------------
+      // 无论上面走了 if 还是 else，现在我们一定有 signTaskId 了
+      // -----------------------------------------------------------
+
+      // 2. 获取签署链接
+      wx.showLoading({ title: '获取链接...', mask: true });
+      console.log('[Debug] 正在获取签署链接, TaskID:', signTaskId);
+      
+      const actorRes = await wx.cloud.callFunction({
+          name: 'api-fadada',
+          data: {
+              action: 'getActorUrl',
+              payload: { signTaskId, actorId, clientUserId }
+          }
+      });
+      const actorData = actorRes.result;
+      const actorUrl = actorData?.data?.actorSignTaskEmbedUrl || actorData?.actorSignTaskEmbedUrl || actorData?.data?.data?.actorSignTaskEmbedUrl;
+
+      if (!actorUrl) {
+          console.error('[Debug] 获取链接失败，返回:', actorRes);
+          throw new Error('未返回签署链接');
+      }
+      console.log('[Debug] 获取链接成功:', actorUrl.slice(0, 30) + '...');
+
+      updatesToDb['esign.lastActorUrl'] = actorUrl;
+
+      // 3. 最终保存 (如果有任何更新的话)
+      const keysToUpdate = Object.keys(updatesToDb);
+      if (keysToUpdate.length > 0) {
+        console.log('[Debug] 正在更新数据库字段:', keysToUpdate);
+        await wx.cloud.callFunction({
+            name: 'api-fadada',
+            data: {
+                action: 'saveContractEsign',
+                payload: { contractId, ...updatesToDb }
+            }
+        });
+      } else {
+        console.log('[Debug] 数据库无字段需要更新');
+      }
+
+      wx.hideLoading();
+      
+      // 4. 复制链接并提示
+      wx.setClipboardData({
+        data: actorUrl,
+        success: () => {
+             wx.showModal({
+                title: '准备就绪',
+                content: '签署链接已刷新并复制。请司机使用此链接签署。',
+                showCancel: false,
+                confirmText: '好的',
+                success: () => this.onPullDownRefresh() 
+            });
         }
       });
 

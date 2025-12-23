@@ -57,7 +57,7 @@ async function post2(path, data) {
   }
 
 // 仅针对 TCB 写库，不经 ECS
-async function saveContractEsign(payload) {
+async function saveContractEsignOld(payload) {
     const db = cloud.database();
     const { contractId, fileId, signTaskId, actorUrl, signTaskStatus } = payload || {};
   
@@ -93,6 +93,67 @@ async function saveContractEsign(payload) {
   
     return { ok: true, matched: ret.stats?.updated || ret.stats?.updatedDocs || 0 };
   }
+
+// [修改版] 支持旧格式 + 新格式(带.路径) + 动态字段
+async function saveContractEsign(payload) {
+    const db = cloud.database();
+    // 1. 分离 contractId，剩下的都是要更新的数据
+    const { contractId, ...updates } = payload || {};
+
+    // console.log('[saveContractEsign] raw payload:', payload);
+
+    if (!contractId) throw new Error('contractId required');
+
+    const data = {};
+
+    // 2. 遍历 payload 里的所有字段，智能处理
+    for (const key in updates) {
+        const val = updates[key];
+        // 过滤掉无意义的值
+        if (val === undefined || val === null) continue;
+
+        // 【情况 A：新格式】如果 key 已经包含了 "esign." (例如 "esign.signTaskId", "esign.attach1FileId")
+        // 直接存入，不需要处理
+        if (key.startsWith('esign.')) {
+            data[key] = val;
+        }
+        // 【情况 B：旧格式兼容】如果是旧的简写字段，手动映射到 esign.xxx
+        else if (key === 'fileId') {
+            data['esign.fileId'] = val;
+        }
+        else if (key === 'signTaskId') {
+            data['esign.signTaskId'] = val;
+        }
+        else if (key === 'actorUrl') {
+            data['esign.lastActorUrl'] = val; // 注意旧逻辑这里有改名
+        }
+        else if (key === 'signTaskStatus') {
+            data['esign.signTaskStatus'] = val;
+        }
+        // 如果还有其他旧字段，可以在这里继续加 else if...
+    }
+
+    // 3. 统一更新时间
+    data['esign.updatedAt'] = db.serverDate();
+
+    // 4. 检查是否有实质更新
+    // 只有 updatedAt 一个字段说明没提取到任何有效数据
+    if (Object.keys(data).length === 1) { 
+        console.warn('[saveContractEsign] No valid fields found to update. Payload keys:', Object.keys(updates));
+        // 这里返回个 ok 避免前端报错，但打印警告
+        return { ok: true, matched: 0, msg: 'nothing to update' };
+    }
+
+    console.log('[saveContractEsign] Final data to update:', data);
+
+    // 5. 执行更新
+    const ret = await db.collection('contracts').doc(contractId).update({ data });
+    
+    return { 
+        ok: true, 
+        matched: ret.stats?.updated || ret.stats?.updatedDocs || 0 
+    };
+}
   
 exports.main = async (event, context) => {
   try {
