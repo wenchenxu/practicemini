@@ -19,3 +19,7 @@ cloudfunctions/**/node_modules/
 # local
 cloudfunctions/addStranger/
 cloudfunctions/ciProbe/
+
+# 微信小程序 npm 构建产物
+miniprogram_npm/
+miniprogram/miniprogram_npm/

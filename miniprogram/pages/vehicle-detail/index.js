@@ -3,6 +3,37 @@ const db = wx.cloud.database();
 const vehiclesCol = db.collection('vehicles');
 const driversCol  = db.collection('drivers');
 const contractsCol = db.collection('contracts');
+const BIZ_TZ = 'Asia/Shanghai';
+
+// 🛠️ 工具函数：将 Date 对象转为 'YYYY-MM-DD' (强制上海时区)
+// 替代了之前的 formatDateStr
+function formatBizDate(dateInput) {
+    if (!dateInput) return '';
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '';
+  
+    // 使用 Intl 强制使用上海时区格式化
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BIZ_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+  
+    const y = parts.find(p => p.type === 'year').value;
+    const m = parts.find(p => p.type === 'month').value;
+    const d = parts.find(p => p.type === 'day').value;
+    return `${y}-${m}-${d}`;
+  }
+  
+// 🛠️ 工具函数：将 'YYYY-MM-DD' 字符串转为 Date 对象 (强制上海时区0点)
+// 替代了之前的 parseDateStr
+function parseBizDate(str) {
+    if (!str) return null;
+    // 核心修改：显式加上 +08:00 时区偏移，防止被解析为 UTC 或 本地时区
+    // 这样生成的 Date 对象，其绝对时间戳就是当天的 00:00:00 (上海时间)
+    return new Date(`${str}T00:00:00+08:00`);
+  }
 
 Page({
   data: {
@@ -16,7 +47,12 @@ Page({
     rentStatusText: '',
     maintenanceStatus: '',   // 'none' | 'in_maintenance'
     maintenanceStatusText: '',
-    statusText: ''           // “已租”、"闲置"、“已租 · 维修中”等
+    statusText: '',           // “已租”、"闲置"、“已租 · 维修中”等
+    showInsEdit: false, // 控制弹窗显示
+    editIns: {},        // 编辑时的临时对象（存字符串格式 'YYYY-MM-DD'）
+    // 新增：年审弹窗控制
+    showAnnualEdit: false,
+    editAnnualDate: '' // 暂存编辑时的日期字符串
   },
 
   onLoad(options) {
@@ -48,6 +84,17 @@ Page({
         wx.showToast({ title: '车辆不存在', icon: 'none' });
         return;
       }
+
+      // 使用新的 formatBizDate 处理显示
+      // 无论用户手机在哪个国家，看到的都是上海时间的日期
+      veh.liabInsStartStr = formatBizDate(veh.liabInsStart);
+      veh.liabInsEndStr   = formatBizDate(veh.liabInsEnd);
+      veh.commInsStartStr = formatBizDate(veh.commInsStart);
+      veh.commInsEndStr   = formatBizDate(veh.commInsEnd);
+
+      //年审
+      veh.annualInspectionDateStr = formatBizDate(veh.annualInspectionDate);
+      this.setData({ vehicle: veh });
 
       // 2) 推导 rentStatus / maintenanceStatus（兼容旧数据）
       const rentStatus = veh.rentStatus || (veh.status === 'rented' ? 'rented' : 'available');
@@ -229,5 +276,200 @@ Page({
     wx.navigateTo({
       url: `/pages/vehicle-history/index?vehicleId=${vehicle._id}&plate=${vehicle.plate}`
     });
-  }  
+  },
+
+  // 1. 点击按钮：打开编辑窗口，并复制当前数据到临时对象
+  onStartEditIns() {
+    const v = this.data.vehicle || {};
+    this.setData({
+      showInsEdit: true,
+      editIns: {
+        liabInsStart: v.liabInsStartStr || '',
+        liabInsEnd:   v.liabInsEndStr || '',
+        commInsStart: v.commInsStartStr || '',
+        commInsEnd:   v.commInsEndStr || '',
+      }
+    });
+  },
+
+  onCloseInsEdit() {
+    this.setData({ showInsEdit: false });
+  },
+
+  // 智能日期计算 (加一年减一天) - 适配时区版
+  calcEndDate(startDateStr) {
+    if (!startDateStr) return '';
+    
+    // 1. 先转成上海时区 0点的 Date 对象
+    const d = parseBizDate(startDateStr); 
+    
+    // 2. 进行日期计算 (JS Date 会自动处理闰年/大小月)
+    d.setFullYear(d.getFullYear() + 1);
+    d.setDate(d.getDate() - 1);
+    
+    // 3. 再转回上海时区的字符串
+    return formatBizDate(d);
+  },
+
+  // 监听日期变化
+  onInsDateChange(e) {
+    const field = e.currentTarget.dataset.field;
+    const val = e.detail.value; // Picker 返回的是 'YYYY-MM-DD'
+    
+    const updates = {};
+    updates[`editIns.${field}`] = val;
+
+    // 智能填充逻辑
+    if (field === 'liabInsStart') {
+        updates['editIns.liabInsEnd'] = this.calcEndDate(val);
+        // wx.showToast({ title: '已自动计算结束日', icon: 'none' });
+    }
+    if (field === 'commInsStart') {
+        updates['editIns.commInsEnd'] = this.calcEndDate(val);
+        // wx.showToast({ title: '已自动计算结束日', icon: 'none' });
+    }
+
+    this.setData(updates);
+  },
+
+  // 2. 点击编辑窗口的“确定” -> 触发二次确认弹窗
+  onConfirmInsEdit() {
+    // 编辑窗口会自动关闭，我们紧接着弹出一个系统确认框
+    const { editIns } = this.data;
+    const content = `请核对即将保存的日期：\r\n
+        交强险：${editIns.liabInsStart || '-'} 至 ${editIns.liabInsEnd || '-'}
+        商业险：${editIns.commInsStart || '-'} 至 ${editIns.commInsEnd || '-'}
+
+        确认无误并写入数据库？`;
+    wx.showModal({
+      title: '确认修改',
+      content: content,
+      confirmText: '确认保存',
+      confirmColor: '#07c160',
+      success: (res) => {
+        if (res.confirm) {
+          // 用户点了“是”，才真正去执行保存
+          this._doSaveInsuranceToDb();
+        } else {
+          // 用户点了“否”，什么都不做，刚才的修改作废
+          wx.showToast({ title: '已取消', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  // 3. 真正的保存逻辑（云函数版）
+  async _doSaveInsuranceToDb() {
+    const { editIns, vehicle } = this.data;
+    
+    // 注意：这里不需要前端 parseBizDate 了，直接传字符串给云函数
+    // 云函数会处理时区和 Date 转换，这样更安全
+    
+    wx.showLoading({ title: '写入中...', mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: {
+          action: 'updateInsurance',
+          payload: {
+            vehicleId: vehicle._id,
+            insuranceData: editIns // 直接传 { liabInsStart: '2025-xx-xx', ... }
+          }
+        }
+      });
+
+      const result = res.result;
+      if (!result || !result.ok) {
+        throw new Error(result?.error || '云函数执行异常');
+      }
+
+      // 保存完立刻刷新页面数据
+      await this.fetchDetail();
+
+      wx.hideLoading();
+      wx.showToast({ title: '保存成功', icon: 'success' });
+      
+    } catch (err) {
+      console.error(err);
+      wx.hideLoading();
+      wx.showModal({ title: '保存失败', content: err.message || String(err), showCancel: false });
+    }
+  },
+
+  // --- 年审相关逻辑 ---
+
+  // 1. 打开年审编辑窗
+  onStartEditAnnual() {
+    const v = this.data.vehicle || {};
+    this.setData({
+      showAnnualEdit: true,
+      editAnnualDate: v.annualInspectionDateStr || ''
+    });
+  },
+
+  // 关闭年审弹窗
+  onCloseAnnualEdit() {
+    this.setData({ showAnnualEdit: false });
+  },
+
+  // 监听年审日期变化
+  onAnnualDateChange(e) {
+    this.setData({ editAnnualDate: e.detail.value });
+  },
+
+  // 2. 点击确定 -> 二次确认
+  onConfirmAnnualEdit() {
+    const { editAnnualDate } = this.data;
+    const content = `请核对年审日期：\r\n
+        年审到期日：${editAnnualDate || '未选择'}
+
+        确认无误并写入数据库？`;
+
+    wx.showModal({
+      title: '确认修改',
+      content: content,
+      confirmText: '确认保存',
+      confirmColor: '#07c160',
+      success: (res) => {
+        if (res.confirm) {
+          this._doSaveAnnualToDb();
+        } else {
+          wx.showToast({ title: '已取消', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  // 3. 调用云函数保存
+  async _doSaveAnnualToDb() {
+    const { editAnnualDate, vehicle } = this.data;
+    wx.showLoading({ title: '写入中...', mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: {
+          action: 'updateAnnualInspection',
+          payload: {
+            vehicleId: vehicle._id,
+            dateStr: editAnnualDate // 直接传字符串 '2025-xx-xx'
+          }
+        }
+      });
+
+      const result = res.result;
+      if (!result || !result.ok) throw new Error(result?.error || '云函数异常');
+
+      await this.fetchDetail(); // 刷新
+
+      wx.hideLoading();
+      wx.showToast({ title: '保存成功', icon: 'success' });
+      
+    } catch (err) {
+      console.error(err);
+      wx.hideLoading();
+      wx.showModal({ title: '保存失败', content: err.message, showCancel: false });
+    }
+  }
 });

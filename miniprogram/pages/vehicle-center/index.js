@@ -35,6 +35,7 @@ Page({
     onShow() {
       // 每次返回页面都刷新，不能同时和 onLoad 的 resetAndFetch 存在，否则重复
       this.resetAndFetch();
+      this.checkExpirations();
     },
   
     // 下拉刷新
@@ -350,6 +351,75 @@ Page({
       wx.navigateTo({
         url: `/pages/vehicle-detail/index?id=${id}&city=${encodeURIComponent(city)}&cityCode=${encodeURIComponent(cityCode)}`
       });
+    },
+
+    // 🔍 检查保险/年检到期
+    async checkExpirations() {
+        const { curCity } = this.data; // 获取当前筛选的城市 (例如 'suzhou')
+        if (!curCity) return;
+
+        // 1. 防止骚扰：检查今天是否已经弹过窗了
+        const storageKey = `last_expire_check_${curCity}`;
+        const lastCheckDate = wx.getStorageSync(storageKey);
+        const todayStr = new Date().toDateString(); // e.g. "Sat Dec 27 2025"
+
+        // 如果今天已经检查并提示过，就不再弹窗（你可以注释掉这一行来强制测试）
+        if (lastCheckDate === todayStr) {
+        console.log('今日已提示过到期预警，跳过');
+        return;
+        }
+
+        const db = wx.cloud.database();
+        const _ = db.command;
+
+        // 2. 计算时间范围
+        const now = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(now.getDate() + 30);
+
+        try {
+        // 3. 查询数据库
+        // 逻辑：城市匹配 + (过期时间 < 30天后) + (过期时间 > 2000年 防止空数据干扰)
+        // 注意：这里假设你的 liabInsEnd 存的是 Date 对象或时间戳
+        // 如果存的是 "2025-05-11" 字符串，比较逻辑会略有不同，建议存 Date 对象
+        const res = await db.collection('vehicles').where({
+            cityCode: curCity, 
+            // 条件：liabInsEnd 小于等于未来30天 (包含了已过期的)
+            liabInsEnd: _.lte(thirtyDaysLater).and(_.gt(new Date('2000-01-01'))) 
+        }).get();
+
+        const expiringVehicles = res.data || [];
+
+        if (expiringVehicles.length > 0) {
+            // 4. 构造提醒文案
+            const count = expiringVehicles.length;
+            // 取出前两辆的车牌做展示
+            const plates = expiringVehicles.slice(0, 2).map(v => v.plate).join('、');
+            const moreText = count > 2 ? ` 等 ${count} 辆车` : ' ';
+            
+            const content = `当前城市有 ${count} 辆车交强险即将到期或已过期！\n\n涉及车辆：${plates}${moreText}\n\n请尽快处理，以免影响运营。`;
+
+            // 5. 弹窗
+            wx.showModal({
+            title: '⚠️ 保险到期预警',
+            content: content,
+            confirmText: '查看详情',
+            cancelText: '知道了',
+            confirmColor: '#ff4d4f', // 红色警示
+            success: (mRes) => {
+                if (mRes.confirm) {
+                // 点击查看，可以跳转到特定筛选页，或者只是关闭
+                // 这里暂时只做关闭，你可以扩展成自动筛选出这些车
+                }
+                // 6. 记录今天已提示
+                wx.setStorageSync(storageKey, todayStr);
+            }
+            });
+        }
+
+        } catch (err) {
+        console.error('[Check Expiration Error]', err);
+        }
     }
   });
   

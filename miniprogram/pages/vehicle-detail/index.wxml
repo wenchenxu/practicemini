@@ -49,6 +49,94 @@
       <text class="value">{{contractId || '无'}}</text>
     </view>
 
+    <view class="card-box" style="margin-top: 20rpx; background: #fff; padding: 20rpx; border-radius: 10rpx;">
+        <view class="section-title" style="font-weight: bold; margin-bottom: 20rpx;">保险信息</view>
+        
+        <van-cell-group>
+            <van-cell title="交强险开始" value="{{ vehicle.liabInsStartStr || '-' }}" />
+            <van-cell title="交强险结束" value="{{ vehicle.liabInsEndStr || '-' }}" />
+            <van-cell title="商业险开始" value="{{ vehicle.commInsStartStr || '-' }}" />
+            <van-cell title="商业险结束" value="{{ vehicle.commInsEndStr || '-' }}" />
+        </van-cell-group>
+
+        <view style="margin-top: 20rpx; text-align: right;">
+            <van-button type="info" size="small" plain bind:click="onStartEditIns">修改保险日期</van-button>
+        </view>
+    </view>
+
+    <van-dialog
+        use-slot
+        title="修改保险日期"
+        show="{{ showInsEdit }}"
+        show-cancel-button
+        bind:confirm="onConfirmInsEdit"
+        bind:close="onCloseInsEdit"
+    >
+        <view style="padding: 30rpx;">
+            
+            <view class="input-item">
+            <view class="input-label">交强险开始日：</view>
+            <picker mode="date" data-field="liabInsStart" bindchange="onInsDateChange" value="{{ editIns.liabInsStart }}">
+                <view class="picker-box">{{ editIns.liabInsStart || '请选择' }}</view>
+            </picker>
+            </view>
+
+            <view class="input-item">
+            <view class="input-label">交强险结束日：</view>
+            <picker mode="date" data-field="liabInsEnd" bindchange="onInsDateChange" value="{{ editIns.liabInsEnd }}">
+                <view class="picker-box">{{ editIns.liabInsEnd || '请选择' }}</view>
+            </picker>
+            </view>
+
+            <view class="divider" style="margin: 30rpx 0; border-bottom: 1px dashed #eee;"></view>
+
+            <view class="input-item">
+            <view class="input-label">商业险开始日：</view>
+            <picker mode="date" data-field="commInsStart" bindchange="onInsDateChange" value="{{ editIns.commInsStart }}">
+                <view class="picker-box">{{ editIns.commInsStart || '请选择' }}</view>
+            </picker>
+            </view>
+
+            <view class="input-item">
+            <view class="input-label">商业险结束日：</view>
+            <picker mode="date" data-field="commInsEnd" bindchange="onInsDateChange" value="{{ editIns.commInsEnd }}">
+                <view class="picker-box">{{ editIns.commInsEnd || '请选择' }}</view>
+            </picker>
+            </view>
+
+        </view>
+    </van-dialog>
+
+    <view class="card-box" style="margin-top: 20rpx; background: #fff; padding: 20rpx; border-radius: 10rpx;">
+        <view class="section-title" style="font-weight: bold; margin-bottom: 20rpx;">年审信息</view>
+        
+        <van-cell-group>
+            <van-cell title="年审到期日" value="{{ vehicle.annualInspectionDateStr || '-' }}" />
+        </van-cell-group>
+
+        <view style="margin-top: 20rpx; text-align: right;">
+            <van-button type="info" size="small" plain bind:click="onStartEditAnnual">修改年审日期</van-button>
+        </view>
+    </view>
+
+    <van-dialog
+        use-slot
+        title="修改年审日期"
+        show="{{ showAnnualEdit }}"
+        show-cancel-button
+        bind:confirm="onConfirmAnnualEdit"
+        bind:close="onCloseAnnualEdit"
+    >
+        <view style="padding: 30rpx;" wx:if="{{ showAnnualEdit }}">
+            <view class="input-item">
+                <view class="input-label">年审到期日：</view>
+                <picker mode="date" bindchange="onAnnualDateChange" value="{{ editAnnualDate }}">
+                    <view class="picker-box">{{ editAnnualDate || '请选择' }}</view>
+                </picker>
+            </view>
+        </view>
+    </van-dialog>
+
     <!-- 操作按钮区域 -->
     <view class="section" wx:if="{{vehicle}}">
       <text class="label">车辆操作</text>

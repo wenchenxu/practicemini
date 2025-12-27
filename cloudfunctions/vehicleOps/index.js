@@ -30,6 +30,48 @@ exports.main = async (event, context) => {
         return await deleteByCity(payload);
       case 'importCsv':
         return await upsertVehiclesFromCsv(payload);
+      case 'updateInsurance': {
+        const { vehicleId, insuranceData } = payload;
+        
+        // 内部工具：强制转为上海时区0点的 Date 对象
+        const parseBizDateCloud = (str) => {
+            if (!str) return null;
+            // 这里的逻辑和前端一致，确保存入的是上海时区 00:00:00 的绝对时间
+            return new Date(`${str}T00:00:00+08:00`);
+        };
+    
+        const dataToUpdate = {
+            liabInsStart: parseBizDateCloud(insuranceData.liabInsStart),
+            liabInsEnd:   parseBizDateCloud(insuranceData.liabInsEnd),
+            commInsStart: parseBizDateCloud(insuranceData.commInsStart),
+            commInsEnd:   parseBizDateCloud(insuranceData.commInsEnd),
+            updatedAt:    db.serverDate()
+        };
+    
+        await db.collection('vehicles').doc(vehicleId).update({
+            data: dataToUpdate
+        });
+    
+        return { ok: true };
+        }
+      case 'updateAnnualInspection': {
+            const { vehicleId, dateStr } = payload;
+            
+            // 内部工具 (如果你之前已经在 updateInsurance 里定义过，可以提出来共用，或者这里再写一遍)
+            const parseBizDateCloud = (str) => {
+              if (!str) return null;
+              return new Date(`${str}T00:00:00+08:00`);
+            };
+      
+            await db.collection('vehicles').doc(vehicleId).update({
+              data: {
+                annualInspectionDate: parseBizDateCloud(dateStr),
+                updatedAt: db.serverDate()
+              }
+            });
+      
+            return { ok: true };
+        }
       default:
         return { ok: false, error: 'unknown-action' };
     }
