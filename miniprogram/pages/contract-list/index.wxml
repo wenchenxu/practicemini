@@ -83,6 +83,14 @@
       <!-- 右侧操作区保留 -->
       <view class="ops">
         <view class="icon-row">
+            <view 
+                class="btn-copy" 
+                catchtap="onCopyInfo" 
+                data-item="{{item}}"
+                style="margin-right: 20rpx; color: #1989fa; display: inline-block;"
+            >
+                复制信息
+            </view>
             <view class="icon-btn" hover-class="icon-btn--hover" bindtap="editOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
             </view>

@@ -298,15 +298,15 @@ Page({
     const signTaskId = e.currentTarget.dataset.signTaskId || item?.esign?.signTaskId;
 
     if (!item) {
-      return wx.showToast({ title: '未找到合同', icon: 'none' });
+      return wx.showModal({ title: '提示', content: '未找到合同', showCancel: false });
     }
-
+  
     if (!signTaskId) {
-      return wx.showToast({ title: '暂无签署任务。请发起签署', icon: 'none' });
+      return wx.showModal({ title: '提示', content: '暂无签署任务。请发起签署', showCancel: false });
     }
-
+  
     if (this.isSignTaskFinished(item?.esign?.signTaskStatus)) {
-      return wx.showToast({ title: '该合同已完成签署', icon: 'none' });
+      return wx.showModal({ title: '提示', content: '该合同已完成签署', showCancel: false });
     }
 
     try {
@@ -351,7 +351,12 @@ Page({
         rawList: mappedRawList,
         list: this.applyFilter(mappedRawList)
       });
-      wx.showToast({ title: `状态：${this.mapSignTaskStatus(signTaskStatus)}`, icon: 'none' });
+      // 成功弹窗
+      wx.showModal({
+        title: '状态已刷新',
+        content: `当前状态：${this.mapSignTaskStatus(signTaskStatus)}`,
+        showCancel: false
+      });
     } catch (err) {
       console.error(err);
       wx.showToast({ title: err.message || '刷新失败', icon: 'none' });
@@ -559,7 +564,7 @@ Page({
     }
   },
 
-  // 单线程稳定版：智能复用 signTaskId (无调试日志)
+  // prod 单线程稳定版：智能复用 signTaskId (无调试日志)
   async onSignFromRowV1(e) {
     const { item } = e.currentTarget.dataset;
     if (!item) return;
@@ -1023,6 +1028,38 @@ Page({
       wx.hideLoading();
       wx.showModal({ title: '操作失败', content: err.message, showCancel: false });
     }
+  },
+
+  // 📋 复制司机信息到剪贴板
+  onCopyInfo(e) {
+    const { item } = e.currentTarget.dataset;
+    if (!item || !item.fields) return;
+
+    const f = item.fields;
+
+    // 1. 拼接文本 (注意 \n 是换行符)
+    const textToCopy = 
+        `司机信息登记表
+        姓名：${f.clientName || ''}
+        电话：${f.clientPhone || ''}
+        身份证号：${f.clientId || ''}
+        身份证地址：${f.clientAddress || ''}
+        车辆型号：${f.carModel || ''}
+        车牌号码：${f.carPlate || ''}
+
+        租金：${f.rentMonthly || 0}元
+        押金：${f.deposit || 0}元`;
+
+    // 2. 调用剪贴板
+    wx.setClipboardData({
+      data: textToCopy,
+      success: () => {
+        wx.showToast({
+          title: '合同信息已复制！',
+          icon: 'success'
+        });
+      }
+    });
   },
 
   viewOne(e) {
