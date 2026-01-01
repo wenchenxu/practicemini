@@ -41,7 +41,7 @@ const BASE_FIELDS = [
   { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'prod', min:0 },
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true  },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'always', help: '1-31号', min:1, max:31 },
-  { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never'},
+  { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never',hideOnCreate: true, hideOnEdit: true, hideOnView: true},
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
@@ -135,7 +135,10 @@ Page({
     vehiclePickerIndex: -1,   // 当前选中的索引（未选为 -1）
     
     fields: FIELDS,
-    form: {},
+    form: {
+      rentToday: 120,
+      rentTodayFormal: numberToCN(120) // 顺便把大写也初始化了，体验更好
+    },
     visibleFields: [],
     saving: false,
   },

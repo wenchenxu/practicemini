@@ -34,6 +34,8 @@ exports.main = async (event, context) => {
         return await updateInsurance(payload);
       case 'updateAnnualInspection':
         return await updateAnnualInspection(payload);
+      case 'getDashboardStats':
+        return await getDashboardStats(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -417,4 +419,117 @@ async function updateAnnualInspection(payload) {
   });
 
   return { ok: true };
+}
+
+async function getDashboardStats(payload) {
+  const { cityCode, timeRange, startDate, endDate } = payload;
+
+  // 重新引用一下，确保作用域安全
+  const db = cloud.database();
+  const _ = db.command;
+  const $ = db.command.aggregate;
+
+  // 1. 计算时间窗口
+  let startT = new Date();
+  let endT = new Date(); // 默认为 now
+
+  // 重置到当天 00:00:00
+  startT.setHours(0, 0, 0, 0);
+  endT.setHours(23, 59, 59, 999);
+
+  if (timeRange === 'week') {
+    const day = startT.getDay() || 7;
+    startT.setDate(startT.getDate() - day + 1); // 本周一
+  } else if (timeRange === 'month') {
+    startT.setDate(1); // 本月1号
+  } else if (timeRange === 'custom' && startDate && endDate) {
+    startT = new Date(startDate);
+    endT = new Date(endDate);
+  }
+
+  // 2. 准备查询条件
+  const cityMatch = cityCode ? { cityCode: cityCode } : {};
+
+  // ----------------------------------------------------
+  // A. 存量快照 (Snapshot)
+  // ----------------------------------------------------
+  const snapshotRes = await db.collection('vehicles').aggregate()
+    .match(cityMatch)
+    .group({
+      _id: null,
+      total: $.sum(1),
+      rented: $.sum($.cond({
+        if: $.eq(['$rentStatus', 'rented']), then: 1, else: 0
+      })),
+      available: $.sum($.cond({
+        if: $.eq(['$rentStatus', 'available']), then: 1, else: 0
+      })),
+      maintenance: $.sum($.cond({
+        if: $.eq(['$maintenanceStatus', 'in_maintenance']), then: 1, else: 0
+      }))
+    })
+    .end();
+
+  const stats = snapshotRes.list[0] || { total: 0, rented: 0, available: 0, maintenance: 0 };
+
+  // ----------------------------------------------------
+  // B. 流量流水 (Flow) - 联表查询
+  // ----------------------------------------------------
+  const flowRes = await db.collection('vehicle_history').aggregate()
+    .match({
+      createdAt: _.gte(startT).and(_.lte(endT))
+    })
+    .lookup({
+      from: 'vehicles',
+      localField: 'vehicleId',
+      foreignField: '_id',
+      as: 'vehicleInfo'
+    })
+    // 过滤城市
+    .match(cityCode ? { 'vehicleInfo.0.cityCode': cityCode } : {})
+    .sort({ createdAt: -1 })
+    .project({
+      plate: 1,
+      eventType: 1,
+      createdAt: 1,
+      driverClientId: 1
+    })
+    .limit(100)
+    .end();
+
+  const historyList = flowRes.list;
+  const flowStats = {
+    rentOut: historyList.filter(x => x.eventType === 'rent_start'),
+    return: historyList.filter(x => ['rent_end', 'rent_end_ocr'].includes(x.eventType)),
+    maintenanceIn: historyList.filter(x => x.eventType === 'maintenance_start'),
+    maintenanceOut: historyList.filter(x => x.eventType === 'maintenance_end')
+  };
+
+  // ----------------------------------------------------
+  // C. 到期预警 (Expirations)
+  // ----------------------------------------------------
+  const future30d = new Date();
+  future30d.setDate(future30d.getDate() + 30);
+  const minDate = new Date('2000-01-01');
+
+  const expiringRes = await db.collection('vehicles').where(
+    _.and([
+      cityMatch,
+      _.or([
+        { liabInsEnd: _.gte(new Date()).and(_.lte(future30d)) },
+        { annualInspectionDate: _.gte(new Date()).and(_.lte(future30d)) }
+      ])
+    ])
+  )
+    .field({ plate: 1, liabInsEnd: 1, annualInspectionDate: 1 })
+    .limit(20)
+    .get();
+
+  return {
+    ok: true,
+    dateRange: { start: startT, end: endT },
+    snapshot: stats,
+    flow: flowStats,
+    expiring: expiringRes.data
+  };
 }
