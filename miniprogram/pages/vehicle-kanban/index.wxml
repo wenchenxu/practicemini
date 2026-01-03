@@ -1,0 +1,99 @@
+<view class="page-container">
+  
+  <view wx:if="{{loading}}" style="text-align:center; padding: 50rpx;">
+    <van-loading type="spinner" />
+  </view>
+
+  <block wx:else>
+    
+    <view class="card-box grand-card">
+      <view class="grand-title">全国实时总览</view>
+      <view class="grand-content">
+        
+        <view class="grand-left">
+          <view class="grand-stat-item">
+            <view class="grand-val">{{ grand.total }}</view>
+            <view class="grand-key">总车辆</view>
+          </view>
+          <view class="grand-stat-item">
+            <view class="grand-val text-green">{{ grand.rented }}</view>
+            <view class="grand-key">在租</view>
+          </view>
+          <view class="grand-stat-item">
+            <view class="grand-val text-blue">{{ grand.available }}</view>
+            <view class="grand-key">闲置</view>
+          </view>
+        </view>
+
+        <view class="grand-right">
+          <van-circle
+            value="{{ grand.utilizationRate }}" 
+            color="#047a40" 
+            layer-color="#e8f5e9"
+            size="110" 
+            stroke-width="10"
+          >
+            <view class="circle-text">
+              <view class="grand-rate-num">{{ grand.utilization }}<text class="unit">%</text></view>
+              <view class="rate-label">总出租率</view>
+            </view>
+          </van-circle>
+        </view>
+
+      </view>
+    </view>
+    <view 
+      class="card-box overview-card clickable" 
+      wx:for="{{list}}" 
+      wx:key="cityCode"
+      bindtap="toCityDetail"
+      data-code="{{item.cityCode}}"
+    >
+      <view class="card-header">
+        <view class="city-name">{{item.cityName}}</view>
+        <van-icon name="arrow" color="#969799" />
+      </view>
+
+      <view class="overview-content">
+         <view class="chart-area">
+            <van-circle
+              value="{{ item.utilizationRate }}" 
+              color="{{ item.utilizationRate > 80 ? '#07c160' : '#1989fa' }}"
+              layer-color="#ebedf0"
+              size="80" 
+              stroke-width="6"
+            >
+              <view class="circle-text">
+                <view class="rate-num">{{ item.utilization }}<text class="unit">%</text></view>
+                <view class="rate-label">出租率</view>
+              </view>
+            </van-circle>
+         </view>
+
+         <view class="grid-area">
+            <view class="stat-item">
+                <view class="stat-val">{{ item.total }}</view>
+                <view class="stat-key">总车辆</view>
+            </view>
+            <view class="stat-item">
+                <view class="stat-val text-green">{{ item.rented }}</view>
+                <view class="stat-key">在租</view>
+            </view>
+            <view class="stat-item">
+                <view class="stat-val text-blue">{{ item.available }}</view>
+                <view class="stat-key">闲置</view>
+            </view>
+            <view class="stat-item">
+                <view class="stat-val text-orange">{{ item.maintenance }}</view>
+                <view class="stat-key">维修</view>
+            </view>
+         </view>
+      </view>
+    </view>
+
+  </block>
+  
+  <view style="text-align:center; color:#ccc; font-size:24rpx; padding-bottom:40rpx;">
+    - 点击卡片查看业务流水 -
+  </view>
+</view>

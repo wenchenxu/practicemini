@@ -41,7 +41,7 @@ Page({
   },
 
   goVehicles() {
-    wx.navigateTo({ url: '/pages/vehicles/index' });
+    wx.navigateTo({ url: '/pages/vehicle-kanban/index' });
   },
 
   goDevTools() {

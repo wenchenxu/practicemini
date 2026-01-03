@@ -1,0 +1,137 @@
+page {
+  background-color: #f7f8fa;
+  padding-top: 20rpx;
+  padding-bottom: 50rpx;
+}
+
+.card-box {
+  background: #ffffff;
+  margin: 24rpx;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.03);
+}
+
+.clickable:active {
+  background-color: #f2f3f5; /* 点击反馈 */
+}
+
+/* 城市标题栏 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f5f6f7;
+  margin-bottom: 20rpx;
+}
+.city-name {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #323233;
+  border-left: 8rpx solid #1989fa;
+  padding-left: 16rpx;
+}
+
+/* --- 下面是复制之前的样式 --- */
+.overview-content {
+  display: flex;
+  align-items: center;
+}
+.chart-area {
+  width: 35%; /*稍微改小一点适配列表*/
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.circle-text { text-align: center; line-height: 1.2; }
+.rate-num { font-size: 32rpx; font-weight: bold; color: #323233; }
+.unit { font-size: 20rpx; }
+.rate-label { font-size: 22rpx; color: #969799; margin-top: 4rpx; }
+
+.grid-area {
+  width: 65%;
+  display: flex;
+  flex-wrap: wrap;
+}
+.stat-item {
+  width: 50%;
+  text-align: center;
+  margin-bottom: 16rpx;
+}
+.stat-val {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #323233;
+  font-family: 'DINAlternate-Bold', sans-serif;
+}
+.stat-key { font-size: 24rpx; color: #969799; }
+
+.text-green { color: #07c160; }
+.text-blue { color: #1989fa; }
+.text-orange { color: #ff976a; }
+
+.grand-card {
+    background: linear-gradient(to bottom right, #ffffff, #fcfcfc);
+    border: 1rpx solid #f0f0f0;
+    padding: 30rpx;
+    margin-bottom: 30rpx; /* 和下面的列表拉开距离 */
+  }
+  
+  .grand-title {
+    font-size: 34rpx;
+    font-weight: 800; /* 加粗 */
+    color: #1a1a1a;
+    margin-bottom: 30rpx;
+    border-left: 10rpx solid #047a40; /* 深绿色左标 */
+    padding-left: 20rpx;
+  }
+  
+  .grand-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  /* 左侧统计区 */
+  .grand-left {
+    flex: 1;
+    display: flex;
+    justify-content: space-around; /* 均匀分布 */
+  }
+  
+  .grand-stat-item {
+    text-align: center;
+  }
+  
+  .grand-val {
+    font-size: 52rpx; /* 特大字体 */
+    font-weight: 900;
+    color: #323233;
+    font-family: 'DINAlternate-Bold', sans-serif;
+    line-height: 1.1;
+  }
+  
+  .grand-key {
+    font-size: 26rpx;
+    color: #666;
+    margin-top: 10rpx;
+    font-weight: 500;
+  }
+  
+  /* 右侧图表区 */
+  .grand-right {
+    width: 240rpx; /* 给圆环留足空间 */
+    display: flex;
+    justify-content: flex-end; /* 靠右对齐 */
+  }
+  
+  .grand-rate-num {
+    font-size: 40rpx;
+    font-weight: bold;
+    color: #047a40; /* 深绿色 */
+  }
+  
+  /* 颜色辅助 (复用原有的，如果没有就加上) */
+  .text-green { color: #07c160; }
+  .text-blue { color: #1989fa; }

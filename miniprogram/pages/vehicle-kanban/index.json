@@ -1,0 +1,9 @@
+{
+    "navigationBarTitleText": "全国运营概览",
+    "enablePullDownRefresh": true,
+    "usingComponents": {
+        "van-icon": "@vant/weapp/icon/index",
+        "van-circle": "@vant/weapp/circle/index",
+        "van-loading": "@vant/weapp/loading/index"
+    }
+}

@@ -21,10 +21,10 @@
             人员管理
         </button>
         </view>
-        <!--
+        
         <view>
-        <button class="admin-btn" bindtap="goVehicles">车辆管理</button>
-        </view> -->
+        <button class="admin-btn" bindtap="goVehicles">车辆看板</button>
+        </view> 
         <view>
         <button class="admin-btn" style="background:#444;" bindtap="goDevTools">开发者工具</button>
         </view>

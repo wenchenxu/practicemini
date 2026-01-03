@@ -36,6 +36,8 @@ exports.main = async (event, context) => {
         return await updateAnnualInspection(payload);
       case 'getDashboardStats':
         return await getDashboardStats(payload);
+      case 'getAllCitiesStats':
+        return await getAllCitiesStats();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -98,10 +100,16 @@ async function updateStatus(payload) {
     updateData.currentDriverName = _.remove();
     updateData.currentDriverPhone = _.remove();
   } else if (newStatus === 'maintenance') {
-    // 切维修状态：toggle
-    eventType = 'maintenance_toggle';
-    newMaintenanceStatus = oldMaintenanceStatus === 'in_maintenance' ? 'none' : 'in_maintenance';
-    // 这里不动租赁轴，也不碰 currentDriverId
+    // 切维修状态：判断是开始还是结束
+    if (oldMaintenanceStatus === 'in_maintenance') {
+        // 原来在维修 -> 现在结束维修
+        newMaintenanceStatus = 'none';
+        eventType = 'maintenance_end';
+      } else {
+        // 原来正常 -> 现在开始维修
+        newMaintenanceStatus = 'in_maintenance';
+        eventType = 'maintenance_start';
+      }
   }
 
   // 3) 更新车辆，只写 rentStatus / maintenanceStatus（不再写 status 字段）
@@ -125,7 +133,9 @@ async function updateStatus(payload) {
       eventType,
       fromStatus: fromStatusLabel,
       toStatus: toStatusLabel,
+      // 注意：veh 是更新前的快照，所以退租时这里依然有旧司机的名字
       driverClientId: driverSnapshot,     // 记录变化发生时的司机，是谁退的租
+      driverName: veh.currentDriverName || null,
       contractId: null,                                  // 这里通常是「结束租赁/维修」操作，没有新合同
       operator: payload.operator || null,
       createdAt: now
@@ -492,7 +502,9 @@ async function getDashboardStats(payload) {
       plate: 1,
       eventType: 1,
       createdAt: 1,
-      driverClientId: 1
+      driverClientId: 1,
+      driverName: 1,
+      clientName: 1, //以防万一存的是 clientName
     })
     .limit(100)
     .end();
@@ -532,4 +544,45 @@ async function getDashboardStats(payload) {
     flow: flowStats,
     expiring: expiringRes.data
   };
+}
+
+// 获取所有城市的存量概览 (分组统计)
+async function getAllCitiesStats() {
+  const db = cloud.database();
+  const $ = db.command.aggregate;
+
+  // 聚合查询：按 cityCode 分组
+  const res = await db.collection('vehicles').aggregate()
+    .group({
+      _id: '$cityCode', // 按城市代码分组
+      total: $.sum(1),
+      rented: $.sum($.cond({
+        if: $.eq(['$rentStatus', 'rented']), then: 1, else: 0
+      })),
+      available: $.sum($.cond({
+        if: $.eq(['$rentStatus', 'available']), then: 1, else: 0
+      })),
+      maintenance: $.sum($.cond({
+        if: $.eq(['$maintenanceStatus', 'in_maintenance']), then: 1, else: 0
+      }))
+    })
+    .end();
+
+  // 整理数据，计算出租率
+  const list = (res.list || []).map(item => {
+    const total = item.total;
+    const rented = item.rented;
+    let rate = 0;
+    if (total > 0) {
+      rate = (rented / total) * 100;
+    }
+    return {
+      cityCode: item._id, // 比如 'suzhou'
+      ...item,
+      utilization: rate.toFixed(1),
+      utilizationRate: rate
+    };
+  });
+
+  return { ok: true, list };
 }

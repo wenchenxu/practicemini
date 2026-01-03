@@ -424,6 +424,7 @@ exports.main = async (event, context) => {
           fromStatus: fromStatusLabel,
           toStatus: toStatusLabel,
           driverClientId: clientId,
+          driverName: clientName,
           // contractId: contractSerialNumberFormatted, // apparently this is critically wrong?
           contractId: serialFormatted,
           operator: payload.operator || null,

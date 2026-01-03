@@ -1,0 +1,37 @@
+// 这是一个 WXS 模块，专门运行在视图层
+var formatTime = function(dateStr) {
+    if (!dateStr) return '-';
+  
+    // 1. 将字符串转为 Date 对象
+    // 注意：云开发返回的 createdAt 是 ISO 格式 (UTC)
+    var date = getDate(dateStr);
+    if (!date) return '-';
+  
+    // 2. 强制转换为 UTC+8 (北京时间)
+    // getTimezoneOffset() 返回的是本地时间与 UTC 的分钟差（负数）
+    // 我们先还原成 UTC 时间戳，再加 8 小时
+    var utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    var sh = utc + (3600000 * 8); 
+    var d = getDate(sh);
+  
+    // 3. 格式化补零
+    var y = d.getFullYear();
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    var h = d.getHours();
+    var min = d.getMinutes();
+    var s = d.getSeconds();
+  
+    if (m < 10) m = '0' + m;
+    if (day < 10) day = '0' + day;
+    if (h < 10) h = '0' + h;
+    if (min < 10) min = '0' + min;
+    if (s < 10) s = '0' + s;
+  
+    // 4. 返回你要求的格式: YYYY-MM-DD, HH:MM:SS
+    return y + '-' + m + '-' + day + ', ' + h + ':' + min + ':' + s;
+  }
+  
+  module.exports = {
+    formatTime: formatTime
+  };
