@@ -44,20 +44,19 @@
   }
   
   .filter-pill {
-    flex: 1;
+    flex: none; /* 关键：防止挤压，保持宽度 */
     text-align: center;
-    padding: 6px 2px;
+    padding: 6px 12px; /* 稍微宽一点 */
     border-radius: 6px;
     font-size: 13px;
     border: 1px solid #ddd;
     background: #ffffff;
     color: #555;
-    /* 使用 Flex 垂直布局 */
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-width: 120rpx; /* 防止太窄 */
+    min-width: 100rpx;
   }
   
   .filter-pill .count {
@@ -73,7 +72,8 @@
   }
   
   /* 选中状态下数字颜色也要变白 */
-.filter-pill.active .count {
+  .filter-pill.active .count,
+  .filter-pill.active .count-warn {
     color: rgba(255, 255, 255, 0.9);
   }
 
@@ -81,6 +81,7 @@
   .loading,
   .empty {
     padding: 12px 16px;
+    text-align: center;
     font-size: 13px;
     color: #999;
   }
@@ -104,11 +105,21 @@
     font-weight: 600;
     font-size: 15px;
   }
-  
+  .status-tags {
+    display: flex;
+    gap: 8rpx;
+  }
   .status-tag {
-    font-size: 12px;
-    padding: 2px 6px;
-    border-radius: 12px;
+    font-size: 11px;
+    padding: 4rpx 12rpx;
+    border-radius: 8rpx; /* 圆角改小一点，更像标签 */
+    /* 居中对齐 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: normal; /* 重置行高，避免干扰 */
+    height: 32rpx;       /* 给一个固定高度，保证所有标签一样高 */
+    min-width: 60rpx;    /* 保证最小宽度 */
   }
   
   .status-available {
@@ -126,11 +137,14 @@
     color: #faad14;
   }
   
-  .row2,
-  .row3 {
+  /* 第二行和第三行：Flex 布局实现左右对齐 */
+  .row2, .row3 {
     margin-top: 4px;
     font-size: 12px;
     color: #666;
+    display: flex;
+    justify-content: space-between; /* 左右分布 */
+    align-items: center;
   }
   
   .model {
@@ -140,25 +154,46 @@
   .driver {
     color: #888;
   }
+  /* 司机信息 */
+  .driver-info {
+    display: flex;
+    gap: 10rpx;
+    flex: 1; /* 占据左侧空间 */
+    overflow: hidden;
+  }
+  .driver-col-name {
+    max-width: 200rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   
+  .expiry-group {
+    display: flex;
+    gap: 12rpx; /* 两个标签之间的间距 */
+    justify-content: flex-end;
+  }
+
+  /* 稍微调整 expiry-text，去掉原来的 margin-left，由 group 控制 */
+  .expiry-text {
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+    /* margin-left: 10px;  <-- 去掉这个 */
+  }
+  .expiry-text.expired {
+    color: #ff4d4f; /* 红色：过期 */
+  }
+  .expiry-text.warning {
+    color: #faad14; /* 橙色：临期 */
+  }
+
   .list-footer {
     text-align: center;
     font-size: 12px;
     color: #999;
     padding: 8px 0;
-  }
-  
-  .status-tags {
-    flex-direction: row;
-    display: flex;
-    align-items: center;
-    gap: 8rpx;
-  }
-  
-  .status-tag {
-    font-size: 22rpx;
-    padding: 4rpx 12rpx;
-    border-radius: 999rpx;
   }
 
   /* 新增样式 */
@@ -167,13 +202,6 @@
     flex-direction: row;
     align-items: center;
     /* 已经在 .row3 定义了 margin-top: 4px; font-size: 12px; color: #666; */
-  }
-  
-.driver-col-name {
-    width: 280rpx; /* 【关键】给名字列一个固定宽度，保证右侧电话对齐 */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   
 .driver-col-phone {

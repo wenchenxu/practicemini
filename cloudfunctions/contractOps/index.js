@@ -6,8 +6,9 @@ const fetch = require('node-fetch');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const COL = db.collection('contracts');
+const DRIVERS = db.collection('drivers');
 
-// —— 公用工具（与 createContract 保持一致）——
+// —— 公用工具 ——
 function pad(n, width = 2) { return String(n).padStart(width, '0'); }
 
 function sanitizePathComponent(input) {
@@ -60,20 +61,29 @@ function nowInTZ(tz) {
   return { y, m, d, ymd: `${y}${m}${d}` };
 }
 
-// 模板映射 
-const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
+// ▼▼▼▼▼ 新增：动态获取环境根路径 ▼▼▼▼▼
+function getEnvBase() {
+    const { ENV } = cloud.getWXContext();
+    // 根据 ENV 字符串判断是哪个环境，返回对应的 CloudBase ID
+    // 这里的 ID 是根据你之前的 contractV2 代码填写的
+    if (ENV === 'dev-4gzrr3qf9d8c8caa') {
+      return 'cloud://dev-4gzrr3qf9d8c8caa.6465-dev-4gzrr3qf9d8c8caa-1379075990';
+    }
+    // 默认为 Prod (旧环境 ID)
+    return 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
+  }
 
 const TPL_DIR = {
-  branch: 'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
-  city: 'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx
-  type: 'contractTemplate/types',    // types/<contractType>.docx
-  def: 'contractTemplate/defaults/default.docx' // 最终兜底
+  branch: 'contractTemplate/branches',
+  city: 'contractTemplate/cities',
+  type: 'contractTemplate/types',
+  def: 'contractTemplate/defaults/default.docx'
 };
 
 // 顺序尝试下载模板：分公司+类型 → 城市+类型 → 类型 → 默认
 async function pickTemplateBuffer(opts) {
   const { cityCode, branchCode, contractType } = opts;
-
+  const ENV_BASE = getEnvBase();
   // 按你的环境前缀与目录约定来（请确保 ENV_BASE 正确）
   const candidates = [];
   if (branchCode) {
@@ -96,12 +106,9 @@ async function pickTemplateBuffer(opts) {
 }
 
 // 渲染并覆盖上传（不改编号、不改路径）
-
 async function renderDocxForContract(doc) {
   const { cityCode, branchCode, contractType, fields, cityName, branchName, contractTypeName, _id } = doc;
   const serialFormatted = fields.contractSerialNumberFormatted;
-
-  // 修正这里的命名
   const { y, m, d } = nowInTZ(BIZ_TZ);
 
   const folderBase = buildContractFolderPath({
@@ -211,8 +218,11 @@ async function renderDocxForContract(doc) {
   }
 
   // 4) 上传 PDF 并回写
+  const safeClientName = (fields.clientName || 'customer').replace(/[\\/]/g, '');
+  const finalPdfName = `${serialFormatted}-${safeClientName}.pdf`;
+
   const upPdf = await cloud.uploadFile({
-    cloudPath: `${folderBase}/${serialFormatted}.pdf`,
+    cloudPath: `${folderBase}/${finalPdfName}`,
     fileContent: pdfBuf,
   });
   const pdfFileID = upPdf.fileID;
@@ -259,6 +269,26 @@ exports.main = async (event, context) => {
       const up = await COL.doc(id).update({
         data: { fields: patched, updatedAt: db.serverDate() }
       });
+
+      // 同步更新司机档案
+      if (fields.clientId && fields.clientPhone) {
+        try {
+          await DRIVERS.where({ clientId: fields.clientId }).update({
+            data: {
+              phone: fields.clientPhone,
+              name: fields.clientName,
+              addressRegistered: fields.clientAddress,
+              addressCurrent: fields.clientAddressCurrent,
+              emergencyContactName: fields.clientEmergencyContact,
+              emergencyContactPhone: fields.clientEmergencyPhone,
+              updatedAt: db.serverDate()
+            }
+          });
+          console.log('[contractOps] driver info synced:', fields.clientId);
+        } catch (driverErr) {
+          console.error('[contractOps] driver sync failed:', driverErr);
+        }
+      }
 
       return { ok: true, updated: up.stats ? up.stats.updated : 1 };
     }

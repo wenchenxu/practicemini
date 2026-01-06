@@ -275,6 +275,7 @@ Page({
     const { vehicle } = this.data;
     wx.navigateTo({
       url: `/pages/vehicle-history/index?vehicleId=${vehicle._id}&plate=${vehicle.plate}`
+      // url: `/pages/vehicle-history/index?vehicleId=${vehicle._id}`
     });
   },
 

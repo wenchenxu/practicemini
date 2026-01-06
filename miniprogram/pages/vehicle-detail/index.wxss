@@ -1,88 +1,154 @@
-/* 页面容器 */
-.page {
+/* 全局背景 */
+.page-container {
     min-height: 100vh;
-    background: #f5f5f5;
-    padding-bottom: 40rpx;
+    background-color: #f7f8fa;
+    padding: 24rpx;
     box-sizing: border-box;
+    padding-bottom: 60rpx;
   }
   
-  /* 顶部标题 */
-  .header {
-    font-size: 34rpx;
-    font-weight: 600;
-    padding: 28rpx 32rpx;
+  /* 卡片通用样式 */
+  .card {
     background: #ffffff;
-    border-bottom: 1rpx solid #eeeeee;
+    border-radius: 16rpx;
+    padding: 30rpx;
+    margin-bottom: 24rpx;
+    box-shadow: 0 2rpx 12rpx rgba(100, 101, 102, 0.05);
   }
   
-  /* 加载/空状态 */
-  .loading,
-  .empty {
-    padding: 40rpx;
-    text-align: center;
-    color: #888888;
-    font-size: 28rpx;
+  /* 标题栏 */
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
   
-  /* 信息分区卡片 */
-  .section {
-    background: #ffffff;
-    margin-top: 20rpx;
-    padding: 28rpx 32rpx;
-    border-bottom: 1rpx solid #f0f0f0;
+  .card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24rpx;
   }
   
-  /* 标签 */
+  /* 车牌号大字 */
+  .plate-number {
+    font-size: 40rpx;
+    font-weight: bold;
+    color: #323233;
+    font-family: 'DINAlternate-Bold', sans-serif;
+  }
+  
+  /* 标签组 */
+  .tags-row {
+    display: flex;
+    gap: 12rpx;
+  }
+  
+  .tag {
+    padding: 4rpx 12rpx;
+    border-radius: 8rpx;
+    font-size: 22rpx;
+    font-weight: 500;
+  }
+  .tag-blue { background: #e8f3ff; color: #1989fa; }
+  .tag-green { background: #e8ffea; color: #07c160; }
+  .tag-orange { background: #fffbe8; color: #ff976a; }
+  
+  /* 分割线 */
+  .divider {
+    height: 1rpx;
+    background: #ebedf0;
+    margin: 24rpx 0;
+  }
+  .divider-dashed {
+    height: 1rpx;
+    border-bottom: 1rpx dashed #ebedf0;
+    margin: 20rpx 0;
+  }
+  
+  /* 网格布局 (3列) */
+  .info-grid {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  
+  .grid-item {
+    width: 33.33%; /* 一行三个 */
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16rpx;
+  }
+  
   .label {
-    display: block;
-    font-size: 26rpx;
-    color: #666666;
+    font-size: 24rpx;
+    color: #969799;
     margin-bottom: 8rpx;
   }
   
-  /* 值 */
   .value {
-    font-size: 30rpx;
+    font-size: 28rpx;
+    color: #323233;
     font-weight: 500;
-    color: #222222;
   }
   
-  /* 操作按钮区域 */
-  .btn-row {
-    margin-top: 20rpx;
+  /* 列表式详情 (保险/年审) */
+  .detail-list {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 20rpx;
   }
+  .detail-row {
+    display: flex;
+    flex-direction: column;
+  }
   
-  /* 控制原生按钮大小与视觉 */
-  button[size="mini"] {
-    padding: 0 20rpx;
-    height: 60rpx;
-    line-height: 60rpx;
-    font-size: 26rpx;
-    border-radius: 12rpx;
+  /* 章节标题 */
+  .section-title {
+    font-size: 30rpx;
+    font-weight: bold;
+    color: #323233;
+    border-left: 8rpx solid #1989fa;
+    padding-left: 16rpx;
+    margin-bottom: 24rpx;
   }
-
-  .sub-value {
-    font-size: 26rpx;
-    color: #666;
-    margin-top: 4rpx;
+  
+  /* 操作按钮行 */
+  .action-row-fill {
+    display: flex;
+    justify-content: space-between; /* 两端对齐 */
+    gap: 24rpx; /* 两个按钮之间的间距 */
   }
-
+  
+  .btn-wrapper {
+    flex: 1; /* 每个按钮占据剩余空间的一半 */
+  }
+  
+  /* ▼▼▼ 历史记录卡片样式 ▼▼▼ */
+  .card-header-arrow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10rpx 0; /* 增加一点点击区域 */
+  }
+  
+  /* 弹窗内的输入框样式 (保留之前的逻辑) */
   .input-item {
-    margin-bottom: 20rpx;
+    display: flex;
+    align-items: center;
+    margin-bottom: 24rpx;
   }
   .input-label {
+    width: 180rpx;
     font-size: 28rpx;
-    color: #666;
-    margin-bottom: 10rpx;
+    color: #646566;
   }
   .picker-box {
-    border: 1rpx solid #ddd;
-    padding: 15rpx;
+    flex: 1;
+    height: 72rpx;
+    line-height: 72rpx;
+    background: #f7f8fa;
+    padding: 0 20rpx;
     border-radius: 8rpx;
-    font-size: 30rpx;
-    color: #333;
-    background-color: #f8f8f8; /* 稍微给点背景色表示可点击 */
+    font-size: 28rpx;
+    color: #323233;
   }

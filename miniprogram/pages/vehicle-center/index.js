@@ -18,7 +18,9 @@ Page({
         available: 0,
         rented: 0,
         maintenance: 0,
-        misc: 0
+        misc: 0,
+        insurance: 0, // 新增：合并后的保险预警
+        annual: 0  // 新增：年审预警数
       }
     },
   
@@ -110,7 +112,18 @@ Page({
   
         // 构造基础查询
         const base = { cityCode };
-  
+        const now = new Date();
+        const warningDate = new Date();
+        warningDate.setDate(now.getDate() + 60); // 60天内预警
+
+        // 有效日期判定：大于 2000年
+        const validDate = _.gt(new Date('2000-01-01'));
+        // 预警判定：<= 60天
+        const isUrgent = _.lte(warningDate);
+
+        // 构造条件：(有效 且 急需)
+        const warnCond = _.and([validDate, isUrgent]);
+    
         // 并发查询5个状态的数量
         try {
           const pAll = db.collection('vehicles').where(base).count();
@@ -134,19 +147,34 @@ Page({
             ...base,
             rentStatus: 'misc'
           }).count();
-  
-          const [rAll, rAvail, rRent, rMaint, rMisc] = await Promise.all([
-            pAll, pAvailable, pRented, pMaintenance, pMisc
-          ]);
+          
+          // 保险预警：(交强险急需) OR (商业险急需)
+          const pInsuranceWarn = db.collection('vehicles').where(_.and([
+            base,
+            _.or([
+            { liabInsEnd: warnCond },
+            { commInsEnd: warnCond }
+            ])
+          ])).count();
+
+          // 年审预警
+          const pAnnualWarn = db.collection('vehicles').where({ 
+            ...base, 
+            annualInspectionDate: warnCond 
+          }).count();
+
+          const results = await Promise.all([pAll, pAvailable, pRented, pMaintenance, pInsuranceWarn, pAnnualWarn, pMisc]);
   
           this.setData({
             counts: {
-              all: rAll.total,
-              available: rAvail.total,
-              rented: rRent.total,
-              maintenance: rMaint.total,
-              misc: rMisc.total
-            }
+                all: results[0].total,
+                available: results[1].total,
+                rented: results[2].total,
+                maintenance: results[3].total,
+                insurance: results[4].total, // 合并后的保险
+                annual: results[5].total,
+                misc: results[6].total,
+              }
           });
         } catch (e) {
           console.error('[fetchStats] error', e);
@@ -175,26 +203,46 @@ Page({
   
       // 基础条件：按城市
       const baseWhere = { cityCode };
-  
+      let orderByField = 'createdAt';
+      let orderByType = 'desc';
+
+      // 预警日期计算 (60天)
+      const now = new Date();
+      const warningDate = new Date();
+      warningDate.setDate(now.getDate() + 60);
+      const validDate = _.gt(new Date('2000-01-01'));
+      const isUrgent = _.lte(warningDate);
+      const warnCond = _.and([validDate, isUrgent]);
+
       // 按状态筛选
-      // 按状态筛选（新版）
-      if (statusFilter === 'available') {
-        baseWhere.rentStatus = 'available';
-      } 
-      else if (statusFilter === 'rented') {
-        baseWhere.rentStatus = 'rented';
-      } 
-      else if (statusFilter === 'maintenance') {
+      let filterCond = baseWhere;
+      let isMemorySortMode = false; // 标记是否需要前端内存排序
+
+      if (['available', 'rented', 'misc'].includes(statusFilter)) {
+        baseWhere.rentStatus = statusFilter;
+      } else if (statusFilter === 'maintenance') {
         baseWhere.maintenanceStatus = 'in_maintenance';
-      }
-      else if (statusFilter === 'misc') {
-        baseWhere.rentStatus = 'misc';
+      } else if (statusFilter === 'insurance') {
+        // 交强险 OR 商业险 急需处理
+        filterCond = _.and([
+          baseWhere,
+          _.or([
+            { liabInsEnd: warnCond },
+            { commInsEnd: warnCond }
+          ])
+        ]);
+        // 数据库无法直接按 min(a,b) 排序，所以我们不依赖数据库排序
+        // 而是取回一批数据，在前端排
+        isMemorySortMode = true;
+      } else if (statusFilter === 'annual') {
+        baseWhere.annualInspectionDate = _.gt(new Date('2000-01-01'));
+        orderByField = 'annualInspectionDate';
+        orderByType = 'asc';
       }
       // 'all' 不加任何条件
 
       // 关键字（模糊搜车牌 / 司机名 / VIN）
       const kw = (searchKeyword || '').trim();
-      let filterCond = baseWhere;
 
       if (kw) {
         const regex = db.RegExp({
@@ -212,39 +260,62 @@ Page({
             )
         ]);
       }
-
-      let where = filterCond;
-      if (lastId) {
-       // 有 lastId 的情况下，看看有没有 lastCreatedAt：
-        if (lastCreatedAt) {
-            // 完整游标：createdAt + _id 组合
-            where = _.and([
-                filterCond,
-                _.or([
-                    { createdAt: _.lt(lastCreatedAt) },
-                    { createdAt: lastCreatedAt, _id: _.lt(lastId) }
-                ])
-            ]);
-        } else {
-            // 没有 createdAt，就只用 _id 做游标，保证不会总是查第一页
-            where = _.and([
-                filterCond,
-                { _id: _.lt(lastId) }
-            ]);
+      
+      // --- 构造查询对象 ---
+      let query = db.collection('vehicles').where(filterCond);
+    
+      // 如果是内存排序模式 (保险筛选)，我们暂时忽略分页游标，一次性拉取前 100 条
+      // 因为前端排序后，原来的 _id / createdAt 游标就失效了
+      if (isMemorySortMode) {
+        // 这是一个取舍：为了排序准确，我们牺牲了无限滚动，改为“显示最紧急的前100台”
+        // 对于单城市的预警车辆，通常不会超过 100 台
+        if (this.data.list.length > 0) {
+           // 如果已经加载过（例如做了假分页），就直接返回
+           this.setData({ loading: false, hasMore: false });
+           return;
         }
-      }
+        query = query.limit(100); 
+      } else {
+        // 普通模式：使用游标分页
+        if (lastId && orderByField === 'createdAt') {
+          if (lastCreatedAt) {
+            query = query.where(_.or([
+              { createdAt: _.lt(lastCreatedAt) },
+              { createdAt: lastCreatedAt, _id: _.lt(lastId) }
+            ]));
+          } else {
+            query = query.where({ _id: _.lt(lastId) });
+          }
+        } else if (lastId) {
+           // 非 createdAt 排序 (如年审)，使用 skip (性能折衷)
+           query = query.skip(this.data.list.length);
+        }
+        query = query.limit(pageSize);
+        query = query.orderBy(orderByField, orderByType).orderBy('_id', 'desc');
+     }
   
       try {
-        // console.log('[vehicle-center] where =', where);
-  
-        const { data } = await db
-          .collection('vehicles')
-          .where(where)
-          .orderBy('createdAt', 'desc')
-          .orderBy('_id', 'desc')
-          .limit(pageSize)
-          .get();
-  
+        const { data } = await query.get();  
+
+        // --- 数据处理与计算过期天数 ---
+        const nowTs = new Date().setHours(0,0,0,0);
+
+        const calcDays = (dateStr) => {
+            if (!dateStr) return 9999;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime()) || d.getFullYear() < 2000) return 9999;
+            const diffTime = d.getTime() - nowTs;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        };
+
+        const getExpiryInfo = (days, label) => {
+            if (days === 9999) return null;
+            if (days > 60) return null; // > 60天隐藏
+            if (days < 0) return { text: `${label}逾期${Math.abs(days)}天`, type: 'expired' };
+            if (days === 0) return { text: `${label}今天到期`, type: 'warning' };
+            return { text: `${label}：${days}天`, type: 'warning' };
+        };
+
         // const newList = this.data.list.concat(data || []);
         const normalized = (data || []).map(item => {
             const rentStatus = item.rentStatus ||
@@ -252,19 +323,42 @@ Page({
             const maintenanceStatus = item.maintenanceStatus ||
               (item.status === 'maintenance' ? 'in_maintenance' : 'none');
   
+            // 旧字段
             const statusLabel = maintenanceStatus === 'in_maintenance'
               ? (rentStatus === 'rented' ? '已租 · 维修中' : '闲置 · 维修中')
               : (rentStatus === 'rented' ? '已租' : '闲置');
-  
+
+            // 计算预警
+            const liabDays = calcDays(item.liabInsEnd);
+            const commDays = calcDays(item.commInsEnd);
+            const annualDays = calcDays(item.annualInspectionDate);
+
+            const liabInfo = getExpiryInfo(liabDays, '交强险');
+            const commInfo = getExpiryInfo(commDays, '商业险');
+            const annualInfo = getExpiryInfo(annualDays, '年审');
+
+            const sortKey = Math.min(liabDays, commDays);
+
+            // 分配到 row2 和 row3 展示 (避免增加高度)
             return {
               ...item,
               rentStatus,
               maintenanceStatus,
-              statusLabel
+              // statusLabel,
+              driverName: item.currentDriverName || item.driverName || '',
+              liabExpiry: liabInfo,   // 交强险信息
+              commExpiry: commInfo,   // 商业险信息
+              annualExpiry: annualInfo, // 年审信息
+              _sortKey: sortKey // 临时字段用于排序
             };
           });
   
         // 批量补充司机姓名，避免依赖车辆文档中的旧 driverName 缓存
+        // 方案一：前端排序
+        if (isMemorySortMode) {
+            normalized.sort((a, b) => a._sortKey - b._sortKey);
+          }
+
         const driverIds = Array.from(new Set(
           normalized
             .map(item => item.currentDriverId)
@@ -314,6 +408,7 @@ Page({
         });
 
         const newList = this.data.list.concat(enriched);
+        // const newList = this.data.list.concat(normalized);
   
         // 更新游标：取本次最后一条
         let newLastCreatedAt = lastCreatedAt;
@@ -333,7 +428,7 @@ Page({
           list: newList,
           lastCreatedAt: newLastCreatedAt,
           lastId: newLastId,
-          hasMore: (data || []).length === pageSize
+          hasMore: isMemorySortMode ? false : (data.length === pageSize)
         });
       } catch (e) {
         // console.error('[vehicle-center] fetchList error', e);
