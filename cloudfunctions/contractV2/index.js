@@ -313,6 +313,8 @@ exports.main = async (event, context) => {
         depositFormal: numberToCN(payload.deposit || 0),
         depositTodayFormal: numberToCN(payload.depositToday || 0),
         depositServiceFeeFormal: numberToCN(payload.depositServiceFee || 0),
+        rentMonthlyFirstYearFormal: numberToCN(payload.rentMonthlyFirstYear || 0),
+        rentMonthlySecondYearFormal: numberToCN(payload.rentMonthlySecondYear || 0),
         depositRemaining,
         contractSerialNumber: seq,
         contractSerialNumberFormatted: serialFormatted
@@ -507,6 +509,14 @@ exports.main = async (event, context) => {
       depositServiceFeeFormal: finalFields.depositServiceFeeFormal,
       depositUnpaidMonthly: finalFields.depositUnpaidMonthly,
       depositRemaining: finalFields.depositRemaining,
+
+      // 新增：RTO 字段透传给 DOCX
+      rentMonthlyFirstYear: finalFields.rentMonthlyFirstYear,
+      rentMonthlyFirstYearFormal: finalFields.rentMonthlyFirstYearFormal,
+      rentMonthlySecondYear: finalFields.rentMonthlySecondYear,
+      rentMonthlySecondYearFormal: finalFields.rentMonthlySecondYearFormal,
+      daysTillPayment: finalFields.daysTillPayment,
+      sellPrice: finalFields.sellPrice,
     };
 
     const basePath = buildContractFolderPath({

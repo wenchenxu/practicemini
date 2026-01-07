@@ -1,3 +1,13 @@
+<wxs module="util">
+  var def = function(val) {
+    if (val === undefined || val === null || val === 'undefined' || val === '') {
+      return '/';
+    }
+    return val;
+  }
+  module.exports.def = def;
+</wxs>
+
 <view class="container">
   <view class="section-card" wx:if="{{mode==='create'}}">
     <view class="card-title">合同基础配置</view>
@@ -16,7 +26,7 @@
       <view class="row-label"><text class="req">*</text>合同类型</view>
       <picker mode="selector" range="{{typeOptions}}" range-key="name" value="{{typeIndex}}" bindchange="onPickType" class="picker-flex">
         <view class="picker-text {{typeIndex>=0?'':'placeholder'}}">
-          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '纯租/零押金' }}
+          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择合同类型' }}
         </view>
       </picker>
       <view class="row-arrow">›</view>
@@ -34,7 +44,7 @@
   </view>
 
   <view class="header" wx:if="{{mode!=='create'}}">
-    <view class="header-tag">{{city}}</view>
+    <view class="header-tag">{{util.def(city)}}</view>
     <view class="header-info">
       <text class="mode-text">{{mode === 'view' ? '查看详情' : '编辑合同'}}</text>
       <text class="type-text">{{selectedTypeName || '纯租租赁'}}</text>
@@ -48,26 +58,55 @@
       <view class="form-wrap">
         <block wx:for="{{visibleFields || []}}" wx:key="name">
           <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
-            <view class="form-item item-{{item.name}}">
-              <label class="label">
-                <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
-                <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
-              </label>
+            
+            <block wx:if="{{ (item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto' }}">
+            
+              <view class="form-item item-{{item.name}}">
+                <label class="label">
+                  <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
+                  <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
+                </label>
 
-              <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{form[item.name] || ''}}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
+                <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] || '') }}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
 
-              <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form[item.name] !== undefined ? form[item.name] : ''}}" bindinput="onInputNumber" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" />
+                <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] !== undefined ? form[item.name] : '') }}" bindinput="onInputNumber" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" />
 
-              <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{form[item.name] || ''}}" bindchange="onDateChange" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}">
-                <view class="input-box picker-box {{form[item.name]?'':'ph'}}">
-                  {{form[item.name] || '请选择日期'}}
-                  <text class="date-icon" wx:if="{{mode!=='view'}}">📅</text>
-                </view>
-              </picker>
-            </view>
+                <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{form[item.name] || ''}}" bindchange="onDateChange" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}">
+                  <view class="input-box picker-box {{form[item.name]?'':'ph'}}">
+                    {{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] || '请选择日期') }}
+                    <text class="date-icon" wx:if="{{mode!=='view'}}">📅</text>
+                  </view>
+                </picker>
+              </view>
+
+            </block>
           </block>
         </block>
-      </view>
+
+        <block wx:if="{{selectedTypeCode === 'rent_rto' && mode === 'create'}}">
+          <view class="divider" style="height:1rpx; background:#f0f0f0; margin: 20rpx 0;"></view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>1—12期每期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFirstYear}}" bindinput="onInputNumber" data-name="rentMonthlyFirstYear" />
+          </view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>13—24期每期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlySecondYear}}" bindinput="onInputNumber" data-name="rentMonthlySecondYear" />
+          </view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>签定之日起自然日内支付</label>
+            <input class="input-box" type="number" placeholder="请输入天数" placeholder-class="ph" value="{{form.daysTillPayment}}" bindinput="onInputNumber" data-name="daysTillPayment" />
+          </view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>约定购买车辆金额</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.sellPrice}}" bindinput="onInputNumber" data-name="sellPrice" />
+          </view>
+        </block>
+        </view>
     </view>
 
     <view wx:if="{{mode!=='view'}}" class="footer-actions">

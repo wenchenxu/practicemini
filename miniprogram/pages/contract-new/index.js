@@ -3,7 +3,7 @@ const { ensureAccess } = require('../../utils/guard');
 const db = wx.cloud.database();
 const COL = db.collection('contracts');
 const app = getApp();
-const IS_PROD = app.globalData.isProd;   // 拿到环境开关
+const IS_PROD = app.globalData.isProd;
 
 const BASE_FIELDS = [
   // ---- Branch ----
@@ -36,12 +36,23 @@ const BASE_FIELDS = [
   { name:'rentDurationMonth', label:'租期（个月）', type:'number', requiredWhen:'always', min:1, max:60 },
   { name:'contractValidPeriodStart', label:'合同生效日期', type:'date', requiredWhen:'prod' },
   { name:'contractValidPeriodEnd', label:'合同结束日期', type:'date', requiredWhen:'prod' },
-  { name:'rentMonthly', label:'月租金', type:'number', requiredWhen:'always', min:0 },
+  
+  // 修改：普通租金相关字段（注意：如果选了以租代购，这些可能不需要填，所以 requiredWhen 改为动态判断或者在 validate 里手动校验，这里暂时保持 always/prod，但在 validate 里做逻辑分支）
+  { name:'rentMonthly', label:'月租金', type:'number', requiredWhen:'never', min:0 }, // 改为 never，手动校验
   { name:'rentMonthlyFormal', label:'月租（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
-  { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'prod', min:0 },
+  { name:'rentToday', label:'首日支付金', type:'number', requiredWhen:'never', min:0 }, // 改为 never，手动校验
   { name:'rentTodayFormal', label:'首日支付（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true  },
   { name:'rentPaybyDayInMonth', label:'每月支付日', type:'number', requiredWhen:'always', help: '1-31号', min:1, max:31 },
   { name:'rentCustomized', label:'自定义租金周期和金额', type:'string', requiredWhen: 'never',hideOnCreate: true, hideOnEdit: true, hideOnView: true},
+
+  // 新增：以租代购 (RTO) 专属字段
+  // 注意：hideOnCreate 设为 true 是为了不让通用循环渲染它们，我们要手动用 wx:if 渲染
+  { name:'rentMonthlyFirstYear', label:'1—12期每期租金', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
+  { name:'rentMonthlyFirstYearFormal', label:'1—12期每期租金（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'rentMonthlySecondYear', label:'13—24期每期租金', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
+  { name:'rentMonthlySecondYearFormal', label:'13—24期每期租金（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
+  { name:'daysTillPayment', label:'自然日内支付首期（天）', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
+  { name:'sellPrice', label:'合同完结后车辆购买售价', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
@@ -62,30 +73,19 @@ function numberToCN(n) {
     if (n === null || n === undefined || n === '') return '';
     const units = '仟佰拾亿仟佰拾万仟佰拾元角分';
     const chars = '零壹贰叁肆伍陆柒捌玖';
-    let s = (Math.round(Number(n) * 100)).toString(); // 分为单位
+    let s = (Math.round(Number(n) * 100)).toString(); 
     if (!/^\d+$/.test(s)) return '';
     if (s === '0') return '零元整';
-    units.slice(-s.length); // 只是为了 linter
+    units.slice(-s.length);
     let u = units.slice(units.length - s.length);
     let str = '';
     for (let i = 0; i < s.length; i++) {
       const num = Number(s[i]);
       str += chars[num] + u[i];
     }
-    // 处理零与单位
-    str = str
-      .replace(/零角零分$/, '整')
-      .replace(/零分$/, '整')
-      .replace(/零角/g, '零')
-      .replace(/零仟|零佰|零拾/g, '零')
-      .replace(/零{2,}/g, '零')
-      .replace(/零亿/g, '亿')
-      .replace(/零万/g, '万')
-      .replace(/零元/g, '元')
-      .replace(/亿万/g, '亿')
-      .replace(/零整$/, '整');
+    str = str.replace(/零角零分$/, '整').replace(/零分$/, '整').replace(/零角/g, '零').replace(/零仟|零佰|零拾/g, '零').replace(/零{2,}/g, '零').replace(/零亿/g, '亿').replace(/零万/g, '万').replace(/零元/g, '元').replace(/亿万/g, '亿').replace(/零整$/, '整');
     return str;
-  };
+};
 
 async function openDocByFileID(fileID) {
     const dres = await wx.cloud.downloadFile({ fileID });
@@ -110,16 +110,15 @@ Page({
   data: {
     cityCode: '',
     city: '',
-    mode: 'create', // create | view | edit
+    mode: 'create', 
     id: '',
     // 用于“重新生成合同”按钮的 loading
     regenLoading: false,
 
-    // 新增：分公司/类型选择状态
     showBranchPicker: false,
     branchOptions: [],
-    branchIndex: -1,          // 选中下标
-    selectedBranchCode: '',   // 选中的 code
+    branchIndex: -1,         
+    selectedBranchCode: '',   
 
     selectedBranchName: '',
 
@@ -129,15 +128,15 @@ Page({
     selectedTypeCode: '',
     selectedTypeName: '',
     
-    // 新增：车辆选择相关
-    vehicleOptions: [],       // 原始车辆列表
-    vehiclePickerRange: [],   // picker 显示用的字符串数组
-    vehiclePickerIndex: -1,   // 当前选中的索引（未选为 -1）
+    vehicleOptions: [],       
+    vehiclePickerRange: [],   
+    vehiclePickerIndex: -1,   
     
     fields: FIELDS,
     form: {
       rentToday: 120,
-      rentTodayFormal: numberToCN(120) // 顺便把大写也初始化了，体验更好
+      rentTodayFormal: numberToCN(120),
+      daysTillPayment: 7,
     },
     visibleFields: [],
     saving: false,
@@ -146,37 +145,23 @@ Page({
   onLoad(options) {
     const run = () => {
         if (!ensureAccess()) return;
-        // console.log('[contract-new onLoad] options=', options);
-
-      // 1) 解析参数
       const id = options.id || '';
-      const mode = options.mode || 'create'; // create | edit | view
+      const mode = options.mode || 'create'; 
       const cityCode = decodeURIComponent(options.cityCode || '');
       const city = decodeURIComponent(options.city || '');
 
-      // 2) 基础状态
       this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
-      // this.setData({ id, mode, cityCode, city });
-      // 加载可出租车辆列表
       this.loadAvailableVehicles(cityCode);
-
-      // 3) 顶部标题
       wx.setNavigationBarTitle({
         title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}`
       });
-
-      // 4) 计算可见字段（先按当前 mode 初始化一遍）
       this.initVisibleFields(mode);
-      // setTimeout(() => { this.initVisibleFields(mode);}, 0);
 
-      // 5) 分公司与合同类型选项（来源保持你现有常量）
       const branchOptions = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
       const showBranchPicker = branchOptions.length > 0;
-
       const typeOptions = TYPE_OPTIONS_BY_CITY[cityCode] || TYPE_OPTIONS_BY_CITY.default;
       const showTypePicker = typeOptions.length > 1;
 
-      // 若只有一个类型/分公司，默认选中它
       const typeIndex = typeOptions.length === 1 ? 0 : -1;
       const selectedTypeCode = typeIndex >= 0 ? typeOptions[typeIndex].code : '';
       const selectedTypeName = typeIndex >= 0 ? typeOptions[typeIndex].name : '';
@@ -192,17 +177,12 @@ Page({
 
       // 6) 根据模式处理
       if ((mode === 'edit' || mode === 'view') && id) {
-        // 统一使用 loadDoc(id) 回填（如果你有 fetchDetail 且它做了更多事，也可以继续用它——二选一别都用）
         this.loadDoc(id).then(() => {
         // 回填后再算一次可见字段（有些显隐依赖分公司/类型）
-        this.initVisibleFields(this.data.mode);
+          this.initVisibleFields(this.data.mode);
         });
-      } else if (mode === 'create') {
-        // 需要的话，做自动门店数据回填
-        // this.autofillBranch && this.autofillBranch();
       }
     };
-
     if (app.globalData.initialized) run();
     else app.$whenReady(run);
   },
@@ -213,30 +193,14 @@ Page({
     else app.$whenReady(check);
   },
 
-  // might be obsolete
-  async fetchDetail(id) {
-    try {
-      const { data } = await COL.doc(id).get();
-      // 兼容老数据结构
-      const form = data.fields || {};
-      this.setData({ form });
-    } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '加载失败', icon: 'none', duration: 5000 });
-    }
-  },
-
   async loadDoc(id) {
     try {
       const db = wx.cloud.database();
       const res = await db.collection('contracts').doc(id).get();
       const doc = res.data;
-      // console.log('[loadDoc]', doc);
-
-      // 回填到表单
+      
       this.setData({
         form: doc.fields || {},
-        // 若你把这几个存在了顶层，顺便回填，供编辑时传回
         selectedBranchCode: doc.branchCode || '',
         selectedBranchName: doc.branchName || '',
         selectedTypeCode: doc.contractType || '',
@@ -249,68 +213,57 @@ Page({
   },
 
   async onSaveAndRender() {
-    const { id, mode } = this.data;
-    if (mode !== 'edit' || !id) {
-      wx.showToast({ title: '仅编辑状态可用', icon: 'none' });
-      return;
-    }
-
-    const err = this.validate && this.validate();
-    if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
-
-    const payload = this.toPersistObject();
-
-    if (this.data.saving) return;
-    this.setData({ saving: true });
-    wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
-
-    try {
-      // 1) 保存更新
-      const upRes = await wx.cloud.callFunction({
-        name: 'contractOps',
-        data: { action: 'update', id, fields: payload }
-      });
-      const upOk = upRes?.result?.ok && upRes.result.updated === 1;
-      if (!upOk) {
-        wx.showToast({ title: upRes?.result?.error || '保存失败', icon: 'none' });
+      const { id, mode } = this.data;
+      if (mode !== 'edit' || !id) {
+        wx.showToast({ title: '仅编辑状态可用', icon: 'none' });
         return;
       }
-
-      // 2) 渲染并覆盖
+      const err = this.validate && this.validate();
+      if (err) { wx.showToast({ title: err, icon: 'none' }); return; }
+      const payload = this.toPersistObject();
+      if (this.data.saving) return;
+      this.setData({ saving: true });
       wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
-      const rnRes = await wx.cloud.callFunction({
-        name: 'contractOps',
-        data: { action: 'render', id }
-      });
-      const rnOk = rnRes?.result?.ok;
-      const fileID = rnRes?.result?.fileID || '';
-
-      wx.hideLoading();
-      if (rnOk) {
-        wx.showToast({ title: '已生成', icon: 'success' });
-
-        try {
-            if (fileID) {
-              const dres = await wx.cloud.downloadFile({ fileID });
-              await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
+      try {
+        const upRes = await wx.cloud.callFunction({
+          name: 'contractOps',
+          data: { action: 'update', id, fields: payload }
+        });
+        const upOk = upRes?.result?.ok && upRes.result.updated === 1;
+        if (!upOk) {
+          wx.showToast({ title: upRes?.result?.error || '保存失败', icon: 'none' });
+          return;
+        }
+        wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
+        const rnRes = await wx.cloud.callFunction({
+          name: 'contractOps',
+          data: { action: 'render', id }
+        });
+        const rnOk = rnRes?.result?.ok;
+        const fileID = rnRes?.result?.fileID || '';
+        wx.hideLoading();
+        if (rnOk) {
+          wx.showToast({ title: '已生成', icon: 'success' });
+          try {
+              if (fileID) {
+                const dres = await wx.cloud.downloadFile({ fileID });
+                await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
+              }
+            } catch (e) {
+              console.warn('openDocument failed', e);
             }
-          } catch (e) {
-            // 打不开也不影响返回
-            console.warn('openDocument failed', e);
-          }
-        
-        setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
-      } else {
-            wx.showToast({ title: rnRes?.result?.error || '已保存，但文档未生成', icon: 'none' });
-            return;
+          setTimeout(() => wx.navigateBack({ delta: 1 }), 300);
+        } else {
+              wx.showToast({ title: rnRes?.result?.error || '已保存，但文档未生成', icon: 'none' });
+              return;
+        }
+      } catch (e) {
+        console.error(e);
+        wx.hideLoading();
+        wx.showToast({ title: '操作失败', icon: 'none' });
+      } finally {
+        this.setData({ saving: false });
       }
-    } catch (e) {
-      console.error(e);
-      wx.hideLoading();
-      wx.showToast({ title: '操作失败', icon: 'none' });
-    } finally {
-      this.setData({ saving: false });
-    }
   },
 
   initVisibleFields(mode) {
@@ -322,7 +275,6 @@ Page({
       return true;
     });
     this.setData({ visibleFields: visible });
-    // console.log('[initVisibleFields]', this.data.mode, 'count=', visible.length);
   },
 
   // 分公司选择
@@ -336,10 +288,10 @@ Page({
         selectedBranchName: opt.name,
     });
   },
-    
+
   // 合同类型选择
   onPickType(e) {
-    if (this.data.mode !== 'create') return; // 编辑/查看时禁选
+    if (this.data.mode !== 'create') return; 
     const idx = Number(e.detail.value);
     const opt = this.data.typeOptions[idx];
     this.setData({
@@ -349,17 +301,15 @@ Page({
     });
   },
 
-  // 文本输入
   onInput(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value;
     this.setData({ [`form.${name}`]: value });
   },
 
-  // 数字输入（保留字符串以便长度校验，再在保存时转为 Number）
   onInputNumber(e) {
     const name = e.currentTarget.dataset.name;
-    const value = e.detail.value; // 先保留字符串
+    const value = e.detail.value;
     const patch = { [`form.${name}`]: value };
 
     const map = {
@@ -367,7 +317,9 @@ Page({
         rentToday: 'rentTodayFormal',
         deposit: 'depositFormal',
         depositToday: 'depositTodayFormal',
-        depositServiceFee: 'depositServiceFeeFormal'
+        depositServiceFee: 'depositServiceFeeFormal',
+        rentMonthlyFirstYear: 'rentMonthlyFirstYearFormal',
+        rentMonthlySecondYear: 'rentMonthlySecondYearFormal',
     };
     if (map[name]) {
         patch[`form.${map[name]}`] = numberToCN(value);
@@ -375,20 +327,27 @@ Page({
     this.setData(patch);
   },
 
-  // 日期
   onDateChange(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value; // yyyy-mm-dd
     this.setData({ [`form.${name}`]: value });
   },
 
-  // 校验函数
+  // 校验逻辑升级
   validate() {
-    const { form } = this.data;
+    const { form, selectedTypeCode } = this.data;
+    
+    // 1. 基础校验 (遍历 FIELDS)
     for (const f of FIELDS) {
       const v = form[f.name];
 
-      // 必填
+      // 特殊：rentMonthly 和 rentToday 在 'rent_rto' 模式下可能不填
+      // 如果是 rto 模式，跳过 rentMonthly 基础校验，改为后面手动校验
+      if (selectedTypeCode === 'rent_rto' && (f.name === 'rentMonthly' || f.name === 'rentToday')) {
+         continue; 
+      }
+      // 如果是普通模式，跳过 rto 字段的基础校验 (它们本身是 requiredWhen:'never' 所以默认就跳过了)
+
       if (f.required) {
         if (f.type === 'string' && (!v || !String(v).trim())) {
           return `${f.label}为必填`;
@@ -404,27 +363,19 @@ Page({
         if (f.minLength && len < f.minLength) return `${f.label}长度需≥${f.minLength}`;
         if (f.maxLength && len > f.maxLength) return `${f.label}长度需≤${f.maxLength}`;
       }
-
       if (f.type === 'number' && (v !== '' && v !== undefined)) {
         const str = String(v);
-        // 数字的“长度”要求（如账号/电话），先以字符串长度校验
         if (f.strLenMin && str.length < f.strLenMin) return `${f.label}长度需≥${f.strLenMin}`;
         if (f.strLenMax && str.length > f.strLenMax) return `${f.label}长度需≤${f.strLenMax}`;
-        // 再转为数值检查范围
         const num = Number(v);
         if (!isFinite(num)) return `${f.label}必须为数字`;
         if (f.min !== undefined && num < f.min) return `${f.label}需≥${f.min}`;
         if (f.max !== undefined && num > f.max) return `${f.label}需≤${f.max}`;
       }
-
       if (f.type === 'date' && v) {
-        // 简单校验格式 yyyy-mm-dd
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${f.label}格式不正确`;
       }
     }
-    // 额外强约束：VIN 17位
-    // if ((form.carVin || '').length !== 17) return '车架号必须为 17 位';
-    // 每月支付日 1-31（上面已校验 min/max，这里冗余保护）
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
 
@@ -434,7 +385,21 @@ Page({
     if (!this.data.selectedTypeCode) {
         return '请选择合同类型';
     }
-    return ''; // 通过
+
+    // 新增：针对合同类型的特定校验
+    if (selectedTypeCode === 'rent_rto') {
+        // 以租代购必填项
+        if (!form.rentMonthlyFirstYear) return '请输入1—12期租金';
+        if (!form.rentMonthlySecondYear) return '请输入13—24期租金';
+        if (!form.daysTillPayment) return '请输入签订后支付天数';
+        if (!form.sellPrice) return '请输入购买车辆金额';
+    } else {
+        // 普通租赁必填项 (补充之前跳过的)
+        if (!form.rentMonthly) return '请输入月租金';
+        if (!form.rentToday) return '请输入首日支付金';
+    }
+
+    return '';
   },
 
   // 保存前转换数字
@@ -458,7 +423,7 @@ Page({
       selectedTypeCode, selectedTypeName
     } = this.data;
 
-    // 1) 防抖/节流：防止快速双击 (2秒内只能点一次)
+    // 1) 防抖
     const now = Date.now();
     if (now - (this.lastSubmitTime || 0) < 2000) {
         return; 
@@ -494,6 +459,31 @@ Page({
     if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
   
     const payload = this.toPersistObject();
+
+    // 兜底逻辑：仅针对普通租赁填充默认值
+    if (mode === 'create' && selectedTypeCode !== 'rent_rto') {
+        if (payload.rentToday === undefined || payload.rentToday === null || payload.rentToday === 0) {
+            if (this.data.form && this.data.form.rentToday === 120) {
+                console.warn('Fixed missing default rentToday: 120');
+                payload.rentToday = 120;
+                if (!payload.rentTodayFormal || payload.rentTodayFormal === '零元整') {
+                    payload.rentTodayFormal = numberToCN(120);
+                }
+            }
+        }
+    }
+
+    // 2. 新增：以租代购 daysTillPayment 兜底逻辑
+    // 防止用户没碰输入框导致提交了 0 或 null
+    if (mode === 'create' && selectedTypeCode === 'rent_rto') {
+        if (!payload.daysTillPayment) {
+            if (this.data.form && this.data.form.daysTillPayment === 7) {
+                console.warn('Fixed missing default daysTillPayment: 7');
+                payload.daysTillPayment = 7;
+            }
+        }
+    }
+
     if (this.submitting) return;
     this.submitting = true;
   
@@ -501,15 +491,13 @@ Page({
       if (mode === 'edit' && id) {
         // —— 合并流程：更新 → 渲染 → 打开 —— //
         await this.onSaveAndRender();
-        return; // ← 记得 return，避免落到后面的 navigateBack
+        return; 
       }
   
-      // —— 新建：沿用你原有流程 —— //
       if (mode === 'create') {
         this.setData({ saving: true });
         wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
         const res = await wx.cloud.callFunction({
-          //name: 'createContract',
           name: 'contractV2',
           data: {
             cityCode,
@@ -531,7 +519,6 @@ Page({
           const dres = await wx.cloud.downloadFile({ fileID });
           await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
         } else {
-          // 这里用 showModal，而不是 showToast 的 content/confirmText
           wx.showModal({
             title: '提示',
             content: '合同已保存，但文档未生成，可稍后重试',
@@ -543,11 +530,7 @@ Page({
   
         // 修改合同后返回上一页
         setTimeout(() => {
-            // 获取当前的城市信息
             const { cityCode, city } = this.data;
-            
-            // 修改跳转目标：不再去 city/index，而是去 contract-list/index
-            // 使用 reLaunch 可以清空页面栈，避免用户点“返回”又回到表单页
             wx.reLaunch({
               url: `/pages/contract-list/index?cityCode=${encodeURIComponent(cityCode || '')}&city=${encodeURIComponent(city || '')}`
             });
@@ -596,7 +579,6 @@ Page({
 
   async onRegenDoc() {
     const id = this.data.id;
-    // console.log('[onRegenDoc] id=', id);
     if (!id) { wx.showToast({ title:'缺少合同ID', icon:'none' }); return; }
 
     try {
@@ -605,11 +587,9 @@ Page({
         name: 'contractOps',
         data: { action: 'render', id }
       });
-      // console.log('[render result]', res);
       const rr = res && res.result ? res.result : {};
       if (rr.ok) {
         wx.showToast({ title: '已重新生成', icon:'success' });
-        // 可选：立即预览
         if (rr.fileID) await openDocByFileID(rr.fileID);
       } else {
         wx.showToast({ title: rr.error || '生成失败', icon:'none' });
@@ -625,36 +605,19 @@ Page({
   // 创建合同时，载入可租赁的车辆
   async loadAvailableVehicles(cityCode) {
     if (!cityCode) return;
-  
     const db = wx.cloud.database();
     const _  = db.command;
-
-    // 只查本城市、可租且不在维修中的车辆：
-    //   rentStatus = 'available'
-    //   maintenanceStatus = 'none' 或 未设置（老数据）
     const where = {
         cityCode,
         rentStatus: 'available',
         maintenanceStatus: _.or([
-            _.eq('none'), 
-            _.eq(''),     // 兼容 CSV 导入的空字符串
-            _.eq(null),   // 兼容空值
-            _.exists(false)
+            _.eq('none'), _.eq(''), _.eq(null), _.exists(false)
         ])
     };
-
     try {
-        const { data } = await db
-        .collection('vehicles')
-        .where(where)
-        .orderBy('plate', 'asc')
-        .limit(20) //微信小程序硬性限制：前端直接调用数据库，一次最多只能取 20 条数据
-        .get();
-
-        // console.log('[contract-new] available vehicles =', data.length, data);
-
+        const { data } = await db.collection('vehicles')
+        .where(where).orderBy('plate', 'asc').limit(20).get();
         this.setData({
-        // 整个对象列表备用
         vehiclePickerOptions: data,
         // picker 显示用字符串
         vehiclePickerRange: data.map(v =>
@@ -662,8 +625,6 @@ Page({
         ),
         vehiclePickerIndex: -1
         });
-
-        // 如果想在加载完就自动填充第一辆，可在这里调用 onVehiclePickChange 模拟一次
     } catch (e) {
         console.error('[contract-new] loadAvailableVehicles error', e);
         wx.showToast({ title: '加载车辆失败', icon: 'none' });
@@ -673,16 +634,10 @@ Page({
   // 选中车辆时自动回填车字段
   onVehiclePickChange(e) {
     const idx = Number(e.detail.value);
-    const list = this.data.vehiclePickerOptions || [];  // 用 vehiclePickerOptions
-  
-    if (!list.length) {
-      return wx.showToast({ title: '暂无车辆', icon: 'none' });
-    }
+    const list = this.data.vehiclePickerOptions || [];
+    if (!list.length) return wx.showToast({ title: '暂无车辆', icon: 'none' });
     const vehicle = list[idx];
     if (!vehicle) return;
-  
-    // console.log('[contract-new] pick vehicle index =', idx, vehicle);
-  
     this.setData({
       vehiclePickerIndex: idx,
       'form.carPlate': vehicle.plate || '',
