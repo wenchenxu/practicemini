@@ -38,6 +38,8 @@ exports.main = async (event, context) => {
         return await getDashboardStats(payload);
       case 'getAllCitiesStats':
         return await getAllCitiesStats();
+      case 'listAvailable': 
+        return await listAvailable(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -585,4 +587,38 @@ async function getAllCitiesStats() {
   });
 
   return { ok: true, list };
+}
+
+// --- 新增的辅助函数 ---
+async function listAvailable(payload) {
+    const { cityCode } = payload || {};
+    if (!cityCode) return { ok: false, error: 'missing-cityCode' };
+  
+    const _ = db.command; // 确保能使用指令
+  
+    try {
+      const where = {
+        cityCode,
+        rentStatus: 'available',
+        // 排除维修状态 (兼容 none, 空字符串, null, 或字段不存在)
+        maintenanceStatus: _.or([
+          _.eq('none'),
+          _.eq(''),
+          _.eq(null),
+          _.exists(false)
+        ])
+      };
+  
+      // 云函数端 limit 最大支持 1000，解决了小程序端 20 条的限制
+      const res = await db.collection('vehicles')
+        .where(where)
+        .orderBy('plate', 'asc')
+        .limit(1000)
+        .get();
+  
+      return { ok: true, list: res.data };
+    } catch (e) {
+      console.error('[vehicleOps] listAvailable error', e);
+      return { ok: false, error: e.message };
+    }
 }

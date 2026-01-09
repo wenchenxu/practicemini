@@ -603,7 +603,7 @@ Page({
   },
 
   // 创建合同时，载入可租赁的车辆
-  async loadAvailableVehicles(cityCode) {
+  async loadAvailableVehiclesOld(cityCode) {
     if (!cityCode) return;
     const db = wx.cloud.database();
     const _  = db.command;
@@ -628,6 +628,46 @@ Page({
     } catch (e) {
         console.error('[contract-new] loadAvailableVehicles error', e);
         wx.showToast({ title: '加载车辆失败', icon: 'none' });
+    }
+  },
+
+  // new version, loads more than 20 vehicles in dropdown
+  async loadAvailableVehicles(cityCode) {
+    if (!cityCode) return;
+  
+    // ▼▼▼ 修改：不再直接查库，改为调用云函数 ▼▼▼
+    wx.showLoading({ title: '加载车辆...', mask: true });
+    
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: {
+          action: 'listAvailable',
+          payload: { cityCode }
+        }
+      });
+
+      const result = res.result || {};
+      if (!result.ok) {
+        throw new Error(result.error || '加载失败');
+      }
+
+      const data = result.list || [];
+
+      // 更新页面数据
+      this.setData({
+        vehiclePickerOptions: data,
+        vehiclePickerRange: data.map(v =>
+            `${v.plate || ''} ${v.model || ''}`.trim()
+        ),
+        vehiclePickerIndex: -1
+      });
+
+    } catch (e) {
+        console.error('[contract-new] loadAvailableVehicles error', e);
+        wx.showToast({ title: '加载车辆失败，请重试', icon: 'none' });
+    } finally {
+        wx.hideLoading();
     }
   },
 
