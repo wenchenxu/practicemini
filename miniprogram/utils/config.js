@@ -28,10 +28,12 @@ export const CITY_CODE_MAP = {
     foshan: [
         { code: 'rent_std',  name: '纯租租赁' },
         { code: 'rent_zeroDown', name: '零押金租赁' },
+        { code: 'rent_rto', name: '以租代购' },
     ],
-    // ▼▼▼ 新增：惠州也支持两种类型 ▼▼▼
+    // 惠州支持多种类型
     huizhou: [
         { code: 'rent_std',  name: '纯租租赁' },
+        { code: 'rent_zeroDown', name: '零押金租赁'},
         { code: 'rent_rto', name: '以租代购' },
     ],
     default: [{ code: 'rent_std', name: '纯租租赁' }],
