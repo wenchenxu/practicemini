@@ -517,6 +517,7 @@ exports.main = async (event, context) => {
       rentMonthlySecondYearFormal: finalFields.rentMonthlySecondYearFormal,
       daysTillPayment: finalFields.daysTillPayment,
       sellPrice: finalFields.sellPrice,
+      notesWhenSell: finalFields.notesWhenSell || '无',
     };
 
     const basePath = buildContractFolderPath({

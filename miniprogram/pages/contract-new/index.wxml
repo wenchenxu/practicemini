@@ -105,6 +105,11 @@
             <label class="label"><text class="req">*</text>约定购买车辆金额</label>
             <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.sellPrice}}" bindinput="onInputNumber" data-name="sellPrice" />
           </view>
+
+          <view class="form-item">
+            <label class="label">合同完结后购车备注</label>
+            <input class="input-box" placeholder="如不填则显示“无”" placeholder-class="ph" value="{{form.notesWhenSell}}" bindinput="onInput" data-name="notesWhenSell" />
+          </view>
         </block>
         </view>
     </view>

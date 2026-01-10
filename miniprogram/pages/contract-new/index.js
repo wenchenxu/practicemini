@@ -53,6 +53,7 @@ const BASE_FIELDS = [
   { name:'rentMonthlySecondYearFormal', label:'13—24期每期租金（大写）', type:'string', requiredWhen:'never', disabled:true, hideOnCreate: true, hideOnEdit:true, hideOnView:true },
   { name:'daysTillPayment', label:'自然日内支付首期（天）', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
   { name:'sellPrice', label:'合同完结后车辆购买售价', type:'number', requiredWhen:'never', min:0, hideOnCreate: true },
+  { name:'notesWhenSell', label:'销售备注', type:'string', requiredWhen:'never', hideOnCreate: true },
 
   // ---- Deposit ----
   { name:'deposit', label:'押金总额', type:'number', requiredWhen:'prod', min:0 },
@@ -481,6 +482,14 @@ Page({
                 console.warn('Fixed missing default daysTillPayment: 7');
                 payload.daysTillPayment = 7;
             }
+        }
+    }
+
+    // 新增：notesWhenSell 默认值处理
+    if (mode === 'create' && selectedTypeCode === 'rent_rto') {
+        // 如果用户没填，或者填的是空字符串，强制设为 '无'
+        if (!payload.notesWhenSell || !String(payload.notesWhenSell).trim()) {
+            payload.notesWhenSell = '无';
         }
     }
 

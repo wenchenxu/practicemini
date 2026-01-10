@@ -67,6 +67,10 @@
           <text class="label">约定购车款</text>
           <text class="value">¥ {{contract.sellPrice || 0}}</text>
        </view>
+       <view class="item">
+          <text class="label">合同完结后购车备注</text>
+          <text class="value">{{contract.notesWhenSell || '无'}}</text>
+       </view>
     </block>
 
   </view>
