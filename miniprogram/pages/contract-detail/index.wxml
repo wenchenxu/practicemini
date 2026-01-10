@@ -1,0 +1,77 @@
+<!--pages/contract-detail/index.wxml-->
+<view class="container">
+  <view class="header-section">
+    <view class="title">合同详情</view>
+    <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
+  </view>
+
+  <view class="info-list" wx:if="{{contract}}">
+    
+    <view class="item">
+      <text class="label">司机姓名</text>
+      <text class="value">{{contract.clientName || '-'}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">司机手机号</text>
+      <text class="value">{{contract.clientPhone || '-'}}</text>
+    </view>
+
+    <view class="divider"></view>
+
+    <view class="item">
+      <text class="label">合同类型</text>
+      <text class="value">{{contract.contractTypeName || contract.contractType || '-'}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">合同生效日期</text>
+      <text class="value">{{contract.contractValidPeriodStart || '-'}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">合同结束日期</text>
+      <text class="value">{{contract.contractValidPeriodEnd || '-'}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">租期</text>
+      <text class="value">{{contract.rentDurationMonth || 0}} 个月</text>
+    </view>
+
+    <view class="divider"></view>
+
+    <view class="item">
+      <text class="label">月租金</text>
+      <text class="value">¥ {{contract.rentMonthly || 0}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">首日支付金</text>
+      <text class="value">¥ {{contract.rentToday || 0}}</text>
+    </view>
+
+    <view class="item">
+      <text class="label">每月支付日</text>
+      <text class="value">{{contract.rentPaybyDayInMonth || '-'}} 号</text>
+    </view>
+
+    <view class="item">
+      <text class="label">押金总额</text>
+      <text class="value">¥ {{contract.deposit || 0}}</text>
+    </view>
+
+    <block wx:if="{{contract.contractType === 'rent_rto'}}">
+       <view class="divider"></view>
+       <view class="item">
+          <text class="label">约定购车款</text>
+          <text class="value">¥ {{contract.sellPrice || 0}}</text>
+       </view>
+    </block>
+
+  </view>
+
+  <view wx:else class="loading">
+    加载中...
+  </view>
+</view>

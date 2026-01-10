@@ -15,7 +15,8 @@
     "pages/vehicle-detail/index",
     "pages/vehicle-history/index",
     "pages/dev-tools/index",
-    "pages/vehicle-kanban/index"
+    "pages/vehicle-kanban/index",
+    "pages/contract-detail/index"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

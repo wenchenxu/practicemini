@@ -1218,5 +1218,15 @@ Page({
     wx.navigateTo({
       url: `/pages/driver-center/index?identNo=${encodeURIComponent(idCard)}`
     });
+  },
+
+  // 新增：跳转到详情页
+  toDetail(e) {
+    // console.log('点击详情，Event:', e);
+    const id = e.currentTarget.dataset.id;
+    if (!id) { return; }
+    wx.navigateTo({
+      url: `/pages/contract-detail/index?id=${id}`
+    });
   }
 });
