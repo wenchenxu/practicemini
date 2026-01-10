@@ -483,11 +483,7 @@ Page({
                 payload.daysTillPayment = 7;
             }
         }
-    }
-
-    // 新增：notesWhenSell 默认值处理
-    if (mode === 'create' && selectedTypeCode === 'rent_rto') {
-        // 如果用户没填，或者填的是空字符串，强制设为 '无'
+        // 新增：notesWhenSell 默认值处理
         if (!payload.notesWhenSell || !String(payload.notesWhenSell).trim()) {
             payload.notesWhenSell = '无';
         }
