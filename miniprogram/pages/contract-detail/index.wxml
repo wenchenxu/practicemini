@@ -108,10 +108,9 @@
     use-slot
     title="编辑延长设置"
     show="{{ showEditModal }}"
-    show-cancel-button
+    show-cancel-button="{{ false }}" 
+    show-confirm-button="{{ false }}"
     bind:close="onCloseEdit"
-    bind:confirm="onConfirmEdit"
-    async-close
   >
     <view class="dialog-content">
       <view class="form-row">
@@ -142,6 +141,24 @@
           fixed="true"
         ></textarea>
       </view>
+
+      <view class="dialog-footer">
+        <van-button 
+            type="default" 
+            size="large" 
+            custom-style="flex:1; margin-right:20rpx;" 
+            bind:click="onCloseEdit"
+        >取消</van-button>
+        
+        <van-button 
+            type="info" 
+            size="large" 
+            custom-style="flex:1;" 
+            loading="{{ saving }}" 
+            bind:click="onConfirmEdit"
+        >确定保存</van-button>
+      </view>
+
     </view>
   </van-dialog>
 </view>

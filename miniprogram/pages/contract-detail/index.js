@@ -45,7 +45,7 @@ Page({
 
       // 如果有默认天数，触发一次计算以确保日期显示正确
       if(displayData.giftDays) {
-        this.calculateEndDate(displayData.giftDays, displayData.contractValidPeriodEnd);
+        this._calcDate(displayData.giftDays, displayData.contractValidPeriodEnd);
       }
 
     } catch (e) {
@@ -191,7 +191,7 @@ Page({
   // 5. 点击弹窗“确定” -> 保存
   async onConfirmEdit(e) {
     // 这里的 e.detail.dialog 是 Vant Dialog 实例，用于控制 loading
-    const { dialog } = e.detail; 
+    // const { dialog } = e.detail; 
     
     const { contract, editGiftDays, editGiftNotes, editRealEndDate } = this.data;
     if (!contract || !contract._id) {
@@ -199,10 +199,12 @@ Page({
         return;
     }
 
+    // 开启按钮 loading
+    this.setData({ saving: true });
+
     try {
       // 开启按钮 loading (如果使用了 async-close)
       // Vant Dialog 默认在 confirm 时会自动变为 loading 状态 (如果 async-close=true)
-      
       const res = await wx.cloud.callFunction({
         name: 'contractOps',
         data: {
@@ -224,7 +226,8 @@ Page({
           giftDays: editGiftDays,
           giftDaysNotes: editGiftNotes,
           contractRealEndDate: editRealEndDate,
-          showEditModal: false // 关闭弹窗
+          showEditModal: false,
+          saving: false
         });
       } else {
         throw new Error(res.result?.error || '保存失败');
@@ -232,8 +235,8 @@ Page({
     } catch (err) {
       console.error(err);
       wx.showToast({ title: '保存失败', icon: 'none' });
-      // 失败时停止 loading
-      if(dialog) dialog.stopLoading();
+      // 失败：只停止 loading，不关闭弹窗，方便用户重试
+      this.setData({ saving: false });
     }
   }
 });
