@@ -78,9 +78,14 @@
             data-name="{{item.fields.clientName}}"
           >司机详情</button>
         </view> -->
-        <view bindtap="toDetail" data-id="{{item._id}}" style="display: inline-block;">
-        <van-button type="default" plain size="small" style="pointer-events: none;">详情</van-button>
-        </view>
+        <button
+            class="mini-op"
+            size="mini"
+            type="default"
+            bindtap="toDetail"
+            data-id="{{item._id}}"
+            style="margin: 10rpx 0 0 0; width: auto; align-self: flex-start;"
+        >详情</button>
       </view>
 
       <!-- 右侧操作区保留 -->

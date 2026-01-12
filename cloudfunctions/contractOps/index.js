@@ -328,6 +328,28 @@ exports.main = async (event, context) => {
       }
     }
 
+    // 新增：更新租金支付设置
+    if (action === 'updateRentSettings') {
+        const { id, payload } = event;
+        if (!id) return { ok: false, error: 'missing-id' };
+  
+        const { rentPayFrequency, rentPayDates } = payload || {};
+  
+        try {
+          const up = await COL.doc(id).update({
+            data: {
+              rentPayFrequency, 
+              rentPayDates,      // 这是一个数组
+              updatedAt: db.serverDate()
+            }
+          });
+          return { ok: true, updated: up.stats ? up.stats.updated : 1 };
+        } catch (e) {
+          console.error('[contractOps] updateRentSettings error', e);
+          return { ok: false, error: e.message || 'update-failed' };
+        }
+    }
+
     // 更新赠送天数逻辑
     if (action === 'updateGiftInfo') {
         const { id, payload } = event;

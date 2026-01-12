@@ -13,6 +13,19 @@ Page({
     editGiftDays: '',
     editGiftNotes: '',
     editRealEndDate: '',
+    // --- 租金支付设置 (展示用) ---
+    rentPayFrequency: 'month', // 默认月付
+    rentPayDates: [],          // 默认空
+    rentFrequencyMap: {
+      'month': '按月支付',
+      'week': '按周支付',
+      'day': '按日支付'
+    },
+    // --- 租金编辑弹窗 (临时数据) ---
+    showRentEditModal: false,
+    editRentFrequency: 'month',
+    editRentDates: [],
+    savingRent: false,
   },
 
   onLoad(options) {
@@ -35,18 +48,36 @@ Page({
         ...(data.fields || {})
       };
 
+      // 新增：计算默认支付日期
+      // 1. 尝试获取已保存的设置
+      let savedDates = displayData.rentPayDates;
+      
+      // 2. 如果没保存过，则取合同上的“每月支付日”作为默认值
+      if (!savedDates || savedDates.length === 0) {
+          const defaultDay = Number(displayData.rentPaybyDayInMonth);
+          // 只有当它是有效数字 (1-31) 时才使用
+          if (defaultDay && !isNaN(defaultDay)) {
+              savedDates = [defaultDay];
+          } else {
+              savedDates = [];
+          }
+      }
+
       this.setData({ 
         contract: displayData,
         giftDays: displayData.giftDays || '',
         giftDaysNotes: displayData.giftDaysNotes || '',
         // 如果数据库里有算好的日期就用，没有就重新算一遍
-        contractRealEndDate: displayData.contractRealEndDate || displayData.contractValidPeriodEnd 
+        contractRealEndDate: displayData.contractRealEndDate || displayData.contractValidPeriodEnd,
+        rentPayFrequency: displayData.rentPayFrequency || 'month',
+        rentPayDates: savedDates,
       });
 
       // 如果有默认天数，触发一次计算以确保日期显示正确
+      /*
       if(displayData.giftDays) {
         this._calcDate(displayData.giftDays, displayData.contractValidPeriodEnd);
-      }
+      }*/
 
     } catch (e) {
       console.error(e);
@@ -55,85 +86,6 @@ Page({
       wx.hideLoading();
     }
   },
-
-  /*
-  // 输入天数
-  onGiftDaysInput(e) {
-    let val = e.detail.value;
-    this.setData({ giftDays: val });
-    
-    // 触发计算
-    if (this.data.contract && this.data.contract.contractValidPeriodEnd) {
-      this.calculateEndDate(val, this.data.contract.contractValidPeriodEnd);
-    }
-  },
-
-  // 输入备注
-  onGiftNotesInput(e) {
-    this.setData({ giftDaysNotes: e.detail.value });
-  },
-
-  // 核心：计算日期
-  calculateEndDate(addDays, baseDateStr) {
-    if (!baseDateStr) return;
-    const days = parseInt(addDays);
-    
-    // 如果输入的不是数字，或者为空，则恢复为原结束日期
-    if (isNaN(days) || !addDays) {
-      this.setData({ contractRealEndDate: baseDateStr });
-      return;
-    }
-
-    // JS 日期计算
-    const date = new Date(baseDateStr);
-    date.setDate(date.getDate() + days);
-    
-    // 格式化回 YYYY-MM-DD
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    
-    this.setData({ contractRealEndDate: `${y}-${m}-${d}` });
-  },
-
-  // 保存数据
-  async onSaveGift() {
-    if (this.data.saving) return;
-    const { contract, giftDays, giftDaysNotes, contractRealEndDate } = this.data;
-
-    if (!contract || !contract._id) return;
-
-    this.setData({ saving: true });
-
-    try {
-      // 直接调用云函数更新，或者简单点直接用 db.update (如果在客户端有权限)
-      // 为了安全和日志，建议走 contractOps 云函数
-      // 这里我们需要去 cloudfunctions/contractOps/index.js 增加一个 case
-      const res = await wx.cloud.callFunction({
-        name: 'contractOps',
-        data: {
-          action: 'updateGiftInfo', // <--- 我们需要去后端加这个 action
-          id: contract._id,
-          payload: {
-            giftDays: Number(giftDays) || 0,
-            giftDaysNotes,
-            contractRealEndDate
-          }
-        }
-      });
-
-      if (res.result && res.result.ok) {
-        wx.showToast({ title: '保存成功', icon: 'success' });
-      } else {
-        throw new Error(res.result?.error || '保存失败');
-      }
-    } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '保存失败', icon: 'none' });
-    } finally {
-      this.setData({ saving: false });
-    }
-  }, */
 
   // --- 核心逻辑：日期计算 (纯函数，不依赖 this.data) ---
   _calcDate(addDays, baseDateStr) {
@@ -237,6 +189,101 @@ Page({
       wx.showToast({ title: '保存失败', icon: 'none' });
       // 失败：只停止 loading，不关闭弹窗，方便用户重试
       this.setData({ saving: false });
+    }
+  },
+
+  // 1. 打开租金编辑弹窗
+  onOpenRentEdit() {
+    const { rentPayFrequency, rentPayDates } = this.data;
+    this.setData({
+      showRentEditModal: true,
+      editRentFrequency: rentPayFrequency || 'month',
+      // 深拷贝一下数组，防止直接修改 data
+      editRentDates: rentPayDates ? [...rentPayDates] : []
+    });
+  },
+
+  onCloseRentEdit() {
+    this.setData({ showRentEditModal: false });
+  },
+
+  // 2. 切换频率 (月/周/日)
+  onChangeFrequency(e) {
+    const type = e.currentTarget.dataset.type;
+    if (type === this.data.editRentFrequency) return;
+    
+    // 切换时清空已选日期，避免逻辑混乱
+    this.setData({
+      editRentFrequency: type,
+      editRentDates: [] 
+    });
+  },
+
+  // 3. 切换月付日期 (1-28 多选)
+  onToggleMonthDate(e) {
+    const day = e.currentTarget.dataset.day; // 数字 1-28
+    let dates = this.data.editRentDates || [];
+    
+    if (dates.includes(day)) {
+      // 如果已存在，则移除
+      dates = dates.filter(d => d !== day);
+    } else {
+      // 如果不存在，则添加
+      dates.push(day);
+    }
+    
+    // 排序一下，好看
+    dates.sort((a, b) => a - b);
+    
+    this.setData({ editRentDates: dates });
+  },
+
+  // 4. 选择周几 (单选)
+  onSelectWeekDay(e) {
+    const day = e.currentTarget.dataset.day; // "周一"
+    this.setData({ editRentDates: [day] }); // 数组里只存一个值
+  },
+
+  // 5. 保存租金设置
+  async onConfirmRentEdit() {
+    const { contract, editRentFrequency, editRentDates } = this.data;
+    
+    // 简单的校验
+    if (editRentFrequency !== 'day' && (!editRentDates || editRentDates.length === 0)) {
+       wx.showToast({ title: '请至少选择一个日期', icon: 'none' });
+       return;
+    }
+
+    this.setData({ savingRent: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: {
+          action: 'updateRentSettings', // <--- 新增的 Action
+          id: contract._id,
+          payload: {
+            rentPayFrequency: editRentFrequency,
+            rentPayDates: editRentDates
+          }
+        }
+      });
+
+      if (res.result && res.result.ok) {
+        wx.showToast({ title: '保存成功', icon: 'success' });
+        this.setData({
+          rentPayFrequency: editRentFrequency,
+          rentPayDates: editRentDates,
+          showRentEditModal: false,
+          savingRent: false
+        });
+      } else {
+        throw new Error(res.result?.error || '保存失败');
+      }
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      this.setData({ savingRent: false });
     }
   }
 });

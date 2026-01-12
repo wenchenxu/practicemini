@@ -1,4 +1,10 @@
 <!--pages/contract-detail/index.wxml-->
+<wxs module="tools">
+  module.exports.includes = function(arr, item) {
+    if (!arr) return false;
+    return arr.indexOf(item) > -1;
+  }
+</wxs>
 <view class="container">
   <view class="header-section">
     <view class="title">合同详情</view>
@@ -74,6 +80,95 @@
         </view>
       </block>
     </view>
+
+    <view class="edit-card">
+      <view class="card-header-row">
+        <view class="section-title" style="margin-bottom:0; border:none; padding:0;">租金支付设置</view>
+        <van-button type="primary" size="small" plain round bind:click="onOpenRentEdit">编辑</van-button>
+      </view>
+
+      <view class="read-row">
+        <text class="label">支付频率</text>
+        <text class="value">{{ rentFrequencyMap[rentPayFrequency] || '-' }}</text>
+      </view>
+
+      <view class="read-row" style="border-bottom:none;">
+        <text class="label">支付日期</text>
+        <view class="value" wx:if="{{rentPayFrequency === 'day'}}">每日支付</view>
+        <view class="value" wx:elif="{{rentPayFrequency === 'week'}}">{{ rentPayDates[0] || '-' }}</view>
+        <view class="value" wx:else>
+           {{ rentPayDates && rentPayDates.length > 0 ? rentPayDates + ' 号' : '-' }}
+        </view>
+      </view>
+    </view>
+    <van-dialog
+      use-slot
+      title="设置支付周期"
+      show="{{ showRentEditModal }}"
+      show-cancel-button="{{ false }}" 
+      show-confirm-button="{{ false }}"
+      bind:close="onCloseRentEdit"
+    >
+      <view class="dialog-content">
+        
+        <view class="form-column">
+          <view class="label" style="margin-bottom:16rpx;">租金类型</view>
+          <view class="radio-group">
+            <view 
+              class="radio-tag {{editRentFrequency === 'month' ? 'active' : ''}}" 
+              bindtap="onChangeFrequency" data-type="month">按月</view>
+            <view 
+              class="radio-tag {{editRentFrequency === 'week' ? 'active' : ''}}" 
+              bindtap="onChangeFrequency" data-type="week">按周</view>
+            <view 
+              class="radio-tag {{editRentFrequency === 'day' ? 'active' : ''}}" 
+              bindtap="onChangeFrequency" data-type="day">按日</view>
+          </view>
+        </view>
+
+        <view class="form-column" style="margin-top:20rpx;">
+          <view class="label" style="margin-bottom:16rpx;">日期选择</view>
+          
+          <block wx:if="{{editRentFrequency === 'month'}}">
+            <view class="month-grid">
+              <block wx:for="{{28}}" wx:key="index">
+                <view 
+                  class="grid-num {{tools.includes(editRentDates, item + 1) ? 'selected' : ''}}" 
+                  bindtap="onToggleMonthDate" 
+                  data-day="{{item + 1}}"
+                >
+                  {{item + 1}}
+                </view>
+              </block>
+            </view>
+            <view class="tips">* 已自动屏蔽 29, 30, 31 号</view>
+          </block>
+
+          <block wx:elif="{{editRentFrequency === 'week'}}">
+            <view class="week-list">
+              <view class="radio-tag {{editRentDates[0] === '周一' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周一">周一</view>
+              <view class="radio-tag {{editRentDates[0] === '周二' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周二">周二</view>
+              <view class="radio-tag {{editRentDates[0] === '周三' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周三">周三</view>
+              <view class="radio-tag {{editRentDates[0] === '周四' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周四">周四</view>
+              <view class="radio-tag {{editRentDates[0] === '周五' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周五">周五</view>
+              <view class="radio-tag {{editRentDates[0] === '周六' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周六">周六</view>
+              <view class="radio-tag {{editRentDates[0] === '周日' ? 'active' : ''}}" bindtap="onSelectWeekDay" data-day="周日">周日</view>
+            </view>
+          </block>
+
+          <block wx:else>
+            <view class="static-text">每日支付，无需选择日期</view>
+          </block>
+
+        </view>
+
+        <view class="dialog-footer">
+          <van-button type="default" size="large" custom-style="flex:1; margin-right:20rpx;" bind:click="onCloseRentEdit">取消</van-button>
+          <van-button type="info" size="large" custom-style="flex:1;" loading="{{ savingRent }}" bind:click="onConfirmRentEdit">保存设置</van-button>
+        </view>
+
+      </view>
+    </van-dialog>
 
     <view class="edit-card">
       <view class="card-header-row">

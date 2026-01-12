@@ -216,3 +216,64 @@
     padding-top: 20rpx;
     border-top: 1rpx solid #f5f5f5;
   }
+
+  /* 标签选择器样式 (用于周选和频率选择) */
+.radio-group, .week-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+  
+  .radio-tag {
+    padding: 12rpx 30rpx;
+    background: #f7f8fa;
+    border-radius: 30rpx;
+    font-size: 26rpx;
+    color: #333;
+    border: 1rpx solid transparent;
+  }
+  
+  .radio-tag.active {
+    background: #e6f1fe;
+    color: #1989fa;
+    border-color: #1989fa;
+    font-weight: bold;
+  }
+  
+  /* 月份数字网格样式 */
+  .month-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16rpx;
+    margin-top: 10rpx;
+  }
+  
+  .grid-num {
+    width: 70rpx;
+    height: 70rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f7f8fa;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+    color: #333;
+  }
+  
+  .grid-num.selected {
+    background: #1989fa;
+    color: #fff;
+    font-weight: bold;
+  }
+  
+  .tips {
+    font-size: 22rpx;
+    color: #999;
+    margin-top: 16rpx;
+  }
+  
+  .static-text {
+    color: #999;
+    font-size: 28rpx;
+    padding: 20rpx 0;
+  }
