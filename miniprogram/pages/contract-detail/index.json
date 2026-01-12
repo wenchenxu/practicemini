@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "合同详情",
-  "usingComponents": {}
+  "usingComponents": {
+    "van-button": "@vant/weapp/button/index",
+    "van-dialog": "@vant/weapp/dialog/index"
+  }
 }

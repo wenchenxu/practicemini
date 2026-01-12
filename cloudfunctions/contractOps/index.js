@@ -328,6 +328,31 @@ exports.main = async (event, context) => {
       }
     }
 
+    // 更新赠送天数逻辑
+    if (action === 'updateGiftInfo') {
+        const { id, payload } = event;
+        if (!id) return { ok: false, error: 'missing-id' };
+  
+        // 从 payload 中提取字段
+        const { giftDays, giftDaysNotes, contractRealEndDate } = payload || {};
+  
+        try {
+          const up = await COL.doc(id).update({
+            data: {
+              giftDays: giftDays,
+              giftDaysNotes: giftDaysNotes,
+              contractRealEndDate: contractRealEndDate,
+              updatedAt: db.serverDate()
+            }
+          });
+  
+          return { ok: true, updated: up.stats ? up.stats.updated : 1 };
+        } catch (e) {
+          console.error('[contractOps] updateGiftInfo error', e);
+          return { ok: false, error: e.message || 'update-failed' };
+        }
+      }
+
     return { ok: false, error: 'unknown-action' };
   } catch (e) {
     console.error('[contractOps error]', e);

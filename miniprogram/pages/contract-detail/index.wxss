@@ -60,3 +60,152 @@
     color: #999;
     margin-top: 100rpx;
   }
+
+  /* 新增样式 */
+.edit-card {
+    background: #fff;
+    margin-top: 24rpx;
+    padding: 30rpx;
+    border-radius: 12rpx;
+  }
+  
+  .section-title {
+    font-size: 30rpx;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 24rpx;
+    border-left: 8rpx solid #1989fa;
+    padding-left: 16rpx;
+  }
+  
+  .form-row {
+    display: flex;
+    align-items: center;
+    padding: 20rpx 0;
+    border-bottom: 1rpx solid #f5f5f5;
+  }
+  
+  .form-column {
+    padding: 20rpx 0;
+  }
+  
+  .form-row .label, .form-column .label {
+    width: 160rpx;
+    font-size: 28rpx;
+    color: #666;
+  }
+  
+  .input {
+    flex: 1;
+    font-size: 28rpx;
+    color: #333;
+  }
+  
+  .unit {
+    font-size: 28rpx;
+    color: #999;
+    margin-left: 10rpx;
+  }
+  
+  .value-read {
+    font-size: 28rpx;
+    color: #333;
+    font-weight: bold;
+  }
+  
+  .textarea {
+    width: 100%;
+    height: 160rpx;
+    background: #f8f8f8;
+    padding: 16rpx;
+    box-sizing: border-box;
+    font-size: 26rpx;
+    margin-top: 16rpx;
+    border-radius: 8rpx;
+  }
+  
+  .save-btn {
+    margin-top: 30rpx;
+    background: #1989fa;
+    color: #fff;
+    font-size: 30rpx;
+    border-radius: 44rpx;
+  }
+
+  /* 卡片头部 Flex 布局 */
+.card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24rpx;
+    padding-bottom: 16rpx;
+    border-bottom: 1rpx solid #eee;
+  }
+  
+  /* 覆盖原有的 section-title 样式，使其更灵活 */
+  .section-title {
+    font-size: 30rpx;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  /* 展示模式的行样式 */
+  .read-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 16rpx 0;
+    border-bottom: 1rpx dashed #f5f5f5;
+    font-size: 28rpx;
+  }
+  
+  .read-column {
+    padding: 16rpx 0;
+  }
+  .read-column .label {
+    display: block;
+    margin-bottom: 12rpx;
+    font-size: 28rpx;
+    color: #666;
+  }
+  .value-box {
+    background: #f9f9f9;
+    padding: 16rpx;
+    border-radius: 8rpx;
+    font-size: 26rpx;
+    color: #333;
+    min-height: 40rpx;
+  }
+  
+  /* --- 弹窗内部样式 --- */
+  .dialog-content {
+    padding: 30rpx;
+  }
+  /* 复用之前的 input 样式，但微调一下间距 */
+  .dialog-content .form-row {
+    display: flex;
+    align-items: center;
+    padding: 20rpx 0;
+    border-bottom: 1rpx solid #f5f5f5;
+  }
+  .dialog-content .label {
+    width: 150rpx;
+    font-size: 28rpx;
+    color: #666;
+  }
+  .dialog-content .input {
+    flex: 1;
+    background: #f7f8fa;
+    padding: 10rpx 20rpx;
+    border-radius: 8rpx;
+    font-size: 28rpx;
+  }
+  .dialog-content .textarea {
+    width: 100%;
+    height: 160rpx;
+    background: #f7f8fa;
+    padding: 16rpx;
+    box-sizing: border-box;
+    font-size: 26rpx;
+    margin-top: 16rpx;
+    border-radius: 8rpx;
+  }

@@ -5,77 +5,143 @@
     <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
   </view>
 
-  <view class="info-list" wx:if="{{contract}}">
+  <block wx:if="{{contract}}">
     
-    <view class="item">
-      <text class="label">司机姓名</text>
-      <text class="value">{{contract.clientName || '-'}}</text>
+    <view class="info-list">
+      <view class="item">
+        <text class="label">司机姓名</text>
+        <text class="value">{{contract.clientName || '-'}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">司机手机号</text>
+        <text class="value">{{contract.clientPhone || '-'}}</text>
+      </view>
+
+      <view class="divider"></view>
+
+      <view class="item">
+        <text class="label">合同类型</text>
+        <text class="value">{{contract.contractTypeName || contract.contractType || '-'}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">合同生效日期</text>
+        <text class="value">{{contract.contractValidPeriodStart || '-'}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">合同结束日期</text>
+        <text class="value">{{contract.contractValidPeriodEnd || '-'}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">租期</text>
+        <text class="value">{{contract.rentDurationMonth || 0}} 个月</text>
+      </view>
+
+      <view class="divider"></view>
+
+      <view class="item">
+        <text class="label">月租金</text>
+        <text class="value">¥ {{contract.rentMonthly || 0}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">首日支付金</text>
+        <text class="value">¥ {{contract.rentToday || 0}}</text>
+      </view>
+
+      <view class="item">
+        <text class="label">每月支付日</text>
+        <text class="value">{{contract.rentPaybyDayInMonth || '-'}} 号</text>
+      </view>
+
+      <view class="item">
+        <text class="label">押金总额</text>
+        <text class="value">¥ {{contract.deposit || 0}}</text>
+      </view>
+
+      <block wx:if="{{contract.contractType === 'rent_rto'}}">
+        <view class="divider"></view>
+        <view class="item">
+            <text class="label">约定购车款</text>
+            <text class="value">¥ {{contract.sellPrice || 0}}</text>
+        </view>
+        <view class="item">
+            <text class="label">销售备注</text>
+            <text class="value">{{contract.notesWhenSell || '无'}}</text>
+        </view>
+      </block>
     </view>
 
-    <view class="item">
-      <text class="label">司机手机号</text>
-      <text class="value">{{contract.clientPhone || '-'}}</text>
+    <view class="edit-card">
+      <view class="card-header-row">
+        <view class="section-title" style="margin-bottom:0; border:none; padding:0;">赠送延长天数</view>
+        <van-button type="primary" size="small" plain round bind:click="onOpenEdit">编辑</van-button>
+      </view>
+      
+      <view class="read-row">
+        <text class="label">赠送天数</text>
+        <text class="value">{{giftDays || 0}} 天</text>
+      </view>
+
+      <view class="read-row">
+        <text class="label">合同结束实际日期</text>
+        <text class="value" style="font-weight:bold;">{{contractRealEndDate || '-'}}</text>
+      </view>
+
+      <view class="read-column">
+        <text class="label">备注信息</text>
+        <view class="value-box">
+          {{giftDaysNotes || '无备注'}}
+        </view>
+      </view>
     </view>
 
-    <view class="divider"></view>
-
-    <view class="item">
-      <text class="label">合同类型</text>
-      <text class="value">{{contract.contractTypeName || contract.contractType || '-'}}</text>
-    </view>
-
-    <view class="item">
-      <text class="label">合同生效日期</text>
-      <text class="value">{{contract.contractValidPeriodStart || '-'}}</text>
-    </view>
-
-    <view class="item">
-      <text class="label">合同结束日期</text>
-      <text class="value">{{contract.contractValidPeriodEnd || '-'}}</text>
-    </view>
-
-    <view class="item">
-      <text class="label">租期</text>
-      <text class="value">{{contract.rentDurationMonth || 0}} 个月</text>
-    </view>
-
-    <view class="divider"></view>
-
-    <view class="item">
-      <text class="label">月租金</text>
-      <text class="value">¥ {{contract.rentMonthly || 0}}</text>
-    </view>
-
-    <view class="item">
-      <text class="label">首日支付金</text>
-      <text class="value">¥ {{contract.rentToday || 0}}</text>
-    </view>
-
-    <view class="item">
-      <text class="label">每月支付日</text>
-      <text class="value">{{contract.rentPaybyDayInMonth || '-'}} 号</text>
-    </view>
-
-    <view class="item">
-      <text class="label">押金总额</text>
-      <text class="value">¥ {{contract.deposit || 0}}</text>
-    </view>
-
-    <block wx:if="{{contract.contractType === 'rent_rto'}}">
-       <view class="divider"></view>
-       <view class="item">
-          <text class="label">约定购车款</text>
-          <text class="value">¥ {{contract.sellPrice || 0}}</text>
-       </view>
-       <view class="item">
-          <text class="label">合同完结后购车备注</text>
-          <text class="value">{{contract.notesWhenSell || '无'}}</text>
-       </view>
-    </block>
-
-  </view>
-
+  </block>
   <view wx:else class="loading">
     加载中...
   </view>
+
+  <van-dialog
+    use-slot
+    title="编辑延长设置"
+    show="{{ showEditModal }}"
+    show-cancel-button
+    bind:close="onCloseEdit"
+    bind:confirm="onConfirmEdit"
+    async-close
+  >
+    <view class="dialog-content">
+      <view class="form-row">
+        <view class="label">赠送天数</view>
+        <input 
+          class="input" 
+          type="number" 
+          placeholder="0" 
+          value="{{editGiftDays}}" 
+          bindinput="onEditDaysInput"
+        />
+        <view class="unit">天</view>
+      </view>
+
+      <view class="form-row">
+        <view class="label">预计结束</view>
+        <view class="value-read">{{editRealEndDate || '-'}}</view>
+      </view>
+
+      <view class="form-column">
+        <view class="label">备注信息 ({{editGiftNotes.length || 0}}/300)</view>
+        <textarea 
+          class="textarea" 
+          placeholder="请输入备注信息..." 
+          maxlength="300" 
+          value="{{editGiftNotes}}" 
+          bindinput="onEditNotesInput"
+          fixed="true"
+        ></textarea>
+      </view>
+    </view>
+  </van-dialog>
 </view>
