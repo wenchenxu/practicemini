@@ -5,9 +5,17 @@
     return arr.indexOf(item) > -1;
   }
 </wxs>
+<wxs src="../../utils/fmt.wxs" module="fmt" />
 <view class="container">
   <view class="header-section">
     <view class="title">合同详情</view>
+    <van-button 
+        type="warning" 
+        size="small" 
+        plain 
+        bind:click="onOpenSwapModal"
+        wx:if="{{contract && !contract.deleted}}"
+      >更换车辆</van-button>
     <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
   </view>
 
@@ -79,6 +87,41 @@
             <text class="value">{{contract.notesWhenSell || '无'}}</text>
         </view>
       </block>
+    </view>
+
+    <view class="edit-card">
+      <view class="card-header-row">
+        <view class="section-title" style="margin-bottom:0; border:none; padding:0;">车辆信息</view>
+        </view>
+
+      <view class="read-row">
+        <text class="label">当前车牌号</text>
+        <text class="value" style="font-weight:bold; color:#333;">{{ contract.fields.carPlate }}</text>
+      </view>
+
+      <view class="read-row">
+        <text class="label">车辆更换次数</text>
+        <text class="value">{{ contract.swapHistory.length || 0 }} 次</text>
+      </view>
+
+      <view class="read-row" style="border-bottom:none; align-items: flex-start;">
+        <text class="label" style="margin-top: 6rpx;">历史车牌号</text>
+        
+        <view class="value" style="text-align:right; max-width: 70%; display:flex; flex-direction:column; align-items:flex-end;">
+          <block wx:if="{{ contract.swapHistory && contract.swapHistory.length > 0 }}">
+            <view 
+              wx:for="{{contract.swapHistory}}" 
+              wx:key="index" 
+              style="margin-bottom: 8rpx; font-size: 26rpx; color:#666;"
+            >
+              <text style="margin-right: 12rpx; font-weight:500;">{{item.oldCar.plate}}</text>
+            </view>
+          </block>
+          <block wx:else>
+            <text style="color:#999;">无</text>
+          </block>
+        </view>
+        </view>
     </view>
 
     <view class="edit-card">
@@ -257,3 +300,78 @@
     </view>
   </van-dialog>
 </view>
+
+<van-popup
+  show="{{ showSwapModal }}"
+  position="bottom"
+  custom-style="height: 60%;"
+  bind:close="onCloseSwapModal"
+  closeable
+>
+  <view class="swap-container" style="padding: 30rpx; padding-top: 80rpx;">
+    <view class="section-title">办理换车</view>
+    
+    <view class="form-item">
+      <view class="label">换车原因 <text style="color:red">*</text></view>
+      <textarea 
+        class="textarea" 
+        placeholder="例如：原车故障、司机要求升级车型..." 
+        value="{{swapReason}}" 
+        bindinput="onInputSwapReason"
+        style="height: 120rpx; background:#f5f5f5; width:100%; padding:20rpx; border-radius:8rpx; box-sizing:border-box;"
+      ></textarea>
+    </view>
+
+    <view class="form-item" style="margin-top:30rpx;">
+      <view class="label">选择新车 ({{availableVehicles.length}} 辆可用) <text style="color:red">*</text></view>
+      
+      <view wx:if="{{loadingVehicles}}" style="color:#999; font-size:24rpx; padding:20rpx;">加载可用车辆中...</view>
+      
+      <view wx:elif="{{availableVehicles.length === 0}}" style="color:#f56c6c; padding:20rpx;">
+        当前城市 ({{contract.cityName}}) 无可用车辆
+      </view>
+
+      <radio-group bindchange="onSelectNewVehicle" style="max-height: 400rpx; overflow-y: auto; display:block;">
+        <label class="vehicle-item" wx:for="{{availableVehicles}}" wx:key="_id" style="display:flex; justify-content:space-between; padding:20rpx 0; border-bottom:1rpx solid #eee;">
+          <view>
+            <view style="font-weight:bold;">{{item.plate}}</view>
+            <view style="font-size:24rpx; color:#666;">{{item.model}} | {{item.color}}</view>
+          </view>
+          <radio value="{{item._id}}" checked="{{selectedNewVehicleId === item._id}}" color="#1989fa"/>
+        </label>
+      </radio-group>
+    </view>
+
+    <view style="margin-top: 40rpx;">
+      <van-button type="info" block round bind:click="onPreConfirmSwap" loading="{{swapping}}">确认换车</van-button>
+    </view>
+  </view>
+</van-popup>
+
+<van-dialog
+  use-slot
+  title="确认换车信息"
+  show="{{ showSwapConfirmDialog }}"
+  show-cancel-button
+  bind:close="onCloseSwapConfirmDialog"
+  bind:confirm="onRealConfirmSwap"
+>
+  <view style="padding: 40rpx 40rpx; font-size: 28rpx; line-height: 1.8; color: #333;">
+    <view style="display:flex; justify-content:space-between;">
+      <text style="color:#666;">原车辆：</text>
+      <text style="font-weight:bold;">{{contract.fields.carPlate}}</text>
+    </view>
+    <view style="display:flex; justify-content:space-between;">
+      <text style="color:#666;">新车辆：</text>
+      <text style="font-weight:bold; color: #1989fa;">{{selectedNewVehiclePlate}}</text>
+    </view>
+    <view style="margin-top:10rpx;">
+      <text style="color:#666;">换车原因：</text>
+      <view style="background:#f7f8fa; padding:10rpx 20rpx; border-radius:8rpx; margin-top:6rpx; color:#333;">{{swapReason}}</view>
+    </view>
+    
+    <view style="margin-top: 30rpx; padding-top:20rpx; border-top:1rpx dashed #eee; color:#f56c6c; font-size:24rpx; text-align:center;">
+      ⚠️ 确认后旧车将自动退租，新车自动起租
+    </view>
+  </view>
+</van-dialog>

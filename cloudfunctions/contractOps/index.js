@@ -375,6 +375,124 @@ exports.main = async (event, context) => {
         }
       }
 
+    if (action === 'swapVehicle') {
+        const { id, payload } = event; // id 是合同ID
+        if (!id || !payload) return { ok: false, error: 'missing-params' };
+  
+        const { newVehicleId, newVehicleData, reason } = payload;
+        
+        // 使用事务，确保新车绑定、旧车解绑、合同更新原子性完成
+        try {
+          const result = await db.runTransaction(async transaction => {
+            
+            // 1. 读取合同 (获取旧车信息)
+            const contractRes = await transaction.collection('contracts').doc(id).get();
+            if (!contractRes.data) throw 'contract-not-found';
+            const contract = contractRes.data;
+            
+            const oldPlate = contract.fields.carPlate;
+  
+            // 2. 查找旧车 (为了获取它的 _id)
+            // 注意：在事务中查询必须用 transaction.collection
+            const oldCarQuery = await transaction.collection('vehicles').where({
+              plate: oldPlate
+            }).get();
+  
+            // 3. 准备更新操作
+            if (oldCarQuery.data && oldCarQuery.data.length > 0) {
+              const oldCar = oldCarQuery.data[0]._id;
+
+              // 3.1 解绑旧车
+              await transaction.collection('vehicles').doc(oldCar).update({
+                data: {
+                  rentStatus: 'available',
+                  currentContractId: db.command.remove(),
+                  currentDriverName: db.command.remove(),
+                  currentDriverId: db.command.remove(),
+                  currentDriverPhone: db.command.remove()
+                }
+              });
+
+              // 3.2 写入旧车历史 (换车退租)
+              await transaction.collection('vehicle_history').add({
+                data: {
+                  vehicleId: oldCar._id,
+                  plate: oldCar.plate,
+                  eventType: '换车退租', // <--- 关键标记
+                  fromStatus: '已租',
+                  toStatus: '闲置',
+                  driverName: contract.fields.clientName,
+                  contractId: id,
+                  reason: reason,
+                  createdAt: db.serverDate()
+                }
+              });
+            }
+  
+            // 4.1 绑定新车
+            await transaction.collection('vehicles').doc(newVehicleId).update({
+              data: {
+                rentStatus: 'rented',
+                currentContractId: id,
+                currentDriverName: contract.fields.clientName,
+                currentDriverPhone: contract.fields.clientPhone,
+                // currentDriverId: contract.fields.clientId // 如果有的话
+              }
+            });
+
+            // 4.2 写入新车历史 (换车起租)
+            await transaction.collection('vehicle_history').add({
+                data: {
+                vehicleId: newVehicleId,
+                plate: newVehicleData.plate,
+                eventType: '换车起租', // <--- 关键标记
+                fromStatus: '闲置',
+                toStatus: '已租',
+                driverName: contract.fields.clientName,
+                contractId: id,
+                reason: reason,
+                createdAt: db.serverDate()
+                }
+            });
+  
+            // C. 更新合同 (替换车辆信息，并记录历史)
+            // 构造 swap log
+            const swapLog = {
+              date: new Date(),
+              reason: reason,
+              oldCar: {
+                plate: oldPlate,
+                model: contract.fields.carModel
+              },
+              newCar: {
+                plate: newVehicleData.plate,
+                model: newVehicleData.model
+              }
+            };
+  
+            await transaction.collection('contracts').doc(id).update({
+              data: {
+                'fields.carPlate': newVehicleData.plate,
+                'fields.carModel': newVehicleData.model,
+                'fields.carVin': newVehicleData.vin || '',
+                'fields.carColor': newVehicleData.color || '',
+                // 记录换车历史 (追加到数组)
+                swapHistory: db.command.push(swapLog),
+                updatedAt: db.serverDate()
+              }
+            });
+  
+            return { status: 'swapped' };
+          });
+  
+          return { ok: true, result };
+  
+        } catch (e) {
+          console.error('[swapVehicle] transaction error', e);
+          return { ok: false, error: e.message || 'swap-failed' };
+        }
+      }
+
     return { ok: false, error: 'unknown-action' };
   } catch (e) {
     console.error('[contractOps error]', e);

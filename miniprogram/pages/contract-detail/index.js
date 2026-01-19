@@ -26,6 +26,16 @@ Page({
     editRentFrequency: 'month',
     editRentDates: [],
     savingRent: false,
+    // --- 换车模块 ---
+    showSwapModal: false,
+    swapReason: '',
+    availableVehicles: [],
+    loadingVehicles: false,
+    selectedNewVehicleId: '',
+    swapping: false,
+    // 二次确认弹窗控制
+    showSwapConfirmDialog: false,
+    selectedNewVehiclePlate: '',
   },
 
   onLoad(options) {
@@ -284,6 +294,186 @@ Page({
       console.error(err);
       wx.showToast({ title: '保存失败', icon: 'none' });
       this.setData({ savingRent: false });
+    }
+  },
+
+  // 1. 打开弹窗
+  onOpenSwapModal() {
+    this.setData({ 
+      showSwapModal: true,
+      swapReason: '',
+      selectedNewVehicleId: '',
+      availableVehicles: [] // 先清空，防止显示旧数据
+    });
+    // 加载当前城市可用车辆
+    this.loadAvailableVehicles();
+  },
+
+  onCloseSwapModal() {
+    this.setData({ showSwapModal: false });
+  },
+
+  // 2. 加载可用车辆 (调用 vehicleOps)
+  async loadAvailableVehicles() {
+    const { contract } = this.data;
+    
+    // 获取城市代码。如果合同数据太旧没有 cityCode，尝试用 cityName 顶一下（视你的数据情况而定）
+    // 注意：vehicleOps 里的 listAvailable 强依赖 'cityCode' 字段
+    const cityCode = contract.cityCode || contract.cityName;
+
+    if (!cityCode) {
+        wx.showToast({ title: '合同缺少城市信息', icon: 'none' });
+        return;
+    }
+
+    this.setData({ loadingVehicles: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: {
+          action: 'listAvailable',
+          payload: { cityCode } // 重点：参数名必须是 cityCode
+        }
+      });
+
+      const result = res.result || {};
+      
+      // 检查业务层面的错误
+      if (!result.ok) {
+        throw new Error(result.error || '加载失败');
+      }
+
+      // 重点：vehicleOps 返回的是 list
+      const list = result.list || []; 
+
+      this.setData({ availableVehicles: list });
+
+    } catch (e) {
+      console.error('[contract-detail] loadAvailableVehicles error', e);
+      wx.showToast({ title: '加载车辆失败', icon: 'none' });
+    } finally {
+      this.setData({ loadingVehicles: false });
+    }
+  },
+
+  // 3. 输入原因
+  onInputSwapReason(e) {
+    this.setData({ swapReason: e.detail.value });
+  },
+
+  // 4. 选择新车
+  onSelectNewVehicle(e) {
+    this.setData({ selectedNewVehicleId: e.detail.value });
+  },
+
+  // 5. 提交换车
+  async onConfirmSwap() {
+    const { contract, swapReason, selectedNewVehicleId, availableVehicles } = this.data;
+    
+    if (!swapReason) return wx.showToast({ title: '请填写换车原因', icon: 'none' });
+    if (!selectedNewVehicleId) return wx.showToast({ title: '请选择新车', icon: 'none' });
+
+    // 找到新车的详情对象 (为了传给后端做冗余存储)
+    const newVehicleObj = availableVehicles.find(v => v._id === selectedNewVehicleId);
+    if (!newVehicleObj) return;
+
+    this.setData({ swapping: true });
+    wx.showLoading({ title: '正在处理...' });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps', // 所有的重逻辑都放在 contractOps
+        data: {
+          action: 'swapVehicle',
+          id: contract._id,
+          payload: {
+            newVehicleId: selectedNewVehicleId,
+            newVehicleData: newVehicleObj, // 把新车完整信息传过去，方便后端提取 plate/model 等
+            reason: swapReason
+          }
+        }
+      });
+
+      if (res.result.ok) {
+        wx.showToast({ title: '换车成功', icon: 'success' });
+        this.setData({ showSwapModal: false });
+        // 刷新页面数据
+        this.fetchDetail(contract._id); 
+      } else {
+        throw new Error(res.result.error || '失败');
+      }
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: '换车失败', icon: 'none' });
+    } finally {
+      this.setData({ swapping: false });
+      wx.hideLoading();
+    }
+  },
+
+  // ▼▼▼ 修改：点击“确认换车”按钮，先校验并弹出确认框 ▼▼▼
+  onPreConfirmSwap() {
+    const { swapReason, selectedNewVehicleId, availableVehicles } = this.data;
+    
+    if (!swapReason) return wx.showToast({ title: '请填写换车原因', icon: 'none' });
+    if (!selectedNewVehicleId) return wx.showToast({ title: '请选择新车', icon: 'none' });
+
+    // 找到新车对象，提取车牌号用于展示
+    const newVehicle = availableVehicles.find(v => v._id === selectedNewVehicleId);
+    if (!newVehicle) return;
+
+    this.setData({
+      selectedNewVehiclePlate: newVehicle.plate,
+      showSwapConfirmDialog: true
+    });
+  },
+
+  // 关闭确认框
+  onCloseSwapConfirmDialog() {
+    this.setData({ showSwapConfirmDialog: false });
+  },
+
+  // ▼▼▼ 重命名：真正的提交逻辑 (点击确认框的“确定”后触发) ▼▼▼
+  async onRealConfirmSwap() {
+    const { contract, swapReason, selectedNewVehicleId, availableVehicles } = this.data;
+    const newVehicleObj = availableVehicles.find(v => v._id === selectedNewVehicleId);
+
+    // 关闭确认弹窗
+    this.setData({ showSwapConfirmDialog: false });
+    
+    // 显示全局 Loading (因为此时弹窗已关)
+    wx.showLoading({ title: '正在处理...', mask: true });
+    this.setData({ swapping: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: {
+          action: 'swapVehicle',
+          id: contract._id,
+          payload: {
+            newVehicleId: selectedNewVehicleId,
+            newVehicleData: newVehicleObj,
+            reason: swapReason
+          }
+        }
+      });
+
+      if (res.result.ok) {
+        wx.showToast({ title: '换车成功', icon: 'success' });
+        // 成功后：关闭大弹窗，并刷新页面
+        this.setData({ showSwapModal: false });
+        this.fetchDetail(contract._id); 
+      } else {
+        throw new Error(res.result.error || '失败');
+      }
+    } catch (e) {
+      console.error(e);
+      wx.showToast({ title: '换车失败', icon: 'none' });
+    } finally {
+      this.setData({ swapping: false });
+      wx.hideLoading();
     }
   }
 });
