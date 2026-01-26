@@ -29,6 +29,14 @@ const INTERNAL_TOKEN = process.env.ECS_INTERNAL_TOKEN;
 // 现用 post，未使用官方格式，目前所有模块依赖此版本
 async function post(path, data) {
     const url = `${ECS_BASE}${path}`;
+    // [新增] 调试日志：拦截创建签署任务的请求，打印完整参数
+    // 判断路径里是否包含 'createTask'，这样只拦截签署相关的接口，避免日志爆炸
+    /*
+    if (path.includes('createTask')) {
+        console.log(`【调试-Fadada-Request】正在请求: ${path}`);
+        console.log('【调试-Fadada-Payload】完整参数如下:');
+        console.log(JSON.stringify(data, null, 2)); // 格式化打印 JSON
+    }  */
     try {
       const res = await axios.post(url, data, {
         headers: { 'x-internal-token': INTERNAL_TOKEN, 'content-type': 'application/json' },
@@ -38,6 +46,10 @@ async function post(path, data) {
     } catch (e) {
       if (e.response) {
         // 把平台返回体透出来，前端能看到 code/msg
+        /*
+        if (path.includes('createTask')) {
+            console.error('【调试-Fadada-Error】API报错详情:', JSON.stringify(e.response.data, null, 2));
+        }*/
         return { error: true, status: e.response.status, data: e.response.data };
       }
       throw e;

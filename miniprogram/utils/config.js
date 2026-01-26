@@ -24,6 +24,7 @@ export const CITY_CODE_MAP = {
     guangzhou: [
         { code: 'rent_std',  name: '纯租租赁' },
         { code: 'rent_zeroDown', name: '零押金租赁' },
+        { code: 'rent_rto', name: '以租代购' },
     ],
     foshan: [
         { code: 'rent_std',  name: '纯租租赁' },
@@ -34,6 +35,11 @@ export const CITY_CODE_MAP = {
     huizhou: [
         { code: 'rent_std',  name: '纯租租赁' },
         { code: 'rent_zeroDown', name: '零押金租赁'},
+        { code: 'rent_rto', name: '以租代购' },
+    ],
+
+    suzhou: [
+        { code: 'rent_std',  name: '纯租租赁' },
         { code: 'rent_rto', name: '以租代购' },
     ],
     default: [{ code: 'rent_std', name: '纯租租赁' }],
