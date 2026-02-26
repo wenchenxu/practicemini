@@ -91,11 +91,11 @@ function sanitizePathComponent(input) {
 
 function buildContractFolderPath(opts) {
   const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
-  const branchFolder = branchCode || 'default';
-  const typeFolder = contractType || 'default';
+  const companyCode = branchCode || 'default_company';
+  const typeFolder = contractType || 'default_type';
   const safeName = sanitizePathComponent(driverName);
   const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
-  return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
+  return `contracts/${cityCode}/${companyCode}/${typeFolder}/${folderName}`;
 }
 
 function numberToCN(n) {
@@ -265,7 +265,12 @@ exports.main = async (event, context) => {
     const { y: yyyy, m: mm, d: dd, ymd: dateStr } = nowInTZ(BIZ_TZ);
 
     // 序列号作用域：分公司优先，否则城市
-    const AA_BY_BRANCH = { gzh_a: 'GZ1', gzh_b: 'GZ2' };
+    const AA_BY_BRANCH = { 
+        gzh_a: 'GZ1', 
+        gzh_b: 'GZ2',
+        suz_a: 'SUZ1',
+        suz_b: 'SUZ2'
+    };
     const AA_DEFAULT_PER_CITY = {
       guangzhou: 'GZ',
       foshan: 'FS',

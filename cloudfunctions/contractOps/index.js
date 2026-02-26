@@ -18,11 +18,11 @@ function sanitizePathComponent(input) {
 
 function buildContractFolderPath(opts) {
   const { cityCode, branchCode, contractType, serialFormatted, driverName } = opts;
-  const branchFolder = branchCode || 'default';
-  const typeFolder = contractType || 'default';
+  const companyCode = branchCode || 'default_company';
+  const typeFolder = contractType || 'default_type';
   const safeName = sanitizePathComponent(driverName);
   const folderName = safeName ? `${serialFormatted}-${safeName}` : serialFormatted;
-  return `contracts/${cityCode}/${branchFolder}/${typeFolder}/${folderName}`;
+  return `contracts/${cityCode}/${companyCode}/${typeFolder}/${folderName}`;
 }
 
 function numberToCN(n) {

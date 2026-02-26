@@ -16,10 +16,18 @@ export const CITY_CODE_MAP = {
       { code: 'gzh_a', name: '广州兔斯夫' },
       { code: 'gzh_b', name: '广州益行' },
     ],
+    suzhou: [
+      { code: 'suz_a', name: '苏州兔斯夫' }, 
+      { code: 'suz_b', name: '苏州亿睿峰' },
+    ],
+    foshan: [
+      { code: 'fos_a', name: '佛山兔斯夫' }, 
+      { code: 'fos_b', name: '佛山老宾' },  
+    ],
     // 其他城市不配置 = 不显示分公司选择
   };
   
-  // 合同类型：广州两种，其它城市默认 rent_std
+  // 合同类型
   export const TYPE_OPTIONS_BY_CITY = {
     guangzhou: [
         { code: 'rent_std',  name: '纯租租赁' },
@@ -49,6 +57,10 @@ export const CITY_CODE_MAP = {
   export const AA_BY_BRANCH = {
     gzh_a: 'GZ1',
     gzh_b: 'GZ2',
+    suz_a: 'SUZ1', 
+    suz_b: 'SUZ2',
+    fos_a: 'FOS1', 
+    fos_b: 'FOS2',
   };
   export const AA_DEFAULT_PER_CITY = {
     guangzhou: 'GZ',
