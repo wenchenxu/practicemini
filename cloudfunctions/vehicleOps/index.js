@@ -591,7 +591,7 @@ async function getAllCitiesStats() {
 
 // --- 新增的辅助函数 ---
 async function listAvailable(payload) {
-    const { cityCode } = payload || {};
+    const { cityCode, branchCode } = payload || {};
     if (!cityCode) return { ok: false, error: 'missing-cityCode' };
   
     const _ = db.command; // 确保能使用指令
@@ -609,7 +609,12 @@ async function listAvailable(payload) {
         ])
       };
   
-      // 云函数端 limit 最大支持 1000，解决了小程序端 20 条的限制
+      // 2. 核心修改：如果前端传了分公司代码，就加入过滤条件
+      if (branchCode) {
+        where.branchCode = branchCode;
+      }
+
+      // 云函数端 limit 最大支持 1000，解决小程序端 20 条限制
       const res = await db.collection('vehicles')
         .where(where)
         .orderBy('plate', 'asc')

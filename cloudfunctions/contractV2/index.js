@@ -269,7 +269,9 @@ exports.main = async (event, context) => {
         gzh_a: 'GZ1', 
         gzh_b: 'GZ2',
         suz_a: 'SUZ1',
-        suz_b: 'SUZ2'
+        suz_b: 'SUZ2',
+        fos_a: 'FOS1',
+        fos_b: 'FOS2'
     };
     const AA_DEFAULT_PER_CITY = {
       guangzhou: 'GZ',

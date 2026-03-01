@@ -152,7 +152,7 @@ Page({
       const city = decodeURIComponent(options.city || '');
 
       this.setData({ id, mode, cityCode, city, visibleFields: this.data.visibleFields || [] });
-      this.loadAvailableVehicles(cityCode);
+      // this.loadAvailableVehicles(cityCode);
       wx.setNavigationBarTitle({
         title: `${city} - ${mode === 'create' ? '新增' : (mode === 'view' ? '查看' : '编辑')}`
       });
@@ -175,6 +175,11 @@ Page({
         branchOptions, showBranchPicker, branchIndex, selectedBranchCode, selectedBranchName,
         typeOptions, showTypePicker, typeIndex, selectedTypeCode, selectedTypeName,
       });
+
+      // 调用拉取车辆，把初始化计算好的 selectedBranchCode 传进去
+      if (mode === 'create') {
+        this.loadAvailableVehicles(cityCode, selectedBranchCode);
+      }
 
       // 6) 根据模式处理
       if ((mode === 'edit' || mode === 'view') && id) {
@@ -287,7 +292,17 @@ Page({
         branchIndex: idx,
         selectedBranchCode: opt.code,
         selectedBranchName: opt.name,
+
+        // 新增：切换分公司时，清空已经选中的车辆，防止数据错乱
+        'form.carPlate': '',
+        'form.carModel': '',
+        'form.carColor': '',
+        'form.carVin': '',
+        vehiclePickerIndex: -1
     });
+
+    // 新增：重新根据新的分公司拉取可用车辆
+    this.loadAvailableVehicles(this.data.cityCode, opt.code);
   },
 
   // 合同类型选择
@@ -637,10 +652,10 @@ Page({
   },
 
   // new version, loads more than 20 vehicles in dropdown
-  async loadAvailableVehicles(cityCode) {
+  async loadAvailableVehicles(cityCode, branchCode = '') {
     if (!cityCode) return;
   
-    // ▼▼▼ 修改：不再直接查库，改为调用云函数 ▼▼▼
+    // 修改：不再直接查库，改为调用云函数
     wx.showLoading({ title: '加载车辆...', mask: true });
     
     try {
@@ -648,7 +663,10 @@ Page({
         name: 'vehicleOps',
         data: {
           action: 'listAvailable',
-          payload: { cityCode }
+          payload: { 
+            cityCode,
+            branchCode //把 branchCode 传给后端
+          }
         }
       });
 

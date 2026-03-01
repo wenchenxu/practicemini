@@ -333,7 +333,10 @@ Page({
         name: 'vehicleOps',
         data: {
           action: 'listAvailable',
-          payload: { cityCode } // 重点：参数名必须是 cityCode
+          payload: { 
+            cityCode: contract.cityCode,
+            branchCode: contract.branchCode
+          } // 重点：参数名必须是 cityCode
         }
       });
 
