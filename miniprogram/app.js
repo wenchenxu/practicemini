@@ -23,21 +23,21 @@ App({
         // 'release': 正式版
 
         // 策略：正式版和体验版连 Prod，开发版连 Dev
-        /*
+        
         if (envVersion === 'release' || envVersion === 'trial') {
             envId = ENV_PROD;
             this.globalData.isProd = true;
         } else {
             envId = ENV_DEV;
             this.globalData.isProd = false;
-        }*/
+        }
 
         // 警告：直连生产服务器，操作需谨慎！！
-        
+        /*
         envId = ENV_PROD; 
         this.globalData.isProd = true;
         console.warn('🚨🚨🚨 当前已强制连接到【生产环境 Prod】，请小心操作！ 🚨🚨🚨'); 
-
+        */
         console.log(`[onLaunch] Current envVersion: ${envVersion}, using env: ${envId}`);
         
         } catch (e) {
