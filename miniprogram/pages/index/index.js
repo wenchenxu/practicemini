@@ -1,8 +1,14 @@
+// pages/index/index.js
 import { CITY_CODE_MAP } from '../../utils/cities';
+import { BRANCH_OPTIONS_BY_CITY } from '../../utils/config';
 const { ensureAccess } = require('../../utils/guard');
 
 Page({
-  data: {isAdmin: false},
+  data: {
+    isAdmin: false,
+    branchCode: '',
+    branchName: ''
+  },
 
   onShow() {
     const app = getApp();
@@ -22,9 +28,20 @@ Page({
   goCity(e) {
     const code = e.currentTarget.dataset.code; // 如 "guangzhou"
     const name = CITY_CODE_MAP[code];
-    wx.navigateTo({
-      url: `/pages/city/index?cityCode=${encodeURIComponent(code)}&city=${encodeURIComponent(name)}`
-    });
+
+    // 新增：检查该城市是否有分公司配置
+    const branches = BRANCH_OPTIONS_BY_CITY[code];
+    if (branches && branches.length > 0) {
+      // 有分公司-> 跳转到分公司选择页
+      wx.navigateTo({
+        url: `/pages/branch-select/index?cityCode=${encodeURIComponent(code)}&city=${encodeURIComponent(name)}`
+      });
+    } else {
+      // 无分公司-> 直接进入原本的城市门店页
+      wx.navigateTo({
+        url: `/pages/city/index?cityCode=${encodeURIComponent(code)}&city=${encodeURIComponent(name)}`
+      });
+    }
   },
 
   // 新增：跳转到法大大测试页

@@ -1,13 +1,20 @@
+/* pages/branch-select/index.wxss */
 /* 页面占满 & 居中 */
 page { height: 100%; }
 .container {
-  min-height: 100vh;  /* 让容器占满屏幕高度 */
+  min-height: 100vh;  
   padding: 32rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }
-.city-title { font-size: 40rpx; font-weight: 700; text-align: center; margin-top: 300rpx; }
+
+.city-title { 
+  font-size: 40rpx; 
+  font-weight: 700; 
+  text-align: center; 
+  margin-top: 300rpx;
+}
 
 .center-box {
   flex: 1;
@@ -18,5 +25,8 @@ page { height: 100%; }
   align-items: center;       /* 水平居中 */
 }
 
-.primary { width: 70%; }
-.ghost { width: 70%; border: 2px solid #ddd; }
+.ghost { 
+  width: 70%; 
+  border: 2px solid #ddd; 
+  background-color: transparent;
+}

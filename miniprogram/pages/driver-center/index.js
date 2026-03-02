@@ -15,7 +15,11 @@ Page({
   onLoad(options) {
     const cityCode = decodeURIComponent(options.cityCode || '');
     const cityName = decodeURIComponent(options.cityName || '');
-    this.setData({ cityCode, cityName });
+    const branchCode = options.branchCode || '';
+    const branchName = decodeURIComponent(options.branchName || '');
+    this.setData({ cityCode, cityName, branchCode, branchName });
+    const displayTitle = branchName ? branchName : cityName;
+    wx.setNavigationBarTitle({ title: `${displayTitle} - 司机列表` });
 
     if (!cityCode) {
       this.setData({ error: '缺少城市参数 cityCode' });
@@ -26,13 +30,18 @@ Page({
   },
 
   async fetchDrivers() {
-    const { cityCode } = this.data;
+    const { cityCode, branchCode } = this.data;
     this.setData({ loading: true, error: '', drivers: [] });
 
     try {
+      let whereCond = { cityCode };
+      if (branchCode) {
+        whereCond.branchCode = branchCode;
+      }
+
       // 最简单版：一次性拉一页所有司机（数量不大问题不大）
       const res = await COL_DRIVERS
-        .where({ cityCode })  // 如果你 drivers 没存 cityCode，可以先只查询全部，再自己过滤
+        .where(whereCond)  // 如果你 drivers 没存 cityCode，可以先只查询全部，再自己过滤
         .orderBy('name', 'asc')  // 没有 name 字段的话可改成 createdAt
         .get();
 

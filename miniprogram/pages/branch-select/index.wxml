@@ -1,0 +1,11 @@
+<!--pages/branch-select/index.wxml-->
+<view class="container">
+  <view class="city-title">{{cityName}} - 选择分公司</view>
+  <view class="center-box">
+    <block wx:for="{{branches}}" wx:key="code">
+      <button class="ghost" bindtap="onSelectBranch" data-code="{{item.code}}" data-name="{{item.name}}">
+        {{item.name}}
+      </button>
+    </block>
+  </view>
+</view>
