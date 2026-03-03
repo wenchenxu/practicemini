@@ -55,4 +55,16 @@
     </button>
   </view>
 
+  <view class="card">
+    <view class="title">城市转分公司数据迁移</view>
+    <view class="desc">
+      由于苏州和佛山从独立城市升级为多基地分公司，这会将旧数据强制归属到默认的初始分公司以防丢失展示:
+      <view>• 苏州记录 -> [suz_a]</view>
+      <view>• 佛山记录 -> [fos_b]</view>
+    </view>
+    <button type="primary" bindtap="onMigrateBranches" loading="{{loading}}">
+      执行迁移找回历史数据
+    </button>
+  </view>
+
   </view>

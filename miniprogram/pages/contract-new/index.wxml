@@ -11,16 +11,6 @@
 <view class="container">
   <view class="section-card" wx:if="{{mode==='create'}}">
     <view class="card-title">合同基础配置</view>
-    
-    <view wx:if="{{showBranchPicker}}" class="row-picker">
-      <view class="row-label"><text class="req">*</text>分公司</view>
-      <picker mode="selector" range="{{branchOptions}}" range-key="name" value="{{branchIndex}}" bindchange="onPickBranch" class="picker-flex">
-        <view class="picker-text {{branchIndex>=0?'':'placeholder'}}">
-          {{ branchIndex>=0 ? branchOptions[branchIndex].name : '请选择分公司' }}
-        </view>
-      </picker>
-      <view class="row-arrow">›</view>
-    </view>
 
     <view wx:if="{{showTypePicker}}" class="row-picker">
       <view class="row-label"><text class="req">*</text>合同类型</view>

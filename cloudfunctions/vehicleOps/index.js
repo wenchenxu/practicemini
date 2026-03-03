@@ -38,8 +38,10 @@ exports.main = async (event, context) => {
         return await getDashboardStats(payload);
       case 'getAllCitiesStats':
         return await getAllCitiesStats();
-      case 'listAvailable': 
+      case 'listAvailable':
         return await listAvailable(payload);
+      case 'migrateBranches':
+        return await migrateBranches();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -104,14 +106,14 @@ async function updateStatus(payload) {
   } else if (newStatus === 'maintenance') {
     // 切维修状态：判断是开始还是结束
     if (oldMaintenanceStatus === 'in_maintenance') {
-        // 原来在维修 -> 现在结束维修
-        newMaintenanceStatus = 'none';
-        eventType = 'maintenance_end';
-      } else {
-        // 原来正常 -> 现在开始维修
-        newMaintenanceStatus = 'in_maintenance';
-        eventType = 'maintenance_start';
-      }
+      // 原来在维修 -> 现在结束维修
+      newMaintenanceStatus = 'none';
+      eventType = 'maintenance_end';
+    } else {
+      // 原来正常 -> 现在开始维修
+      newMaintenanceStatus = 'in_maintenance';
+      eventType = 'maintenance_start';
+    }
   }
 
   // 3) 更新车辆，只写 rentStatus / maintenanceStatus（不再写 status 字段）
@@ -591,39 +593,74 @@ async function getAllCitiesStats() {
 
 // --- 新增的辅助函数 ---
 async function listAvailable(payload) {
-    const { cityCode, branchCode } = payload || {};
-    if (!cityCode) return { ok: false, error: 'missing-cityCode' };
-  
-    const _ = db.command; // 确保能使用指令
-  
-    try {
-      const where = {
-        cityCode,
-        rentStatus: 'available',
-        // 排除维修状态 (兼容 none, 空字符串, null, 或字段不存在)
-        maintenanceStatus: _.or([
-          _.eq('none'),
-          _.eq(''),
-          _.eq(null),
-          _.exists(false)
-        ])
-      };
-  
-      // 2. 核心修改：如果前端传了分公司代码，就加入过滤条件
-      if (branchCode) {
-        where.branchCode = branchCode;
-      }
+  const { cityCode, branchCode } = payload || {};
+  if (!cityCode) return { ok: false, error: 'missing-cityCode' };
 
-      // 云函数端 limit 最大支持 1000，解决小程序端 20 条限制
-      const res = await db.collection('vehicles')
-        .where(where)
-        .orderBy('plate', 'asc')
-        .limit(1000)
-        .get();
-  
-      return { ok: true, list: res.data };
-    } catch (e) {
-      console.error('[vehicleOps] listAvailable error', e);
-      return { ok: false, error: e.message };
+  const _ = db.command; // 确保能使用指令
+
+  try {
+    const where = {
+      cityCode,
+      rentStatus: 'available',
+      // 排除维修状态 (兼容 none, 空字符串, null, 或字段不存在)
+      maintenanceStatus: _.or([
+        _.eq('none'),
+        _.eq(''),
+        _.eq(null),
+        _.exists(false)
+      ])
+    };
+
+    // 2. 核心修改：如果前端传了分公司代码，就加入过滤条件
+    if (branchCode) {
+      where.branchCode = branchCode;
     }
+
+    // 云函数端 limit 最大支持 1000，解决小程序端 20 条限制
+    const res = await db.collection('vehicles')
+      .where(where)
+      .orderBy('plate', 'asc')
+      .limit(1000)
+      .get();
+
+    return { ok: true, list: res.data };
+  } catch (e) {
+    console.error('[vehicleOps] listAvailable error', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+async function migrateBranches() {
+  const collections = ['vehicles', 'drivers', 'contracts'];
+  const db = cloud.database();
+  const _ = db.command;
+
+  const updates = [
+    { cityCode: 'suzhou', branchCode: 'suz_a', branchName: '苏州兔斯夫' },
+    { cityCode: 'foshan', branchCode: 'fos_b', branchName: '佛山老宾' }
+  ];
+
+  let summary = {};
+
+  try {
+    for (const target of updates) {
+      for (const colName of collections) {
+        const res = await db.collection(colName).where({
+          cityCode: target.cityCode,
+          branchCode: _.or([_.eq(null), _.exists(false), _.eq('')])
+        }).update({
+          data: {
+            branchCode: target.branchCode,
+            branchName: target.branchName,
+            updatedAt: db.serverDate()
+          }
+        });
+        summary[`${colName}_${target.cityCode}`] = res.stats.updated;
+      }
+    }
+    return { ok: true, summary };
+  } catch (err) {
+    console.error('[migrateBranches] error', err);
+    return { ok: false, error: err.message };
+  }
 }

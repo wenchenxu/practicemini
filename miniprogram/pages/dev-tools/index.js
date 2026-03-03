@@ -11,7 +11,7 @@ Page({
 
   onLoad() {
     // 只有管理员能进，虽然 guard 已经在 index 入口做了，这里双重保险
-    ensureAdmin(); 
+    ensureAdmin();
   },
 
   async onDeduplicateVehicles() {
@@ -23,7 +23,7 @@ Page({
       confirmColor: '#d93025',
       success: async (res) => {
         if (!res.confirm) return;
-        
+
         that.setData({ loading: true });
         wx.showLoading({ title: '处理中...', mask: true });
 
@@ -62,7 +62,7 @@ Page({
       content: '将把所有 "yyyy-mm-dd" 格式的字符串转换为日期对象。',
       success: async (res) => {
         if (!res.confirm) return;
-        
+
         that.setData({ loading: true });
         wx.showLoading({ title: '修复中...', mask: true });
 
@@ -111,11 +111,11 @@ Page({
     const { delCity, delConfirm } = this.data;
     // 规则：口令必须是 "confirmDelete" + 首字母大写的城市名 (或者直接全拼接，看你喜好)
     // 这里为了简单且符合你要求：直接比对 'confirmDelete' + delCity (忽略大小写可能更方便，或者严格匹配)
-    
+
     // 让我们做严格匹配： confirmDelete + delCity (例如 suzhou -> confirmDeleteSuzhou)
     // 首字母大写处理
     const expected = 'confirmDelete' + delCity.charAt(0).toUpperCase() + delCity.slice(1);
-    
+
     // 或者如果你想简单点，直接全小写匹配也可以，这里按你描述的 CamelCase 来
     this.setData({
       canDelete: delCity && delConfirm === expected
@@ -135,11 +135,11 @@ Page({
         if (!res.confirm) return;
 
         that.setData({ loading: true });
-        
+
         try {
           const { result } = await wx.cloud.callFunction({
             name: 'vehicleOps',
-            data: { 
+            data: {
               action: 'deleteByCity',
               payload: { cityCode: delCity }
             }
@@ -171,7 +171,7 @@ Page({
 
   async onImportCsvUpsert() {
     const that = this;
-    
+
     // 1. 选择文件
     wx.chooseMessageFile({
       count: 1,
@@ -179,7 +179,7 @@ Page({
       extension: ['csv'],
       success: async (chooseRes) => {
         const filePath = chooseRes.tempFiles[0].path;
-        
+
         that.setData({ loading: true });
         wx.showLoading({ title: '上传中...' });
 
@@ -190,15 +190,15 @@ Page({
             cloudPath,
             filePath,
           });
-          
+
           const fileID = uploadRes.fileID;
-          
+
           wx.showLoading({ title: '正在处理数据...' });
 
           // 3. 调用云函数处理
           const { result } = await wx.cloud.callFunction({
             name: 'vehicleOps',
-            data: { 
+            data: {
               action: 'importCsv',
               payload: { fileID }
             }
@@ -222,6 +222,46 @@ Page({
           that.setData({ loading: false });
           wx.hideLoading();
           wx.showToast({ title: '异常', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  async onMigrateBranches() {
+    const that = this;
+    wx.showModal({
+      title: '迁移确认',
+      content: '确定要将现有的苏州记录分配给 "苏州兔斯夫(suz_a)"，将佛山记录分配给 "佛山老宾(fos_b)" 吗？',
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        that.setData({ loading: true });
+        wx.showLoading({ title: '迁移中...', mask: true });
+
+        try {
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: { action: 'migrateBranches' }
+          });
+
+          wx.hideLoading();
+          that.setData({ loading: false });
+
+          if (result && result.ok) {
+            const summaryStr = JSON.stringify(result.summary, null, 2);
+            wx.showModal({
+              title: '迁移完成',
+              content: `成功更新数据：\n${summaryStr}`,
+              showCancel: false
+            });
+          } else {
+            wx.showModal({ title: '操作失败', content: result?.error || '未知错误', showCancel: false });
+          }
+        } catch (e) {
+          console.error(e);
+          wx.hideLoading();
+          that.setData({ loading: false });
+          wx.showToast({ title: '调用异常', icon: 'none' });
         }
       }
     });

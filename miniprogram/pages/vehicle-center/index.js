@@ -123,11 +123,11 @@ Page({
     }
     const now = new Date();
     const warningDate = new Date();
-    warningDate.setDate(now.getDate() + 60); // 60天内预警
+    warningDate.setDate(now.getDate() + 30); // 30天内预警
 
     // 有效日期判定：大于 2000年
     const validDate = _.gt(new Date('2000-01-01'));
-    // 预警判定：<= 60天
+    // 预警判定：<= 30天
     const isUrgent = _.lte(warningDate);
 
     // 构造条件：(有效 且 急需)
@@ -219,10 +219,10 @@ Page({
     let orderByField = 'createdAt';
     let orderByType = 'desc';
 
-    // 预警日期计算 (60天)
+    // 预警日期计算 (30天)
     const now = new Date();
     const warningDate = new Date();
-    warningDate.setDate(now.getDate() + 60);
+    warningDate.setDate(now.getDate() + 30);
     const validDate = _.gt(new Date('2000-01-01'));
     const isUrgent = _.lte(warningDate);
     const warnCond = _.and([validDate, isUrgent]);
@@ -323,7 +323,7 @@ Page({
 
       const getExpiryInfo = (days, label) => {
         if (days === 9999) return null;
-        if (days > 60) return null; // > 60天隐藏
+        if (days > 30) return null; // > 30天隐藏
         if (days < 0) return { text: `${label}逾期${Math.abs(days)}天`, type: 'expired' };
         if (days === 0) return { text: `${label}今天到期`, type: 'warning' };
         return { text: `${label}：${days}天`, type: 'warning' };
