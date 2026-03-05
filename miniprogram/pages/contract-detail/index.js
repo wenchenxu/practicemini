@@ -6,7 +6,7 @@ Page({
     contract: null,
     giftDays: '', // 默认为空字符串，方便显示 placeholder
     giftDaysNotes: '',
-    contractRealEndDate: '', 
+    contractRealEndDate: '',
     saving: false,
     // 编辑弹窗用的临时数据
     showEditModal: false,
@@ -61,19 +61,19 @@ Page({
       // 新增：计算默认支付日期
       // 1. 尝试获取已保存的设置
       let savedDates = displayData.rentPayDates;
-      
+
       // 2. 如果没保存过，则取合同上的“每月支付日”作为默认值
       if (!savedDates || savedDates.length === 0) {
-          const defaultDay = Number(displayData.rentPaybyDayInMonth);
-          // 只有当它是有效数字 (1-31) 时才使用
-          if (defaultDay && !isNaN(defaultDay)) {
-              savedDates = [defaultDay];
-          } else {
-              savedDates = [];
-          }
+        const defaultDay = Number(displayData.rentPaybyDayInMonth);
+        // 只有当它是有效数字 (1-31) 时才使用
+        if (defaultDay && !isNaN(defaultDay)) {
+          savedDates = [defaultDay];
+        } else {
+          savedDates = [];
+        }
       }
 
-      this.setData({ 
+      this.setData({
         contract: displayData,
         giftDays: displayData.giftDays || '',
         giftDaysNotes: displayData.giftDaysNotes || '',
@@ -105,17 +105,49 @@ Page({
 
     const date = new Date(baseDateStr);
     date.setDate(date.getDate() + days);
-    
+
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   },
 
+  // 📋 复制司机信息到剪贴板
+  onCopyInfo() {
+    const { contract } = this.data;
+    if (!contract || !contract.fields) return;
+
+    const f = contract.fields;
+
+    // 1. 拼接文本 (注意 \n 是换行符)
+    const textToCopy =
+      `司机信息登记表
+        姓名：${f.clientName || ''}
+        电话：${f.clientPhone || ''}
+        身份证号：${f.clientId || ''}
+        身份证地址：${f.clientAddress || ''}
+        车辆型号：${f.carModel || ''}
+        车牌号码：${f.carPlate || ''}
+
+        租金：${f.rentMonthly || 0}元
+        押金：${f.deposit || 0}元`;
+
+    // 2. 调用剪贴板
+    wx.setClipboardData({
+      data: textToCopy,
+      success: () => {
+        wx.showToast({
+          title: '合同信息已复制！',
+          icon: 'success'
+        });
+      }
+    });
+  },
+
   // 1. 点击“编辑”按钮
   onOpenEdit() {
     const { giftDays, giftDaysNotes, contract, contractRealEndDate } = this.data;
-    
+
     // 将当前展示的值，复制给编辑用的临时变量
     this.setData({
       showEditModal: true,
@@ -135,11 +167,11 @@ Page({
   onEditDaysInput(e) {
     const val = e.detail.value;
     const baseDate = this.data.contract.contractValidPeriodEnd;
-    
+
     // 实时计算新的结束日期
     const newDate = this._calcDate(val, baseDate);
 
-    this.setData({ 
+    this.setData({
       editGiftDays: val,
       editRealEndDate: newDate
     });
@@ -154,11 +186,11 @@ Page({
   async onConfirmEdit(e) {
     // 这里的 e.detail.dialog 是 Vant Dialog 实例，用于控制 loading
     // const { dialog } = e.detail; 
-    
+
     const { contract, editGiftDays, editGiftNotes, editRealEndDate } = this.data;
     if (!contract || !contract._id) {
-        this.setData({ showEditModal: false });
-        return;
+      this.setData({ showEditModal: false });
+      return;
     }
 
     // 开启按钮 loading
@@ -182,7 +214,7 @@ Page({
 
       if (res.result && res.result.ok) {
         wx.showToast({ title: '保存成功', icon: 'success' });
-        
+
         // 保存成功后，把“编辑值”同步给“展示值”
         this.setData({
           giftDays: editGiftDays,
@@ -221,11 +253,11 @@ Page({
   onChangeFrequency(e) {
     const type = e.currentTarget.dataset.type;
     if (type === this.data.editRentFrequency) return;
-    
+
     // 切换时清空已选日期，避免逻辑混乱
     this.setData({
       editRentFrequency: type,
-      editRentDates: [] 
+      editRentDates: []
     });
   },
 
@@ -233,7 +265,7 @@ Page({
   onToggleMonthDate(e) {
     const day = e.currentTarget.dataset.day; // 数字 1-28
     let dates = this.data.editRentDates || [];
-    
+
     if (dates.includes(day)) {
       // 如果已存在，则移除
       dates = dates.filter(d => d !== day);
@@ -241,10 +273,10 @@ Page({
       // 如果不存在，则添加
       dates.push(day);
     }
-    
+
     // 排序一下，好看
     dates.sort((a, b) => a - b);
-    
+
     this.setData({ editRentDates: dates });
   },
 
@@ -257,11 +289,11 @@ Page({
   // 5. 保存租金设置
   async onConfirmRentEdit() {
     const { contract, editRentFrequency, editRentDates } = this.data;
-    
+
     // 简单的校验
     if (editRentFrequency !== 'day' && (!editRentDates || editRentDates.length === 0)) {
-       wx.showToast({ title: '请至少选择一个日期', icon: 'none' });
-       return;
+      wx.showToast({ title: '请至少选择一个日期', icon: 'none' });
+      return;
     }
 
     this.setData({ savingRent: true });
@@ -299,7 +331,7 @@ Page({
 
   // 1. 打开弹窗
   onOpenSwapModal() {
-    this.setData({ 
+    this.setData({
       showSwapModal: true,
       swapReason: '',
       selectedNewVehicleId: '',
@@ -316,14 +348,14 @@ Page({
   // 2. 加载可用车辆 (调用 vehicleOps)
   async loadAvailableVehicles() {
     const { contract } = this.data;
-    
+
     // 获取城市代码。如果合同数据太旧没有 cityCode，尝试用 cityName 顶一下（视你的数据情况而定）
     // 注意：vehicleOps 里的 listAvailable 强依赖 'cityCode' 字段
     const cityCode = contract.cityCode || contract.cityName;
 
     if (!cityCode) {
-        wx.showToast({ title: '合同缺少城市信息', icon: 'none' });
-        return;
+      wx.showToast({ title: '合同缺少城市信息', icon: 'none' });
+      return;
     }
 
     this.setData({ loadingVehicles: true });
@@ -333,7 +365,7 @@ Page({
         name: 'vehicleOps',
         data: {
           action: 'listAvailable',
-          payload: { 
+          payload: {
             cityCode: contract.cityCode,
             branchCode: contract.branchCode
           } // 重点：参数名必须是 cityCode
@@ -341,14 +373,14 @@ Page({
       });
 
       const result = res.result || {};
-      
+
       // 检查业务层面的错误
       if (!result.ok) {
         throw new Error(result.error || '加载失败');
       }
 
       // 重点：vehicleOps 返回的是 list
-      const list = result.list || []; 
+      const list = result.list || [];
 
       this.setData({ availableVehicles: list });
 
@@ -373,7 +405,7 @@ Page({
   // 5. 提交换车
   async onConfirmSwap() {
     const { contract, swapReason, selectedNewVehicleId, availableVehicles } = this.data;
-    
+
     if (!swapReason) return wx.showToast({ title: '请填写换车原因', icon: 'none' });
     if (!selectedNewVehicleId) return wx.showToast({ title: '请选择新车', icon: 'none' });
 
@@ -402,7 +434,7 @@ Page({
         wx.showToast({ title: '换车成功', icon: 'success' });
         this.setData({ showSwapModal: false });
         // 刷新页面数据
-        this.fetchDetail(contract._id); 
+        this.fetchDetail(contract._id);
       } else {
         throw new Error(res.result.error || '失败');
       }
@@ -418,7 +450,7 @@ Page({
   // ▼▼▼ 修改：点击“确认换车”按钮，先校验并弹出确认框 ▼▼▼
   onPreConfirmSwap() {
     const { swapReason, selectedNewVehicleId, availableVehicles } = this.data;
-    
+
     if (!swapReason) return wx.showToast({ title: '请填写换车原因', icon: 'none' });
     if (!selectedNewVehicleId) return wx.showToast({ title: '请选择新车', icon: 'none' });
 
@@ -444,7 +476,7 @@ Page({
 
     // 关闭确认弹窗
     this.setData({ showSwapConfirmDialog: false });
-    
+
     // 显示全局 Loading (因为此时弹窗已关)
     wx.showLoading({ title: '正在处理...', mask: true });
     this.setData({ swapping: true });
@@ -467,7 +499,7 @@ Page({
         wx.showToast({ title: '换车成功', icon: 'success' });
         // 成功后：关闭大弹窗，并刷新页面
         this.setData({ showSwapModal: false });
-        this.fetchDetail(contract._id); 
+        this.fetchDetail(contract._id);
       } else {
         throw new Error(res.result.error || '失败');
       }

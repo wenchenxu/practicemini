@@ -6,6 +6,45 @@
     <button wx:if="{{searchKeyword}}" class="search-clear" size="mini" bindtap="onSearchClear">清除</button>
   </view>
 
+  <!-- Overview Widget Copied From Kanban -->
+  <view class="card-box overview-card">
+    <view class="overview-content">
+      <view class="chart-area">
+        <van-circle
+          value="{{ counts.utilizationRate }}" 
+          color="{{ counts.utilizationRate > 80 ? '#07c160' : '#1989fa' }}"
+          layer-color="#ebedf0"
+          size="80" 
+          stroke-width="6"
+        >
+          <view class="circle-text">
+            <view class="rate-num">{{ counts.utilization }}<text class="unit">%</text></view>
+            <view class="rate-label">出租率</view>
+          </view>
+        </van-circle>
+      </view>
+
+      <view class="grid-area">
+        <view class="stat-item">
+            <view class="stat-val">{{ counts.all }}</view>
+            <view class="stat-key">总车辆</view>
+        </view>
+        <view class="stat-item">
+            <view class="stat-val text-green">{{ counts.rented }}</view>
+            <view class="stat-key">在租</view>
+        </view>
+        <view class="stat-item">
+            <view class="stat-val text-blue">{{ counts.available }}</view>
+            <view class="stat-key">闲置</view>
+        </view>
+        <view class="stat-item">
+            <view class="stat-val text-orange">{{ counts.maintenance }}</view>
+            <view class="stat-key">维修</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="filter-bar">
     <view class="filter-pill {{statusFilter==='all' ? 'active' : ''}}" data-status="all" bindtap="onStatusFilterTap">
       <view>全部</view>

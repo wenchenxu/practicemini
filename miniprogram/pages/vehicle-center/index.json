@@ -1,5 +1,7 @@
 {
     "navigationBarTitleText": "车辆中心",
-    "usingComponents": {},
+    "usingComponents": {
+        "van-circle": "@vant/weapp/circle/index"
+    },
     "enablePullDownRefresh": true
 }

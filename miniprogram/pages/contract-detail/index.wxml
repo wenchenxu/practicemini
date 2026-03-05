@@ -7,9 +7,19 @@
 </wxs>
 <wxs src="../../utils/fmt.wxs" module="fmt" />
 <view class="container">
-  <view class="header-section">
-    <view class="title">合同详情</view>
-    <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
+  <view class="header-section" style="display: flex; justify-content: space-between; align-items: flex-start;">
+    <view>
+      <view class="title">合同详情</view>
+      <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
+    </view>
+    <van-button 
+      wx:if="{{contract}}"
+      size="small" 
+      icon="notes-o"
+      type="primary" 
+      plain 
+      bind:click="onCopyInfo"
+    >复制信息</van-button>
   </view>
 
   <block wx:if="{{contract}}">

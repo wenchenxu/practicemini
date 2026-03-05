@@ -45,12 +45,14 @@
     <view 
       class="card-box overview-card clickable" 
       wx:for="{{list}}" 
-      wx:key="cityCode"
+      wx:key="displayName"
       bindtap="toCityDetail"
-      data-code="{{item.cityCode}}"
+      data-citycode="{{item.cityCode}}"
+      data-branchcode="{{item.branchCode}}"
+      data-name="{{item.displayName}}"
     >
       <view class="card-header">
-        <view class="city-name">{{item.cityName}}</view>
+        <view class="city-name">{{item.displayName}}</view>
         <van-icon name="arrow" color="#969799" />
       </view>
 

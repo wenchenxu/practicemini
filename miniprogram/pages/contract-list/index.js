@@ -1036,38 +1036,6 @@ Page({
     }
   },
 
-  // 📋 复制司机信息到剪贴板
-  onCopyInfo(e) {
-    const { item } = e.currentTarget.dataset;
-    if (!item || !item.fields) return;
-
-    const f = item.fields;
-
-    // 1. 拼接文本 (注意 \n 是换行符)
-    const textToCopy =
-      `司机信息登记表
-        姓名：${f.clientName || ''}
-        电话：${f.clientPhone || ''}
-        身份证号：${f.clientId || ''}
-        身份证地址：${f.clientAddress || ''}
-        车辆型号：${f.carModel || ''}
-        车牌号码：${f.carPlate || ''}
-
-        租金：${f.rentMonthly || 0}元
-        押金：${f.deposit || 0}元`;
-
-    // 2. 调用剪贴板
-    wx.setClipboardData({
-      data: textToCopy,
-      success: () => {
-        wx.showToast({
-          title: '合同信息已复制！',
-          icon: 'success'
-        });
-      }
-    });
-  },
-
   viewOne(e) {
     const id = e.currentTarget.dataset.id;
     const { city } = this.data;

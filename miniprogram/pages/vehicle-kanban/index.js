@@ -1,16 +1,7 @@
+import { CITY_CODE_MAP, BRANCH_OPTIONS_BY_CITY } from '../../utils/config';
+
 Page({
     data: {
-        // 定义城市映射 (你可以从全局配置 config.js 引入)
-        cityMap: {
-            'guangzhou': '广州',
-            'foshan': '佛山',
-            'huizhou': '惠州',
-            'jiaxing': '嘉兴',
-            'shaoxing': '绍兴',
-            'nantong': '南通',
-            'changzhou': '常州',
-            'suzhou': '苏州'
-        },
         list: [],
 
         grand: {
@@ -42,23 +33,56 @@ Page({
             });
 
             if (res.result.ok) {
-                // 将云端数据与本地城市名合并
                 const rawList = res.result.list;
 
-                // 确保我们定义的 cityMap 里的城市都能显示（即使云端没数据也要显示0）
-                const displayList = Object.keys(this.data.cityMap).map(code => {
-                    const found = rawList.find(r => r.cityCode === code);
-                    return {
-                        cityCode: code,
-                        cityName: this.data.cityMap[code],
-                        // 如果库里没这个城市的数据，给默认值
-                        total: found ? found.total : 0,
-                        rented: found ? found.rented : 0,
-                        available: found ? found.available : 0,
-                        maintenance: found ? found.maintenance : 0,
-                        utilization: found ? found.utilization : '0.0',
-                        utilizationRate: found ? found.utilizationRate : 0
-                    };
+                const displayList = [];
+
+                // 遍历配置中的每个城市
+                Object.keys(CITY_CODE_MAP).forEach(cityCode => {
+                    const cityName = CITY_CODE_MAP[cityCode];
+                    const branches = BRANCH_OPTIONS_BY_CITY[cityCode] || [];
+
+                    if (branches.length > 0) {
+                        // 有分公司：为每个分公司生成一个卡片
+                        branches.forEach(branch => {
+                            const found = rawList.find(r => r.cityCode === cityCode && r.branchCode === branch.code);
+                            displayList.push({
+                                cityCode: cityCode,
+                                branchCode: branch.code,
+                                displayName: branch.name,
+                                total: found ? found.total : 0,
+                                rented: found ? found.rented : 0,
+                                available: found ? found.available : 0,
+                                maintenance: found ? found.maintenance : 0,
+                                utilization: found ? found.utilization : '0.0',
+                                utilizationRate: found ? found.utilizationRate : 0
+                            });
+                        });
+                    } else {
+                        // 无分公司：按城市生成卡片
+                        // 累加该城市所有数据（防止之前脏数据有 branchCode 导致漏统计）
+                        let total = 0, rented = 0, available = 0, maintenance = 0;
+                        rawList.filter(r => r.cityCode === cityCode).forEach(found => {
+                            total += found.total;
+                            rented += found.rented;
+                            available += found.available;
+                            maintenance += found.maintenance;
+                        });
+
+                        let utilizationRate = total > 0 ? (rented / total) * 100 : 0;
+
+                        displayList.push({
+                            cityCode: cityCode,
+                            branchCode: '',
+                            displayName: cityName,
+                            total,
+                            rented,
+                            available,
+                            maintenance,
+                            utilization: utilizationRate.toFixed(1),
+                            utilizationRate
+                        });
+                    }
                 });
 
                 // 2. 新增：计算全国总和
@@ -98,9 +122,12 @@ Page({
 
     // 跳转详情
     toCityDetail(e) {
-        const code = e.currentTarget.dataset.code;
-        wx.navigateTo({
-            url: `/pages/vehicles/index?cityCode=${code}`
-        });
+        const { citycode, branchcode, name } = e.currentTarget.dataset;
+        // Navigation expects: cityCode, city/branchName, branchCode
+        let url = `/pages/vehicle-center/index?cityCode=${citycode}&city=${encodeURIComponent(name)}`;
+        if (branchcode) {
+            url += `&branchCode=${branchcode}&branchName=${encodeURIComponent(name)}`;
+        }
+        wx.navigateTo({ url });
     }
 });

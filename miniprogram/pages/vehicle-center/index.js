@@ -174,15 +174,27 @@ Page({
 
       const results = await Promise.all([pAll, pAvailable, pRented, pMaintenance, pInsuranceWarn, pAnnualWarn, pMisc]);
 
+      const all = results[0].total;
+      const available = results[1].total;
+      const rented = results[2].total;
+      const maintenance = results[3].total;
+      const insurance = results[4].total;
+      const annual = results[5].total;
+      const misc = results[6].total;
+
+      let utilizationRate = all > 0 ? (rented / all) * 100 : 0;
+
       this.setData({
         counts: {
-          all: results[0].total,
-          available: results[1].total,
-          rented: results[2].total,
-          maintenance: results[3].total,
-          insurance: results[4].total, // 合并后的保险
-          annual: results[5].total,
-          misc: results[6].total,
+          all,
+          available,
+          rented,
+          maintenance,
+          insurance, // 合并后的保险
+          annual,
+          misc,
+          utilization: utilizationRate.toFixed(1),
+          utilizationRate
         }
       });
     } catch (e) {

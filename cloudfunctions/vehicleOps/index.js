@@ -555,10 +555,13 @@ async function getAllCitiesStats() {
   const db = cloud.database();
   const $ = db.command.aggregate;
 
-  // 聚合查询：按 cityCode 分组
+  // 聚合查询：按 cityCode 和 branchCode 分组
   const res = await db.collection('vehicles').aggregate()
     .group({
-      _id: '$cityCode', // 按城市代码分组
+      _id: {
+        cityCode: '$cityCode',
+        branchCode: $.ifNull(['$branchCode', ''])
+      },
       total: $.sum(1),
       rented: $.sum($.cond({
         if: $.eq(['$rentStatus', 'rented']), then: 1, else: 0
@@ -581,7 +584,8 @@ async function getAllCitiesStats() {
       rate = (rented / total) * 100;
     }
     return {
-      cityCode: item._id, // 比如 'suzhou'
+      cityCode: item._id.cityCode,
+      branchCode: item._id.branchCode,
       ...item,
       utilization: rate.toFixed(1),
       utilizationRate: rate
