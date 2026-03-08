@@ -48,8 +48,8 @@ const ATTACHMENT_CONFIG = {
   },
 
   foshan: {
-      type: 'city',
-      files: ['责任书.docx', '司机合规运营承诺函.docx']
+    type: 'city',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
   },
 
   changzhou: {
@@ -265,13 +265,13 @@ exports.main = async (event, context) => {
     const { y: yyyy, m: mm, d: dd, ymd: dateStr } = nowInTZ(BIZ_TZ);
 
     // 序列号作用域：分公司优先，否则城市
-    const AA_BY_BRANCH = { 
-        gzh_a: 'GZ1', 
-        gzh_b: 'GZ2',
-        suz_a: 'SUZ1',
-        suz_b: 'SUZ2',
-        fos_a: 'FOS1',
-        fos_b: 'FOS2'
+    const AA_BY_BRANCH = {
+      gzh_a: 'GZ1',
+      gzh_b: 'GZ2',
+      suz_a: 'SUZ1',
+      suz_b: 'SUZ2',
+      fos_a: 'FOS1',
+      fos_b: 'FOS2'
     };
     const AA_DEFAULT_PER_CITY = {
       guangzhou: 'GZ',
@@ -394,7 +394,16 @@ exports.main = async (event, context) => {
 
       // 只要这车已经在「已租」，就不允许再新签合同
       if (oldRentStatus === 'rented') {
-        throw new Error('vehicle-not-available');
+        const isRenewal = event.isRenewal;
+        const driverMatch = vehicle.currentDriverId === clientId;
+
+        if (isRenewal && driverMatch) {
+          // ★ 续约豁免通道：允许同一司机对同一辆已租的车，直接生成新合同
+          console.log(`[ContractV2] Renewal matched! Allowing new contract for existing rented vehicle: ${carPlate}`);
+        } else {
+          // 否则，正常拦截
+          throw new Error('vehicle-not-available');
+        }
       }
 
       // 新合同生效 = 标记为已租，维修轴保持不变

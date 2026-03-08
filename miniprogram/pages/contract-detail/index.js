@@ -144,6 +144,15 @@ Page({
     });
   },
 
+  // 1.5 续约 (Clone and Renew)
+  onRenew() {
+    const { contract } = this.data;
+    if (!contract || !contract._id) return;
+    wx.navigateTo({
+      url: `/pages/contract-new/index?id=${contract._id}&cityCode=${encodeURIComponent(contract.cityCode)}&city=${encodeURIComponent(contract.cityName)}&branchCode=${encodeURIComponent(contract.branchCode || '')}&branchName=${encodeURIComponent(contract.branchName || '')}&mode=renew`
+    });
+  },
+
   // 1. 点击“编辑”按钮
   onOpenEdit() {
     const { giftDays, giftDaysNotes, contract, contractRealEndDate } = this.data;

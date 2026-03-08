@@ -172,10 +172,42 @@ Page({
       }
 
       // 6) 根据模式处理
-      if ((mode === 'edit' || mode === 'view') && id) {
+      if ((mode === 'edit' || mode === 'view' || mode === 'renew') && id) {
         this.loadDoc(id).then(() => {
-          // 回填后再算一次可见字段（有些显隐依赖分公司/类型）
-          this.initVisibleFields(this.data.mode);
+          if (mode === 'renew') {
+            // -- CLONE & RENEW 核心逻辑 --
+            const { form } = this.data;
+
+            // 构造 mock 的车辆选择器选项（锁定仅包含当前这一辆车，不可选其他）
+            const lockedVehicleStr = `${form.carPlate || ''} ${form.carModel || ''}`.trim();
+            const mockVehicleOptions = [{
+              plate: form.carPlate || '',
+              model: form.carModel || '',
+              color: form.carColor || '',
+              vin: form.carVin || ''
+            }];
+
+            this.setData({
+              mode: 'create', // 骗过前端UI渲染，让它处于创建态
+              isRenewal: true, // 埋点告诉后端这是特殊续签通道
+              vehiclePickerOptions: mockVehicleOptions,
+              vehiclePickerRange: [lockedVehicleStr],
+              vehiclePickerIndex: 0,
+
+              // 抹掉旧的时间戳和序号
+              'form.contractDate': '',
+              'form.contractValidPeriodStart': '',
+              'form.contractValidPeriodEnd': '',
+              'form.contractSerialNumber': '',
+              'form.contractSerialNumberFormatted': ''
+            });
+
+            // 算一下可见字段
+            this.initVisibleFields('create');
+          } else {
+            // 普通编辑/查看，再次算一下可见字段
+            this.initVisibleFields(this.data.mode);
+          }
         });
       }
     };
@@ -491,6 +523,7 @@ Page({
             branchName: selectedBranchName || null,
             contractType: selectedTypeCode,
             contractTypeName: selectedTypeName,
+            isRenewal: this.data.isRenewal || false, // 传递续约标志
             payload
           }
         });

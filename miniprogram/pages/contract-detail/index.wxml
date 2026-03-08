@@ -12,14 +12,24 @@
       <view class="title">合同详情</view>
       <view class="sub-title">编号：{{contract.contractSerialNumber || '-'}}</view>
     </view>
-    <van-button 
-      wx:if="{{contract}}"
-      size="small" 
-      icon="notes-o"
-      type="primary" 
-      plain 
-      bind:click="onCopyInfo"
-    >复制信息</van-button>
+    <view style="display: flex; gap: 10rpx;">
+      <van-button 
+        wx:if="{{contract}}"
+        size="small" 
+        icon="notes-o"
+        type="primary" 
+        plain 
+        bind:click="onCopyInfo"
+      >复制信息</van-button>
+      <van-button 
+        wx:if="{{contract}}"
+        size="small" 
+        icon="replay"
+        type="info" 
+        plain 
+        bind:click="onRenew"
+      >续约</van-button>
+    </view>
   </view>
 
   <block wx:if="{{contract}}">
