@@ -67,4 +67,14 @@
     </button>
   </view>
 
+  <view class="card">
+    <view class="title" style="color: #faad14;">逾期车辆收回 (Auto-Return)</view>
+    <view class="desc">
+      手动触发系统扫描，强制将合同已过期 (按到期日早晨 6:00 计算) 的车辆从『已租』变回『闲置』，并解绑相关司机。
+    </view>
+    <button type="primary" style="background-color: #faad14; color: #fff;" bindtap="onAutoReturnExpired" loading="{{loading}}">
+      手动执行逾期车辆收回
+    </button>
+  </view>
+
   </view>

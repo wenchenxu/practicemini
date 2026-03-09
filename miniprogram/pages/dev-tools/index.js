@@ -265,5 +265,47 @@ Page({
         }
       }
     });
+  },
+
+  async onAutoReturnExpired() {
+    const that = this;
+    wx.showModal({
+      title: '手动执行过期退车',
+      content: '确定要扫描并处理所有合同过期的在租车辆吗？\n(注：系统每晚会自动执行一次)',
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        that.setData({ loading: true });
+        wx.showLoading({ title: '扫描处理中...', mask: true });
+
+        try {
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: { action: 'autoReturnExpired' }
+          });
+
+          wx.hideLoading();
+          that.setData({ loading: false });
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '处理完成',
+              content: `在租车辆排查数：${result.processed} 辆\n成功强制退车数：${result.returned} 辆`,
+              showCancel: false
+            });
+            if (result.errors && result.errors.length > 0) {
+              console.warn('[AutoReturn] Errors:', result.errors);
+            }
+          } else {
+            wx.showModal({ title: '操作失败', content: result?.error || '未知错误', showCancel: false });
+          }
+        } catch (e) {
+          console.error(e);
+          wx.hideLoading();
+          that.setData({ loading: false });
+          wx.showToast({ title: '调用异常', icon: 'none' });
+        }
+      }
+    });
   }
 });

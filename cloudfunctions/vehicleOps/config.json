@@ -1,6 +1,12 @@
 {
   "permissions": {
-    "openapi": [
-    ]
-  }
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "dailyAutoReturn",
+      "type": "Timer",
+      "config": "0 5 0 * * * *"
+    }
+  ]
 }

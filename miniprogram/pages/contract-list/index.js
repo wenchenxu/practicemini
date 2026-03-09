@@ -1099,10 +1099,26 @@ Page({
 
   decorateContractItem(item) {
     const signTaskStatus = item?.esign?.signTaskStatus;
+
+    // 计算时效与过期状态
+    const start = item.fields?.contractValidPeriodStart || '未指定';
+    const end = item.fields?.contractValidPeriodEnd || '未指定';
+    const validityPeriod = `${start} 至 ${end}`;
+
+    let isExpired = false;
+    if (end !== '未指定') {
+      try {
+        const expireTimeMs = new Date(`${end}T06:00:00+08:00`).getTime();
+        isExpired = Date.now() >= expireTimeMs;
+      } catch (e) { }
+    }
+
     return {
       ...item,
       _signStatusText: this.mapSignTaskStatus(signTaskStatus),
-      _signFinished: this.isSignTaskFinished(signTaskStatus)
+      _signFinished: this.isSignTaskFinished(signTaskStatus),
+      _validityPeriod: validityPeriod,
+      _isExpired: isExpired
     };
   },
 

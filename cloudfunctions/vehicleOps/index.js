@@ -16,6 +16,11 @@ function deriveStatus(rentStatus, maintenanceStatus) {
 }
 
 exports.main = async (event, context) => {
+  // --- 拦截定时触发器 ---
+  if (event.Type === 'Timer' && event.TriggerName === 'dailyAutoReturn') {
+    return await autoReturnExpired();
+  }
+
   const { action, payload = {} } = event || {};
 
   try {
@@ -42,6 +47,8 @@ exports.main = async (event, context) => {
         return await listAvailable(payload);
       case 'migrateBranches':
         return await migrateBranches();
+      case 'autoReturnExpired':
+        return await autoReturnExpired();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -665,6 +672,93 @@ async function migrateBranches() {
     return { ok: true, summary };
   } catch (err) {
     console.error('[migrateBranches] error', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+// ==========================================
+// 定时任务：逾期自动退车 (Cron Job)
+// ==========================================
+async function autoReturnExpired() {
+  const collectionVehicles = db.collection('vehicles');
+  const collectionContracts = db.collection('contracts');
+
+  let processedCount = 0;
+  let returnedCount = 0;
+  const errors = [];
+
+  try {
+    // 1. 获取所有在租的车辆
+    // 注意：云函数单次 limit 1000。如果您的车队非常大，请改成循环分页。
+    const vehRes = await collectionVehicles.where({ rentStatus: 'rented' }).limit(1000).get();
+    const rentedVehicles = vehRes.data || [];
+
+    const now = Date.now(); // 绝对时间戳
+
+    for (const veh of rentedVehicles) {
+      if (!veh.plate) continue;
+      processedCount++;
+
+      // 2. 找到该车辆【最新】且【有效】的合同
+      // 排除已经被软删除 (deleted: true) 或者被作废/异常终止的合同
+      const _ = db.command;
+      const contractRes = await collectionContracts
+        .where(_.and([
+          { 'fields.carPlate': veh.plate },
+          { deleted: _.neq(true) }, // 必须未被删除
+          _.or([ // E-sign 状态必须不是作废或终止，或者根本没有 E-sign
+            { 'esign.signTaskStatus': _.exists(false) },
+            { 'esign.signTaskStatus': null },
+            { 'esign.signTaskStatus': _.nin(['revoked', 'task_terminated', 'abolishing']) }
+          ])
+        ]))
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+
+      if (!contractRes.data || contractRes.data.length === 0) continue;
+
+      const latestContract = contractRes.data[0];
+      const endDateStr = latestContract.fields?.contractValidPeriodEnd; // e.g. '2025-10-15'
+
+      if (!endDateStr) continue;
+
+      // 3. 构建该合同的绝对过期时间阈值
+      // 用户的要求：在 expiry day 的 早上 6:00 (UTC+8) 到期
+      // 拼接成标准 ISO8601，带有 +08:00 时区偏移，这样 new Date 就会绝对精确，不受云函数本地 Node 环境时区影响
+      const expireTimeString = `${endDateStr}T06:00:00+08:00`;
+      const expireTimeMs = new Date(expireTimeString).getTime();
+
+      // 4. 判断是否过期
+      // 如果当前绝对时间已经超过了设定的过期时间，自动触发还车
+      if (now >= expireTimeMs) {
+        try {
+          console.log(`[AutoReturn] Vehicle ${veh.plate} expired at ${expireTimeString}. Triggering return.`);
+          // 复用现成的 updateStatus 来优雅地结束租赁、解绑司机、写历史记录
+          await updateStatus({
+            vehicleId: veh._id,
+            newStatus: 'available',
+            operator: 'system-timer'
+          });
+          returnedCount++;
+        } catch (updateErr) {
+          console.error(`[AutoReturn] Failed to auto-return ${veh.plate}:`, updateErr);
+          errors.push(`Plate: ${veh.plate}, Error: ${updateErr.message}`);
+        }
+      }
+    }
+
+    const result = {
+      ok: true,
+      processed: processedCount,
+      returned: returnedCount,
+      errors
+    };
+    console.log('[AutoReturn] Completed:', result);
+    return result;
+
+  } catch (err) {
+    console.error('[AutoReturn] Fatal Error:', err);
     return { ok: false, error: err.message };
   }
 }

@@ -392,6 +392,18 @@ Page({
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${f.label}格式不正确`;
       }
     }
+
+    // Expiry Date Validation: End must be strictly after Start
+    const startStr = form.contractValidPeriodStart;
+    const endStr = form.contractValidPeriodEnd;
+    if (startStr && endStr) {
+      const startTime = new Date(`${startStr}T00:00:00+08:00`).getTime();
+      const endTime = new Date(`${endStr}T00:00:00+08:00`).getTime();
+      if (endTime <= startTime) {
+        return '合同时效结束日必须在开始日之后';
+      }
+    }
+
     const payDay = Number(form.rentPaybyDayInMonth);
     if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
 

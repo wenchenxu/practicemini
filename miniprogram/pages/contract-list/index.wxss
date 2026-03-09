@@ -110,6 +110,25 @@
   font-size: 24rpx;
 }
 
+.status-pill {
+    padding: 2rpx 10rpx;
+    border-radius: 6rpx;
+    font-size: 20rpx;
+    font-weight: 500;
+}
+
+.status-pill.active {
+    background-color: #e6f7ff;
+    color: #1677ff;
+    border: 1rpx solid #91caff;
+}
+
+.status-pill.expired {
+    background-color: #fff1f0;
+    color: #cf1322;
+    border: 1rpx solid #ffa39e;
+}
+
 .driver-action {
     display: flex;
     align-items: center;
