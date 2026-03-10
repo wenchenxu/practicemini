@@ -43,7 +43,10 @@
 
   <form bindsubmit="onSubmit">
     <view class="section-card form-card">
-      <view class="card-title" wx:if="{{mode==='create'}}">填写合同详情</view>
+      <view class="card-title-row" wx:if="{{mode==='create'}}">
+        <view class="card-title" style="margin-bottom: 0;">填写合同详情</view>
+        <view class="paste-btn" hover-class="paste-btn--hover" bindtap="onPasteClipboard">📋 粘贴信息板</view>
+      </view>
       
       <view class="form-wrap">
         <block wx:for="{{visibleFields || []}}" wx:key="name">

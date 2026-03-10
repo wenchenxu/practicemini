@@ -692,5 +692,63 @@ Page({
       'form.carColor': vehicle.color || '',
       'form.carVin': vehicle.vin || '',
     });
+  },
+
+  onPasteClipboard() {
+    wx.getClipboardData({
+      success: (res) => {
+        const text = (res.data || '').trim();
+        if (!text) {
+          return wx.showToast({ title: '剪贴板为空', icon: 'none' });
+        }
+
+        // 关键字 → 表单字段映射
+        const KEYWORD_MAP = [
+          { keywords: ['姓名'], field: 'clientName' },
+          { keywords: ['电话'], field: 'clientPhone' },
+          { keywords: ['身份证号'], field: 'clientId' },
+          { keywords: ['身份证地址'], field: 'clientAddress' },
+          { keywords: ['现住地址', '现居住地址'], field: 'clientAddressCurrent' },
+          { keywords: ['亲属姓名', '紧急联系人姓名'], field: 'clientEmergencyContact' },
+          { keywords: ['亲属电话', '紧急联系人电话'], field: 'clientEmergencyPhone' },
+        ];
+
+        const patch = {};
+        let matchCount = 0;
+
+        // 逐行扫描剪贴板文本
+        const lines = text.split(/[\n\r]+/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          for (const mapping of KEYWORD_MAP) {
+            for (const kw of mapping.keywords) {
+              // 匹配 "关键字：值" 或 "关键字: 值" (全角/半角冒号)
+              const regex = new RegExp(`${kw}[：:]\\s*(.+)`);
+              const match = trimmed.match(regex);
+              if (match && match[1]) {
+                const value = match[1].trim();
+                if (value && !patch[`form.${mapping.field}`]) {
+                  patch[`form.${mapping.field}`] = value;
+                  matchCount++;
+                }
+                break; // 该行已匹配，跳到下一行
+              }
+            }
+          }
+        }
+
+        if (matchCount === 0) {
+          return wx.showToast({ title: '未检测到司机信息', icon: 'none' });
+        }
+
+        this.setData(patch);
+        wx.showToast({ title: `已粘贴 ${matchCount} 项信息`, icon: 'success' });
+      },
+      fail: () => {
+        wx.showToast({ title: '读取剪贴板失败', icon: 'none' });
+      }
+    });
   }
 });

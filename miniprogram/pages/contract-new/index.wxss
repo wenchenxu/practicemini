@@ -183,3 +183,25 @@ page {
     color: #1677ff;
     font-weight: 500;
   }
+
+/* === 粘贴信息板 === */
+.card-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24rpx;
+}
+
+.paste-btn {
+    font-size: 24rpx;
+    color: #1677ff;
+    background: #e6f7ff;
+    border: 1rpx solid #91caff;
+    border-radius: 8rpx;
+    padding: 6rpx 16rpx;
+    white-space: nowrap;
+}
+
+.paste-btn--hover {
+    opacity: 0.6;
+}
