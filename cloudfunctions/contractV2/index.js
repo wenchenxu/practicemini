@@ -244,7 +244,7 @@ const TPL_DIR = {
 // ========== 主入口 ==========
 
 exports.main = async (event, context) => {
-  const { ENV } = cloud.getWXContext;
+  const { OPENID, ENV } = cloud.getWXContext();
   console.log(`[ContractV2] Running in ENV: ${ENV}`); // 确认当前环境
 
   try {
@@ -260,6 +260,17 @@ exports.main = async (event, context) => {
 
     if (!cityCode) {
       return { ok: false, error: 'cityCode-required' };
+    }
+
+    // 查找当前操作人的名字（从白名单）
+    let creatorName = '';
+    try {
+      const wlRes = await db.collection('whitelist').where({ openid: OPENID }).limit(1).get();
+      if (wlRes.data && wlRes.data.length > 0) {
+        creatorName = wlRes.data[0].name || '';
+      }
+    } catch (e) {
+      console.warn('[ContractV2] Failed to lookup creator name:', e);
     }
 
     const { y: yyyy, m: mm, d: dd, ymd: dateStr } = nowInTZ(BIZ_TZ);
@@ -461,6 +472,8 @@ exports.main = async (event, context) => {
           contractTypeName,
           fields,
           contractStatus: 'active',
+          creatorOpenId: OPENID || '',
+          creatorName: creatorName || '',
           deleted: false,
           createdAt: now,
           updatedAt: now,

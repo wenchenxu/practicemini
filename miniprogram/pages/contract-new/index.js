@@ -346,6 +346,24 @@ Page({
   onDateChange(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value; // yyyy-mm-dd
+
+    // 即时校验：如果选的是结束日期，立即和开始日期比较
+    if (name === 'contractValidPeriodEnd' && value) {
+      const startStr = this.data.form.contractValidPeriodStart;
+      if (startStr && value <= startStr) {
+        wx.showToast({ title: '结束日期必须晚于开始日期', icon: 'none', duration: 2000 });
+        return; // 拒绝设置，保持原值
+      }
+    }
+    // 如果选的是开始日期，也检查是否和已有的结束日期冲突
+    if (name === 'contractValidPeriodStart' && value) {
+      const endStr = this.data.form.contractValidPeriodEnd;
+      if (endStr && endStr <= value) {
+        wx.showToast({ title: '开始日期必须早于结束日期', icon: 'none', duration: 2000 });
+        return;
+      }
+    }
+
     this.setData({ [`form.${name}`]: value });
   },
 
