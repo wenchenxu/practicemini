@@ -63,7 +63,7 @@
         </view>
         <view class="sub" style="margin-top: 4rpx; display: flex; align-items: center; justify-content: space-between;">
            <text>{{item._validityPeriod}}</text>
-           <text class="status-pill {{item._isExpired ? 'expired' : 'active'}}">{{item._isExpired ? '已逾期' : '生效中'}}</text>
+           <text class="status-pill {{item._statusClass}}">{{item._statusLabel}}</text>
         </view>
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}

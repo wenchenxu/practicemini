@@ -460,6 +460,7 @@ exports.main = async (event, context) => {
           contractType,
           contractTypeName,
           fields,
+          contractStatus: 'active',
           deleted: false,
           createdAt: now,
           updatedAt: now,

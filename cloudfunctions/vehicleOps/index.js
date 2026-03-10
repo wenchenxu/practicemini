@@ -153,6 +153,43 @@ async function updateStatus(payload) {
     }
   });
 
+  // 5) 如果是退租操作，标记关联合同为 '退租'（仅限手动操作，定时器有自己的标记逻辑）
+  if (eventType === 'rent_end' && payload.operator !== 'system-timer') {
+    try {
+      const plate = veh.plate;
+      if (plate) {
+        const contractCol = db.collection('contracts');
+        const latestContract = await contractCol
+          .where(db.command.and([
+            { 'fields.carPlate': plate },
+            { deleted: db.command.neq(true) },
+            db.command.or([
+              { contractStatus: 'active' },
+              { contractStatus: db.command.exists(false) },
+              { contractStatus: null }
+            ])
+          ]))
+          .orderBy('createdAt', 'desc')
+          .limit(1)
+          .get();
+
+        if (latestContract.data && latestContract.data.length > 0) {
+          const contractDoc = latestContract.data[0];
+          await contractCol.doc(contractDoc._id).update({
+            data: {
+              contractStatus: 'terminated',
+              terminatedAt: now
+            }
+          });
+          console.log(`[updateStatus] Marked contract ${contractDoc._id} as terminated (退租)`);
+        }
+      }
+    } catch (contractErr) {
+      console.error('[updateStatus] Failed to mark contract as terminated:', contractErr);
+      // 不影响主流程，仅记录错误
+    }
+  }
+
   return {
     ok: true,
     vehicleId,
@@ -740,6 +777,20 @@ async function autoReturnExpired() {
             newStatus: 'available',
             operator: 'system-timer'
           });
+
+          // 标记该合同为 '已到期'
+          try {
+            await collectionContracts.doc(latestContract._id).update({
+              data: {
+                contractStatus: 'expired',
+                expiredAt: db.serverDate()
+              }
+            });
+            console.log(`[AutoReturn] Marked contract ${latestContract._id} as expired`);
+          } catch (cErr) {
+            console.error(`[AutoReturn] Failed to mark contract as expired:`, cErr);
+          }
+
           returnedCount++;
         } catch (updateErr) {
           console.error(`[AutoReturn] Failed to auto-return ${veh.plate}:`, updateErr);

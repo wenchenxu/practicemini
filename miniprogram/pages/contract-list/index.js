@@ -1100,17 +1100,33 @@ Page({
   decorateContractItem(item) {
     const signTaskStatus = item?.esign?.signTaskStatus;
 
-    // 计算时效与过期状态
+    // 计算时效期
     const start = item.fields?.contractValidPeriodStart || '未指定';
     const end = item.fields?.contractValidPeriodEnd || '未指定';
     const validityPeriod = `${start} 至 ${end}`;
 
-    let isExpired = false;
-    if (end !== '未指定') {
-      try {
-        const expireTimeMs = new Date(`${end}T06:00:00+08:00`).getTime();
-        isExpired = Date.now() >= expireTimeMs;
-      } catch (e) { }
+    // 合同状态：优先使用持久化的 contractStatus，否则动态计算（兼容旧数据）
+    let statusLabel = '生效中';
+    let statusClass = 'active';
+
+    const persisted = item.contractStatus;
+    if (persisted === 'terminated') {
+      statusLabel = '退租';
+      statusClass = 'terminated';
+    } else if (persisted === 'expired') {
+      statusLabel = '已到期';
+      statusClass = 'expired';
+    } else if (!persisted || persisted === 'active') {
+      // 无持久化状态或明确 active —— 用日期动态判断（兼容旧合同）
+      if (end !== '未指定') {
+        try {
+          const expireTimeMs = new Date(`${end}T06:00:00+08:00`).getTime();
+          if (Date.now() >= expireTimeMs) {
+            statusLabel = '已到期';
+            statusClass = 'expired';
+          }
+        } catch (e) { }
+      }
     }
 
     return {
@@ -1118,7 +1134,8 @@ Page({
       _signStatusText: this.mapSignTaskStatus(signTaskStatus),
       _signFinished: this.isSignTaskFinished(signTaskStatus),
       _validityPeriod: validityPeriod,
-      _isExpired: isExpired
+      _statusLabel: statusLabel,
+      _statusClass: statusClass
     };
   },
 
