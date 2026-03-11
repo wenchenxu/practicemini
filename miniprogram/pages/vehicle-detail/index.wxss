@@ -53,6 +53,7 @@
   .tag-blue { background: #e8f3ff; color: #1989fa; }
   .tag-green { background: #e8ffea; color: #07c160; }
   .tag-orange { background: #fffbe8; color: #ff976a; }
+  .tag-red { background: #fff1f0; color: #cf1322; }
   
   /* 分割线 */
   .divider {

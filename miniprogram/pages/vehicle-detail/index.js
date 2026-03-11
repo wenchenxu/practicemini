@@ -233,6 +233,42 @@ Page({
     });
   },
 
+  // 「标记已售/报废」：从所有活跃视图中隐藏车辆（双重确认）
+  onMarkRetired() {
+    const { vehicle, rentStatus, opBusy } = this.data;
+    if (opBusy) return;
+    if (!vehicle || !vehicle._id) return;
+
+    if (rentStatus === 'rented') {
+      wx.showToast({ title: '请先退租再标记', icon: 'none' });
+      return;
+    }
+
+    // 第一次确认：说明操作内容
+    wx.showModal({
+      title: '确认标记已售/报废',
+      content: `车辆「${vehicle.plate}」将被标记为已售或报废。\n\n该车辆将不再出现在车辆列表和统计中，但数据会保留在数据库中。\n\n是否继续？`,
+      confirmColor: '#ee0a24',
+      success: (res) => {
+        if (!res.confirm) return;
+
+        // 第二次确认：强调不可逆
+        wx.showModal({
+          title: '⚠️ 最终确认',
+          content: '此操作不可撤销！\n\n车辆一旦标记为已售/报废，将永久从所有列表、统计和可选车辆中移除。\n\n请再次确认是否继续？',
+          confirmText: '确认报废',
+          confirmColor: '#ee0a24',
+          success: (res2) => {
+            if (!res2.confirm) return;
+            this._doUpdateStatus('retired').then(() => {
+              setTimeout(() => wx.navigateBack({ delta: 1 }), 500);
+            });
+          }
+        });
+      }
+    });
+  },
+
   // 真正调用云函数的内部方法
   async _doUpdateStatus(newStatus) {
     const { vehicle } = this.data;

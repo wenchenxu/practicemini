@@ -9,6 +9,7 @@
         <view class="tag tag-green" wx:else>闲置</view>
         
         <view class="tag tag-orange" wx:if="{{vehicle.maintenanceStatus === 'in_maintenance'}}">维修中</view>
+        <view class="tag tag-red" wx:if="{{vehicle.retired}}">已售/报废</view>
       </view>
     </view>
 
@@ -106,6 +107,17 @@
       <view class="section-title" style="margin-bottom:0; border-left:none;">车辆历史记录</view>
       <van-icon name="arrow" color="#969799" />
     </view>
+  </view>
+
+  <view style="padding: 30rpx 24rpx 60rpx;" wx:if="{{rentStatus !== 'rented' && !vehicle.retired}}">
+    <van-button 
+      type="danger" 
+      block 
+      plain
+      bind:click="onMarkRetired" 
+      disabled="{{opBusy}}"
+      custom-style="border-style: dashed;"
+    >标记已售/报废</van-button>
   </view>
 
   <van-dialog

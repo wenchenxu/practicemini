@@ -70,7 +70,7 @@ async function updateStatus(payload) {
 
   if (!vehicleId) throw new Error('vehicleId-required');
   // 这里 newStatus 仅仅是“操作类型”，不是要写进数据库的字段
-  if (!newStatus || !['available', 'maintenance'].includes(newStatus)) {
+  if (!newStatus || !['available', 'maintenance', 'retired'].includes(newStatus)) {
     throw new Error('invalid-status');
   }
 
@@ -121,6 +121,18 @@ async function updateStatus(payload) {
       newMaintenanceStatus = 'in_maintenance';
       eventType = 'maintenance_start';
     }
+  } else if (newStatus === 'retired') {
+    // 标记为已售/报废：车辆必须先退租才能报废
+    if (oldRentStatus === 'rented') {
+      throw new Error('vehicle-still-rented');
+    }
+    eventType = 'vehicle_retired';
+    newRentStatus = 'available'; // 保持原状
+    updateData.retired = true;
+    updateData.retiredAt = now;
+    updateData.currentDriverId = _.remove();
+    updateData.currentDriverName = _.remove();
+    updateData.currentDriverPhone = _.remove();
   }
 
   // 3) 更新车辆，只写 rentStatus / maintenanceStatus（不再写 status 字段）
@@ -601,6 +613,9 @@ async function getAllCitiesStats() {
 
   // 聚合查询：按 cityCode 和 branchCode 分组
   const res = await db.collection('vehicles').aggregate()
+    .match({
+      retired: db.command.neq(true) // 排除已售/报废
+    })
     .group({
       _id: {
         cityCode: '$cityCode',
@@ -650,6 +665,7 @@ async function listAvailable(payload) {
     const where = {
       cityCode,
       rentStatus: 'available',
+      retired: _.neq(true), // 排除已售/报废
       // 排除维修状态 (兼容 none, 空字符串, null, 或字段不存在)
       maintenanceStatus: _.or([
         _.eq('none'),

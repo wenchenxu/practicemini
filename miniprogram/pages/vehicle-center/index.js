@@ -117,7 +117,7 @@ Page({
     const _ = db.command;
 
     // 构造基础查询
-    const base = { cityCode };
+    const base = { cityCode, retired: _.neq(true) };
     if (branchCode) {
       base.branchCode = branchCode;
     }
@@ -224,7 +224,7 @@ Page({
     const pageSize = 20;
 
     // 基础条件：按城市
-    const baseWhere = { cityCode };
+    const baseWhere = { cityCode, retired: _.neq(true) };
     if (branchCode) {
       baseWhere.branchCode = branchCode;
     }
