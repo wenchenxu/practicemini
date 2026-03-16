@@ -12,17 +12,14 @@ function formatBizDate(dateInput) {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) return '';
   
-    // 使用 Intl 强制使用上海时区格式化
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: BIZ_TZ,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(date);
+    // 微信小程序中 Intl API 兼容性极差，特别是 timeZone 选项在很多真机上会直接抛出一场
+    // 替代方案：直接拿 UTC 时间戳加上 8 小时的毫秒数，然后按 UTC 输出，即为标准的北京时间
+    const shTime = date.getTime() + (8 * 3600000);
+    const shDate = new Date(shTime);
   
-    const y = parts.find(p => p.type === 'year').value;
-    const m = parts.find(p => p.type === 'month').value;
-    const d = parts.find(p => p.type === 'day').value;
+    const y = shDate.getUTCFullYear();
+    const m = String(shDate.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(shDate.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
   
