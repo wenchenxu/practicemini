@@ -50,6 +50,10 @@ export const CITY_CODE_MAP = {
         { code: 'rent_std',  name: '纯租租赁' },
         { code: 'rent_rto', name: '以租代购' },
     ],
+    shaoxing: [
+        { code: 'rent_std',  name: '纯租租赁' },
+        { code: 'rent_zeroDown', name: '零押金租赁' },
+    ],    
     default: [{ code: 'rent_std', name: '纯租租赁' }],
   };
   
