@@ -27,6 +27,8 @@ exports.main = async (event, context) => {
     switch (action) {
       case 'updateStatus':
         return await updateStatus(payload);
+      case 'importOfflineContracts':
+        return await importOfflineContracts(payload);
       case 'deduplicate': // <--- 新增这个 case
         return await deduplicateVehicles(payload);
       case 'fixDates':
@@ -110,16 +112,19 @@ async function updateStatus(payload) {
     updateData.currentDriverId = _.remove();
     updateData.currentDriverName = _.remove();
     updateData.currentDriverPhone = _.remove();
+    updateData.maintenanceStartAt = _.remove();
   } else if (newStatus === 'maintenance') {
     // 切维修状态：判断是开始还是结束
     if (oldMaintenanceStatus === 'in_maintenance') {
       // 原来在维修 -> 现在结束维修
       newMaintenanceStatus = 'none';
       eventType = 'maintenance_end';
+      updateData.maintenanceStartAt = _.remove();
     } else {
       // 原来正常 -> 现在开始维修
       newMaintenanceStatus = 'in_maintenance';
       eventType = 'maintenance_start';
+      updateData.maintenanceStartAt = now;
     }
   } else if (newStatus === 'retired') {
     // 标记为已售/报废：车辆必须先退租才能报废
@@ -397,43 +402,27 @@ async function upsertVehiclesFromCsv(payload) {
 
   // 3. 逐条 Upsert
   for (const row of rows) {
-    // PapaParse 解析出来的对象，key 是表头，value 是单元格内容
     // 空单元格默认是 "" (空字符串)，完全符合你的需求，无需转 null
 
     const plate = row.plate ? row.plate.trim() : '';
     if (!plate) continue; // 跳过没车牌的行
 
     // 强制更新时间
-    // 注意：这里我们构造一个新的 updateData 对象，而不是直接污染 row，
-    // 这样可以避免把 _id 等不该更新的字段带进去
     const updateData = { ...row };
-
     updateData.updatedAt = now;
-
-    // 清理不需要写入数据库的字段 (比如 CSV 里可能有的空列或者序号)
-    // 如果 CSV 里有 _id 或者是空字符串的 _id，一定要删掉，否则会冲突
     delete updateData._id;
-
-    // 删除旧字段键（如果存在），保持数据库整洁
     delete updateData.currentDriverClientId;
 
     try {
-      // 先查
       const exist = await vehiclesCol.where({ plate }).get();
 
       if (exist.data.length > 0) {
-        // --- 更新 ---
         const docId = exist.data[0]._id;
-        await vehiclesCol.doc(docId).update({
-          data: updateData
-        });
+        await vehiclesCol.doc(docId).update({ data: updateData });
         updatedCount++;
       } else {
-        // --- 新增 ---
         updateData.createdAt = now;
-        await vehiclesCol.add({
-          data: updateData
-        });
+        await vehiclesCol.add({ data: updateData });
         insertedCount++;
       }
     } catch (e) {
@@ -456,9 +445,231 @@ async function upsertVehiclesFromCsv(payload) {
  */
 function parseBizDateCloud(str) {
   if (!str) return null;
-  // 这里的逻辑和前端一致，确保存入的是上海时区 00:00:00 的绝对时间
   return new Date(`${str}T00:00:00+08:00`);
 }
+
+async function importOfflineContracts(payload) {
+  const { fileID } = payload;
+  if (!fileID) throw new Error('fileID required');
+
+  // 1. Download CSV
+  const downloadRes = await cloud.downloadFile({ fileID });
+  const csvContent = downloadRes.fileContent.toString('utf8');
+
+  // 2. Parse CSV (trim headers to avoid stray whitespace/tab issues)
+  const parseResult = Papa.parse(csvContent, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim()
+  });
+
+  if (parseResult.errors.length > 0) {
+    console.warn('[importOffline] CSV parse warnings:', parseResult.errors);
+  }
+
+  const rows = parseResult.data;
+  if (!rows || rows.length === 0) return { ok: false, msg: 'empty-csv' };
+
+  // Log detected headers for debugging
+  console.log('[importOffline] Detected CSV headers:', Object.keys(rows[0]));
+
+  let successCount = 0;
+  let errorCount = 0;
+  const errorDetails = [];
+
+  const typeMapping = {
+    'offline_std_monthly': '线下月付',
+    'offline_std_weekly': '线下周付',
+    'offline_zeroDown': '线下零首付',
+    'offline': '线下合同'
+  };
+
+  // Now expecting both cityCode and branchCode cleanly from CSV
+  // No branchToCity mapping needed anymore.
+
+  const cityCodeToName = {
+    guangzhou: '广州',
+    suzhou: '苏州',
+    foshan: '佛山',
+    huizhou: '惠州',
+    jiaxing: '嘉兴',
+    shaoxing: '绍兴',
+    changzhou: '常州',
+    nantong: '南通'
+  };
+
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+
+    await Promise.all(batch.map(async (row, idx) => {
+      const realIndex = i + idx;
+
+      // 防御性 trim 所有值
+      const t = (v) => (v == null ? '' : String(v).trim());
+
+      const safePlate          = t(row.plate);
+      const safeClientId       = t(row.clientId);
+      const safeClientName     = t(row.clientName);
+      const safeClientPhone    = t(row.clientPhone);
+      const safeBranchCode     = t(row.branchCode);
+      const safeCityCode       = t(row.cityCode);           // CSV 可能直接带 cityCode
+      const safeContractType   = t(row.contractType) || 'offline';
+      const safeTypeName       = t(row.contractTypeName);
+      const safeStart          = t(row.contractValidPeriodStart);
+      const safeEnd            = t(row.contractValidPeriodEnd);
+      const safeRent           = t(row.rentMonthly);
+      const safeDeposit        = t(row.deposit);
+
+      if (!safePlate || !safeClientId) {
+        errorCount++;
+        errorDetails.push(`Row ${realIndex + 1}: Missing plate or clientId`);
+        return; // Equivalent to continue in a map
+      }
+
+      // 推导 cityCode/branchCode: 严格提取自 CSV
+      const derivedCityCode = safeCityCode; // Take directly from CSV
+      const derivedTypeName = safeTypeName || (typeMapping[safeContractType] || '线下合同');
+      const derivedCityName = cityCodeToName[derivedCityCode] || '';
+
+      try {
+        // ★ 关键修复：每行事务创建独立的 serverDate，避免跨事务复用同一指令对象
+        const now = db.serverDate();
+
+        await db.runTransaction(async tx => {
+          const driversTx  = tx.collection('drivers');
+          const vehiclesTx = tx.collection('vehicles');
+          const historyTx  = tx.collection('vehicle_history');
+          const contractsTx = tx.collection('contracts');
+
+          // ==== 1. Driver Upsert ====
+          const drvRes = await driversTx.where({ clientId: safeClientId }).get();
+          if (!drvRes.data || drvRes.data.length === 0) {
+            await driversTx.add({
+              data: {
+                clientId: safeClientId,
+                name: safeClientName,
+                phone: safeClientPhone,
+                status: '租车中',
+                cityCode: derivedCityCode,
+                cityName: derivedCityName, // Added City Name
+                branchCode: safeBranchCode,
+                createdAt: now,
+                updatedAt: now
+              }
+            });
+          } else {
+            const doc = drvRes.data[0];
+            await driversTx.doc(doc._id).update({
+              data: {
+                name: safeClientName || doc.name || '',
+                phone: safeClientPhone || doc.phone || '',
+                status: '租车中',
+                cityCode: derivedCityCode || doc.cityCode || '',
+                cityName: derivedCityName || doc.cityName || '', // Added City Name
+                branchCode: safeBranchCode || doc.branchCode || '',
+                updatedAt: now
+              }
+            });
+          }
+
+          // ==== 2. Vehicle Update (允许覆盖已租车辆) ====
+          const vRes = await vehiclesTx.where({ plate: safePlate }).get();
+          if (!vRes.data || vRes.data.length === 0) {
+            throw new Error(`Vehicle not found: ${safePlate}`);
+          }
+          const veh = vRes.data[0];
+
+          // 不再阻止已租车辆，直接覆盖绑定关系
+          await vehiclesTx.doc(veh._id).update({
+            data: {
+              rentStatus: 'rented',
+              currentDriverId: safeClientId,
+              currentDriverName: safeClientName,
+              updatedAt: now
+            }
+          });
+
+          // ==== 3. Vehicle History ====
+          const wasRented = veh.rentStatus === 'rented';
+          await historyTx.add({
+            data: {
+              vehicleId: veh._id,
+              plate: veh.plate || '',
+              eventType: 'offline_rent_start',
+              fromStatus: wasRented ? '已租' : '闲置',
+              toStatus: '已租',
+              driverClientId: safeClientId,
+              driverName: safeClientName,
+              contractId: null,
+              operator: 'system-offline-import',
+              createdAt: now
+            }
+          });
+
+          const inputType = safeContractType; // Original CSV input type
+          let derivedType = 'rent_std'; // default fallback for the system
+          if (inputType.includes('std')) derivedType = 'rent_std';
+          if (inputType.includes('zeroDown')) derivedType = 'rent_zeroDown';
+
+          // ==== 4. Contract 'Ghost' Record ====
+          const addContractRes = await contractsTx.add({
+            data: {
+              contractType: derivedType,
+              contractTypeName: derivedTypeName,
+              deleted: false,
+              contractStatus: 'active',
+              cityCode: derivedCityCode,
+              cityName: derivedCityName,  // Added City Name
+              branchCode: safeBranchCode,
+              createdAt: now,
+              updatedAt: now,
+              fields: {
+                carPlate: safePlate,
+                clientName: safeClientName,
+                clientPhone: safeClientPhone,
+                clientId: safeClientId,
+                branchCode: safeBranchCode,
+                contractValidPeriodStart: safeStart,
+                contractValidPeriodEnd: safeEnd,
+                rentMonthly: safeRent,
+                deposit: safeDeposit
+              }
+            }
+          });
+
+          // ==== 5. Link Contract to Driver ====
+          const contractId = addContractRes._id;
+          const drvAfter = await driversTx.where({ clientId: safeClientId }).get();
+          if (drvAfter.data && drvAfter.data.length > 0) {
+            await driversTx.doc(drvAfter.data[0]._id).update({
+              data: {
+                lastContractId: contractId,
+                cityName: derivedCityName, // Ensure driver has cityName
+                updatedAt: now
+              }
+            });
+          }
+        });
+
+        successCount++;
+      } catch (err) {
+        errorCount++;
+        errorDetails.push(`Row ${realIndex + 1} (${safePlate}): ${err.message}`);
+        console.error(`[importOffline] Row ${realIndex + 1} failed:`, err);
+      }
+    }));
+  }
+
+  return {
+    ok: true,
+    total: rows.length,
+    success: successCount,
+    errors: errorCount,
+    errorDetails
+  };
+}
+
 
 async function updateInsurance(payload) {
   const { vehicleId, insuranceData } = payload;

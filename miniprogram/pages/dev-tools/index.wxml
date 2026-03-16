@@ -77,4 +77,14 @@
     </button>
   </view>
 
+  <view class="card" style="border: 2rpx solid #722ed1; background:#f9f0ff;">
+    <view class="title" style="color:#722ed1;">线下合同 CSV 导入</view>
+    <view class="desc">
+      上传线下记录的 CSV 文件，强制更新司机信息与车辆已被绑定的租赁关系，同时生成不带电子签约文件的“补录”合同记录。
+    </view>
+    <button type="primary" style="background-color: #722ed1; color: #fff;" bindtap="onImportOfflineContracts" loading="{{loading}}">
+      选择文件并执行导入
+    </button>
+  </view>
+
   </view>

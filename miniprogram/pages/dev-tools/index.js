@@ -307,5 +307,59 @@ Page({
         }
       }
     });
+  },
+
+  async onImportOfflineContracts() {
+    const that = this;
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['csv'],
+      success: async (chooseRes) => {
+        const filePath = chooseRes.tempFiles[0].path;
+        that.setData({ loading: true });
+        wx.showLoading({ title: '上传中...' });
+
+        try {
+          const cloudPath = `temp_imports/${Date.now()}_offline_import.csv`;
+          const uploadRes = await wx.cloud.uploadFile({
+            cloudPath,
+            filePath,
+          });
+
+          const fileID = uploadRes.fileID;
+          wx.showLoading({ title: '正在处理数据...' });
+
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: {
+              action: 'importOfflineContracts',
+              payload: { fileID }
+            }
+          });
+
+          that.setData({ loading: false });
+          wx.hideLoading();
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '导入完成',
+              content: `共处理 ${result.total} 条。\n成功: ${result.success} 条\n失败: ${result.errors} 条\n请在云日志查看具体失败原因。`,
+              showCancel: false
+            });
+            if (result.errors > 0) {
+              console.warn('[OfflineImport] Errors:', result.errorDetails);
+            }
+          } else {
+            wx.showModal({ title: '导入失败', content: result.msg || result.error || '未知错误', showCancel: false });
+          }
+        } catch (e) {
+          console.error(e);
+          that.setData({ loading: false });
+          wx.hideLoading();
+          wx.showToast({ title: '异常', icon: 'none' });
+        }
+      }
+    });
   }
 });
