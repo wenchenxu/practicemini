@@ -45,6 +45,21 @@
     </view>
   </view>
 
+  <!-- 维修专属信息区 (仅当维修中时显示) -->
+  <view class="card" wx:if="{{vehicle.maintenanceStatus === 'in_maintenance'}}">
+    <view class="section-title">维修信息</view>
+    <view class="info-grid">
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">开始时间</text>
+        <text class="value">{{maintenanceStartAtStr || '-'}}</text>
+      </view>
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">已维保时长</text>
+        <text class="value text-orange">{{maintenanceDurationText || '-'}}</text>
+      </view>
+    </view>
+  </view>
+
   <view class="card">
     <view class="section-title">车辆操作</view>
     <view class="action-row-fill">
@@ -102,9 +117,27 @@
     </view>
   </view>
 
+  <!-- 专属维修历史卡片 -->
+  <view class="card">
+    <view class="section-title">维修历史记录</view>
+    <view class="timeline" wx:if="{{maintenanceHistory && maintenanceHistory.length > 0}}">
+      <view class="timeline-item" wx:for="{{maintenanceHistory}}" wx:key="_id">
+        <view class="timeline-dot {{item.eventType === 'maintenance_start' ? 'dot-orange' : 'dot-green'}}"></view>
+        <view class="timeline-content">
+          <view class="timeline-head">
+            <text class="timeline-event">{{item.eventType === 'maintenance_start' ? '开始维修' : '结束维修'}}</text>
+            <text class="timeline-time">{{item.timeStr}}</text>
+          </view>
+          <view class="timeline-desc" wx:if="{{item.operator}}">操作人：{{item.operator}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:else style="font-size:24rpx;color:#999;text-align:center;padding:20rpx 0;">暂无维修记录</view>
+  </view>
+
   <view class="card" bindtap="toHistory">
     <view class="card-header-arrow">
-      <view class="section-title" style="margin-bottom:0; border-left:none;">车辆历史记录</view>
+      <view class="section-title" style="margin-bottom:0; border-left:none;">车辆完整历史记录</view>
       <van-icon name="arrow" color="#969799" />
     </view>
   </view>

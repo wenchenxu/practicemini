@@ -45,6 +45,9 @@ Page({
     maintenanceStatus: '',   // 'none' | 'in_maintenance'
     maintenanceStatusText: '',
     statusText: '',           // “已租”、"闲置"、“已租 · 维修中”等
+    maintenanceStartAtStr: '', // 维修开始时间的格式化字符串
+    maintenanceDurationText: '', // 维修时长
+    maintenanceHistory: [], // 专属的维修历史记录
     showInsEdit: false, // 控制弹窗显示
     editIns: {},        // 编辑时的临时对象（存字符串格式 'YYYY-MM-DD'）
     // 新增：年审弹窗控制
@@ -141,6 +144,63 @@ Page({
         } 
       } catch (e) { /* ignore */ }
 
+      // 6) 维修时长和相关显示逻辑
+      let maintenanceStartAtStr = '';
+      let maintenanceDurationText = '';
+      const nowTs = new Date().getTime();
+
+      if (maintenanceStatus === 'in_maintenance') {
+        // 尝试获取维修开始时间：优先用车辆文档上的 maintenanceStartAt
+        let startTime = veh.maintenanceStartAt ? new Date(veh.maintenanceStartAt) : null;
+
+        // 兜底：如果车辆文档没有 maintenanceStartAt（说明是部署前就进入维修的），
+        // 从 vehicle_history 查最近一条 maintenance_start 事件的 createdAt
+        if (!startTime || isNaN(startTime.getTime())) {
+          try {
+            const histRes = await db.collection('vehicle_history')
+              .where({
+                vehicleId: vehicleId,
+                eventType: 'maintenance_start'
+              })
+              .orderBy('createdAt', 'desc')
+              .limit(1)
+              .get();
+            if (histRes.data && histRes.data.length > 0 && histRes.data[0].createdAt) {
+              startTime = new Date(histRes.data[0].createdAt);
+            }
+          } catch (e) {
+            console.warn('[vehicle-detail] fallback history query failed', e);
+          }
+        }
+
+        if (startTime && !isNaN(startTime.getTime())) {
+          // 格式化开始时间 (上海时区)
+          const shTime = startTime.getTime() + (8 * 3600000);
+          const shDate = new Date(shTime);
+          const y = shDate.getUTCFullYear();
+          const m = String(shDate.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(shDate.getUTCDate()).padStart(2, '0');
+          const hr = String(shDate.getUTCHours()).padStart(2, '0');
+          const min = String(shDate.getUTCMinutes()).padStart(2, '0');
+          maintenanceStartAtStr = `${y}-${m}-${d} ${hr}:${min}`;
+
+          // 计算时长
+          const diffMs = nowTs - startTime.getTime();
+          if (diffMs > 0) {
+            const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+            if (days > 0) {
+              maintenanceDurationText = `${days}天${hours}小时`;
+            } else {
+              maintenanceDurationText = `${hours}小时`;
+            }
+          } else {
+            maintenanceDurationText = '刚刚';
+          }
+        }
+      }
+
       this.setData({
         vehicle: veh,
         driverName,
@@ -151,12 +211,53 @@ Page({
         rentStatusText,
         maintenanceStatus,
         maintenanceStatusText,
+        maintenanceStartAtStr,
+        maintenanceDurationText,
         loading: false
       });
+
+      // 7) 异步拉取独立的维修历史
+      this.fetchMaintenanceHistory(vehicleId);
+
     } catch (e) {
       console.error('[vehicle-detail] fetchDetail error', e);
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败', icon: 'none' });
+    }
+  },
+
+  // 获取车辆的历史维修记录
+  async fetchMaintenanceHistory(vehicleId) {
+    try {
+      const _ = db.command;
+      const res = await db.collection('vehicle_history')
+        .where({
+          vehicleId,
+          eventType: _.in(['maintenance_start', 'maintenance_end'])
+        })
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get();
+
+      const list = (res.data || []).map(item => {
+        let timeStr = '';
+        if (item.createdAt) {
+          const d = new Date(item.createdAt);
+          const shTime = d.getTime() + (8 * 3600000);
+          const shDate = new Date(shTime);
+          const y = shDate.getUTCFullYear();
+          const mo = String(shDate.getUTCMonth() + 1).padStart(2, '0');
+          const da = String(shDate.getUTCDate()).padStart(2, '0');
+          const hr = String(shDate.getUTCHours()).padStart(2, '0');
+          const min = String(shDate.getUTCMinutes()).padStart(2, '0');
+          timeStr = `${y}-${mo}-${da} ${hr}:${min}`;
+        }
+        return { ...item, timeStr };
+      });
+
+      this.setData({ maintenanceHistory: list });
+    } catch (err) {
+      console.error('[vehicle-detail] fetch maintenance history error', err);
     }
   },
 

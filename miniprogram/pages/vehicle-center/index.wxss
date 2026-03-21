@@ -253,3 +253,18 @@
 .text-green { color: #07c160; }
 .text-blue { color: #1989fa; }
 .text-orange { color: #ff976a; }
+
+/* 维修时长独立显示行 */
+.maintenance-duration-row {
+  margin-top: 6rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+.maintenance-duration-text {
+  font-size: 22rpx;
+  color: #fa8c16;
+  background: #fff7e6;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  font-weight: 500;
+}

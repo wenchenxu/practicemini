@@ -369,6 +369,7 @@ Page({
           ...item,
           rentStatus,
           maintenanceStatus,
+          maintenanceDurationText: '', // 占位，后续补充
           // statusLabel,
           driverName: item.currentDriverName || item.driverName || '',
           liabExpiry: liabInfo,   // 交强险信息
@@ -377,6 +378,54 @@ Page({
           _sortKey: sortKey // 临时字段用于排序
         };
       });
+
+      // ★ 补充维修时长：对所有维修中的车辆，计算 maintenanceDurationText
+      // 先收集需要从 vehicle_history 补充数据的车辆
+      const maintenanceItems = normalized.filter(
+        v => v.maintenanceStatus === 'in_maintenance'
+      );
+      
+      if (maintenanceItems.length > 0) {
+        // 批量查一次 vehicle_history 获取所有最近的 maintenance_start 事件
+        const maintVehicleIds = maintenanceItems.map(v => v._id);
+        let historyMap = {}; // vehicleId -> createdAt
+        try {
+          const histRes = await db.collection('vehicle_history')
+            .where({
+              vehicleId: _.in(maintVehicleIds),
+              eventType: 'maintenance_start'
+            })
+            .orderBy('createdAt', 'desc')
+            .limit(100)
+            .get();
+          // 只保留每辆车的最新一条
+          for (const h of (histRes.data || [])) {
+            if (!historyMap[h.vehicleId]) {
+              historyMap[h.vehicleId] = h.createdAt;
+            }
+          }
+        } catch (e) {
+          console.warn('[vehicle-center] history fallback failed', e);
+        }
+
+        const nowCalc = new Date().getTime();
+        for (const v of maintenanceItems) {
+          // 优先用车辆文档上的 maintenanceStartAt，否则用历史记录
+          const rawStart = v.maintenanceStartAt || historyMap[v._id];
+          if (!rawStart) continue;
+          const startD = new Date(rawStart);
+          if (isNaN(startD.getTime())) continue;
+          const diffMs = nowCalc - startD.getTime();
+          if (diffMs > 0) {
+            const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+            v.maintenanceDurationText = days > 0 ? `${days}天${hours}小时` : `${hours}小时`;
+          } else {
+            v.maintenanceDurationText = '刚刚';
+          }
+        }
+      }
 
       // 批量补充司机姓名，避免依赖车辆文档中的旧 driverName 缓存
       // 方案一：前端排序

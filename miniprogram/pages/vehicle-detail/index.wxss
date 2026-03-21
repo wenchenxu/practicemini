@@ -153,3 +153,44 @@
     font-size: 28rpx;
     color: #323233;
   }
+
+  /* 维修历史 Timeline 样式 */
+  .timeline { padding-left: 10rpx; }
+
+  .timeline-item {
+    position: relative;
+    padding-bottom: 30rpx;
+    padding-left: 40rpx;
+    border-left: 2rpx solid #ebedf0;
+  }
+  .timeline-item:last-child {
+    border-left-color: transparent;
+    padding-bottom: 0;
+  }
+
+  .timeline-dot {
+    position: absolute;
+    left: -11rpx;
+    top: 8rpx;
+    width: 20rpx;
+    height: 20rpx;
+    border-radius: 50%;
+    z-index: 1;
+  }
+  .dot-orange { background: #ff976a; border: 4rpx solid #fffbe8; }
+  .dot-green { background: #07c160; border: 4rpx solid #e8ffea; }
+
+  .timeline-content { display: flex; flex-direction: column; }
+
+  .timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8rpx;
+  }
+  .timeline-event { font-size: 28rpx; font-weight: 500; color: #323233; }
+  .timeline-time { font-size: 24rpx; color: #969799; }
+  .timeline-desc { font-size: 24rpx; color: #646566; }
+
+  /* 辅助高亮 */
+  .text-orange { color: #ff976a; }

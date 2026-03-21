@@ -97,19 +97,25 @@
         <text class="model">{{item.model || '车型'}} {{item.color}}</text>
         
         <view class="expiry-group">
-          <view wx:if="{{item.liabExpiry}}" class="expiry-text {{item.liabExpiry.type}}">
-            {{item.liabExpiry.text}}
+          <!-- 维修时长优先显示，如果有的话替换保险预警 -->
+          <view wx:if="{{item.maintenanceDurationText}}" class="expiry-text" style="color:#fa8c16;">
+            🔧已维修 {{item.maintenanceDurationText}}
           </view>
-          <view wx:if="{{item.commExpiry}}" class="expiry-text {{item.commExpiry.type}}">
-            {{item.commExpiry.text}}
-          </view>
+          <block wx:else>
+            <view wx:if="{{item.liabExpiry}}" class="expiry-text {{item.liabExpiry.type}}">
+              {{item.liabExpiry.text}}
+            </view>
+            <view wx:if="{{item.commExpiry}}" class="expiry-text {{item.commExpiry.type}}">
+              {{item.commExpiry.text}}
+            </view>
+          </block>
         </view>
       </view>
 
       <view class="row3 driver-row">
         <view class="driver-info">
           <view class="driver-col-name">
-            {{ item.driverName ? ('司机：' + item.driverName) : '当前无司机' }}
+            {{ item.driverName ? (item.driverName) : '当前无司机' }}
           </view>
           <view class="driver-col-phone" wx:if="{{item.currentDriverPhone}}">
             {{ item.currentDriverPhone }}
