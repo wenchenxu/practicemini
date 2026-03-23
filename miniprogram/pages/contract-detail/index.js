@@ -36,6 +36,8 @@ Page({
     // 二次确认弹窗控制
     showSwapConfirmDialog: false,
     selectedNewVehiclePlate: '',
+    // 合同内赠送天数
+    giftDaysInContract: 0,
   },
 
   onLoad(options) {
@@ -73,12 +75,22 @@ Page({
         }
       }
 
+      // 处理合同内置赠送天数
+      const giftDaysInContract = Number(displayData.giftDaysInContract || (displayData.fields && displayData.fields.giftDaysInContract) || 0);
+      const postGiftDays = Number(displayData.giftDays || 0);
+      const totalGiftDays = giftDaysInContract + postGiftDays;
+      let computedRealEndDate = displayData.contractValidPeriodEnd;
+
+      if (totalGiftDays > 0) {
+        computedRealEndDate = this._calcDate(totalGiftDays, displayData.contractValidPeriodEnd);
+      }
+
       this.setData({
         contract: displayData,
         giftDays: displayData.giftDays || '',
         giftDaysNotes: displayData.giftDaysNotes || '',
-        // 如果数据库里有算好的日期就用，没有就重新算一遍
-        contractRealEndDate: displayData.contractRealEndDate || displayData.contractValidPeriodEnd,
+        giftDaysInContract: giftDaysInContract,
+        contractRealEndDate: computedRealEndDate,
         rentPayFrequency: displayData.rentPayFrequency || 'month',
         rentPayDates: savedDates,
       });
@@ -162,7 +174,6 @@ Page({
       showEditModal: true,
       editGiftDays: giftDays, // 回显天数
       editGiftNotes: giftDaysNotes, // 回显备注
-      // 回显计算好的日期，或者基于合同原结束日重算
       editRealEndDate: contractRealEndDate || contract.contractValidPeriodEnd
     });
   },
@@ -176,9 +187,11 @@ Page({
   onEditDaysInput(e) {
     const val = e.detail.value;
     const baseDate = this.data.contract.contractValidPeriodEnd;
-
-    // 实时计算新的结束日期
-    const newDate = this._calcDate(val, baseDate);
+    const giftDaysInContract = this.data.giftDaysInContract || 0;
+    
+    // 实时计算新的结束日期 (合同内置赠送天数 + 后续赠送天数)
+    const totalDays = Number(val || 0) + Number(giftDaysInContract);
+    const newDate = this._calcDate(totalDays, baseDate);
 
     this.setData({
       editGiftDays: val,

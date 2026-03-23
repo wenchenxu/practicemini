@@ -5,7 +5,19 @@
     }
     return val;
   }
-  module.exports.def = def;
+  var isMonthly = function(val) {
+    if (!val) return false;
+    return val.indexOf('按月支付') === 0;
+  }
+  var isWeekly = function(val) {
+    if (!val) return false;
+    return val.indexOf('按周支付') === 0;
+  }
+  module.exports = {
+    def: def,
+    isMonthly: isMonthly,
+    isWeekly: isWeekly
+  };
 </wxs>
 
 <view class="container">
@@ -54,7 +66,7 @@
             
             <block wx:if="{{ (item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto' }}">
             
-              <view class="form-item item-{{item.name}}">
+              <view class="form-item item-{{item.name}}" wx:if="{{item.name !== 'rentPaybyDayInMonth' || cityCode !== 'changzhou'}}">
                 <label class="label">
                   <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
                   <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
@@ -70,6 +82,32 @@
                     <text class="date-icon" wx:if="{{mode!=='view'}}">📅</text>
                   </view>
                 </picker>
+              </view>
+
+              <!-- Changzhou custom rent pay row -->
+              <view class="form-item" wx:if="{{item.name === 'rentPaybyDayInMonth' && cityCode === 'changzhou'}}">
+                <label class="label"><text class="req">*</text>支付周期及日期</label>
+                <view style="display: flex; gap: 20rpx; align-items: stretch;">
+                  <picker mode="selector" range="{{['月付', '周付']}}" bindchange="onRentFreqChange" disabled="{{mode==='view'}}" style="flex: 1; min-width: 0;">
+                    <view class="input-box picker-box {{form.rentFrequency ? '' : 'ph'}}" style="height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+                      {{util.isMonthly(form.rentFrequency) ? '月付' : (util.isWeekly(form.rentFrequency) ? '周付' : '请选择周期')}}
+                      <text class="date-icon" style="margin-left:8rpx; font-size: 20rpx;">▼</text>
+                    </view>
+                  </picker>
+
+                  <input wx:if="{{util.isMonthly(form.rentFrequency)}}" class="input-box" type="number" placeholder="1-31号" placeholder-class="ph" value="{{ (mode==='view') ? util.def(form.rentPaybyDayInMonth) : (form.rentPaybyDayInMonth !== undefined ? form.rentPaybyDayInMonth : '') }}" bindinput="onInputNumber" data-name="rentPaybyDayInMonth" disabled="{{mode==='view'}}" style="flex: 1; min-width: 0;" />
+                  
+                  <picker wx:elif="{{util.isWeekly(form.rentFrequency)}}" mode="selector" range="{{['周一','周二','周三','周四','周五','周六','周日']}}" bindchange="onRentWeekChange" disabled="{{mode==='view'}}" style="flex: 1; min-width: 0;">
+                    <view class="input-box picker-box {{form.rentPaybyDayInWeek ? '' : 'ph'}}" style="height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+                      {{form.rentPaybyDayInWeek || '请选择周几'}}
+                      <text class="date-icon" style="margin-left:8rpx; font-size: 20rpx;">▼</text>
+                    </view>
+                  </picker>
+                  
+                  <view wx:else class="input-box picker-box ph" style="flex: 1; opacity: 0.5; min-width: 0; display: flex; align-items: center;">
+                    请先选周期
+                  </view>
+                </view>
               </view>
 
             </block>

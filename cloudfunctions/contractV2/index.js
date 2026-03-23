@@ -548,6 +548,11 @@ exports.main = async (event, context) => {
       daysTillPayment: finalFields.daysTillPayment,
       sellPrice: finalFields.sellPrice,
       notesWhenSell: finalFields.notesWhenSell || '无',
+
+      // 最新添加的字段：常州专属字段、赠送天数
+      rentFrequency: finalFields.rentFrequency || '',
+      rentPaybyDayInWeek: finalFields.rentPaybyDayInWeek || '',
+      giftDaysInContract: finalFields.giftDaysInContract !== undefined ? finalFields.giftDaysInContract : '',
     };
 
     const basePath = buildContractFolderPath({

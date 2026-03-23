@@ -67,6 +67,11 @@ const BASE_FIELDS = [
   // ---- Dates / Serial ----
   { name: 'contractDate', label: '签约日期', type: 'date', requiredWhen: 'always' },
   { name: 'contractSerialNumber', label: '合同流水号', type: 'number', requiredWhen: 'never', disabled: true, hideOnCreate: true },
+  
+  // ---- Admin / Hidden / Special ----
+  { name: 'giftDaysInContract', label: '赠送天数', type: 'number', requiredWhen: 'never', min: 0 },
+  { name: 'rentFrequency', label: '支付周期', type: 'string', requiredWhen: 'never', hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentPaybyDayInWeek', label: '每周支付日', type: 'string', requiredWhen: 'never', hideOnCreate: true, hideOnEdit: true, hideOnView: true }
 ];
 
 // 将数字自动换成中文大写
@@ -296,7 +301,12 @@ Page({
 
   initVisibleFields(mode) {
     const all = this.data.fields || [];
+    const cityCode = this.data.cityCode;
     const visible = all.filter(f => {
+      // 赠送天数仅常州新建合同可见
+      if (f.name === 'giftDaysInContract') {
+        return mode === 'create' && cityCode === 'changzhou';
+      }
       if (mode === 'create') return !f.hideOnCreate;
       if (mode === 'edit') return !f.hideOnEdit;
       if (mode === 'view') return !f.hideOnView;
@@ -325,7 +335,19 @@ Page({
 
   onInputNumber(e) {
     const name = e.currentTarget.dataset.name;
-    const value = e.detail.value;
+    let value = e.detail.value;
+
+    // 实时校验每月支付日不能跨出 1-31 范围
+    if (name === 'rentPaybyDayInMonth' && value !== '') {
+      const num = Number(value);
+      if (!Number.isInteger(num) || num < 1 || num > 31) {
+        wx.showToast({ title: '只能输入1-31之间的整数', icon: 'none' });
+        value = value.slice(0, -1);
+        this.setData({ [`form.${name}`]: value });
+        return value;
+      }
+    }
+
     const patch = { [`form.${name}`]: value };
 
     const map = {
@@ -341,6 +363,22 @@ Page({
       patch[`form.${map[name]}`] = numberToCN(value);
     }
     this.setData(patch);
+  },
+
+  onRentFreqChange(e) {
+    const val = Number(e.detail.value) === 0 ? '按月支付' : '按周支付';
+    this.setData({ 'form.rentFrequency': val });
+    if (val === '按周支付') {
+      this.setData({ 'form.rentPaybyDayInMonth': '' }); // 清空月份的值
+    } else {
+      this.setData({ 'form.rentPaybyDayInWeek': '' }); // 清空周的值
+    }
+  },
+
+  onRentWeekChange(e) {
+    const opts = ['周一','周二','周三','周四','周五','周六','周日'];
+    const val = opts[Number(e.detail.value)];
+    this.setData({ 'form.rentPaybyDayInWeek': val });
   },
 
   onDateChange(e) {
@@ -387,6 +425,9 @@ Page({
           return `${f.label}为必填`;
         }
         if ((f.type === 'number' || f.type === 'date') && (v === undefined || v === null || v === '')) {
+          if (f.name === 'rentPaybyDayInMonth' && this.data.cityCode === 'changzhou') {
+            continue;
+          }
           return `${f.label}为必填`;
         }
       }
@@ -422,8 +463,18 @@ Page({
       }
     }
 
-    const payDay = Number(form.rentPaybyDayInMonth);
-    if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
+    if (this.data.cityCode === 'changzhou') {
+      if (!form.rentFrequency) return '请选择支付周期';
+      if (form.rentFrequency.indexOf('按月支付') === 0) {
+        const payDay = Number(form.rentPaybyDayInMonth);
+        if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
+      } else if (form.rentFrequency.indexOf('按周支付') === 0) {
+        if (!form.rentPaybyDayInWeek) return '请选择每周支付日';
+      }
+    } else {
+      const payDay = Number(form.rentPaybyDayInMonth);
+      if (!(payDay >= 1 && payDay <= 31)) return '每月支付日需在 1 到 31 之间';
+    }
 
     if (!this.data.selectedTypeCode) {
       return '请选择合同类型';
@@ -502,6 +553,15 @@ Page({
     if (err) { wx.showToast({ title: err, icon: 'none', duration: 3000 }); return; }
 
     const payload = this.toPersistObject();
+
+    // 针对常州租金频次字符串做完整组装
+    if (cityCode === 'changzhou' && payload.rentFrequency) {
+      if (payload.rentFrequency.indexOf('按月支付') === 0) {
+        payload.rentFrequency = `按月支付，每月 ${payload.rentPaybyDayInMonth || form.rentPaybyDayInMonth} 号交租`;
+      } else if (payload.rentFrequency.indexOf('按周支付') === 0) {
+        payload.rentFrequency = `按周支付，每周 ${payload.rentPaybyDayInWeek || form.rentPaybyDayInWeek} 交租`;
+      }
+    }
 
     // 兜底逻辑：仅针对普通租赁填充默认值
     if (mode === 'create' && selectedTypeCode !== 'rent_rto') {

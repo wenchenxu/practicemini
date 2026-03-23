@@ -260,7 +260,11 @@
         <view class="section-title" style="margin-bottom:0; border:none; padding:0;">赠送延长天数</view>
         <van-button type="primary" size="small" plain round bind:click="onOpenEdit">编辑</van-button>
       </view>
-      
+      <view class="read-row" wx:if="{{contract.cityCode === 'changzhou' || giftDaysInContract > 0}}">
+        <text class="label">合同内赠送天数</text>
+        <text class="value">{{giftDaysInContract || 0}} 天</text>
+      </view>
+
       <view class="read-row">
         <text class="label">赠送天数</text>
         <text class="value">{{giftDays || 0}} 天</text>
