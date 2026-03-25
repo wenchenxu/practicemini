@@ -302,17 +302,15 @@ Page({
       query = query.limit(100);
     } else {
       // 普通模式：使用游标分页
-      if (lastId && orderByField === 'createdAt') {
-        if (lastCreatedAt) {
-          query = query.where(_.or([
-            { createdAt: _.lt(lastCreatedAt) },
-            { createdAt: lastCreatedAt, _id: _.lt(lastId) }
-          ]));
-        } else {
-          query = query.where({ _id: _.lt(lastId) });
-        }
+      if (lastId && orderByField === 'createdAt' && lastCreatedAt) {
+        // 如果我们有 createdAt，精确游标查询
+        query = query.where(_.or([
+          { createdAt: _.lt(lastCreatedAt) },
+          { createdAt: lastCreatedAt, _id: _.lt(lastId) }
+        ]));
       } else if (lastId) {
-        // 非 createdAt 排序 (如年审)，使用 skip (性能折衷)
+        // 当最后一条数据没有 createdAt（例如早期导入的记录）
+        // 或者是非 createdAt 排序 (如年审) 时，使用 skip (性能折衷，但保证绝对不重复)
         query = query.skip(this.data.list.length);
       }
       query = query.limit(pageSize);
@@ -491,11 +489,11 @@ Page({
       if (data && data.length > 0) {
         const tail = data[data.length - 1];
         newLastId = tail._id || '';
-
-        if (tail.createdAt) {
-          // 只有在 tail 有 createdAt 时才更新
-          newLastCreatedAt = tail.createdAt;
-        }
+        
+        // 关键修复：就算没有 createdAt，也要更新为 undefined/null，
+        // 从而触发下一页使用 skip 逻辑，否则会导致旧的 createdAt
+        // 遗留带入下一页条件使得数据全部乱套并导致无限循环。
+        newLastCreatedAt = tail.createdAt || null;
       }
 
       this.setData({

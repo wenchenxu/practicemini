@@ -69,15 +69,17 @@
 
       <view class="divider"></view>
 
-      <view class="item">
-        <text class="label">月租金</text>
-        <text class="value">¥ {{contract.rentMonthly || 0}}</text>
-      </view>
+      <block wx:if="{{contract.contractType !== 'rent_rto'}}">
+        <view class="item">
+          <text class="label">月租金</text>
+          <text class="value">¥ {{contract.rentMonthly || 0}}</text>
+        </view>
 
-      <view class="item">
-        <text class="label">首日支付金</text>
-        <text class="value">¥ {{contract.rentToday || 0}}</text>
-      </view>
+        <view class="item">
+          <text class="label">首期/当天支付租金</text>
+          <text class="value">¥ {{contract.rentToday || 0}}</text>
+        </view>
+      </block>
 
       <view class="item">
         <text class="label">每月支付日</text>
@@ -91,6 +93,14 @@
 
       <block wx:if="{{contract.contractType === 'rent_rto'}}">
         <view class="divider"></view>
+        <view class="item">
+            <text class="label">1到12月每期租金</text>
+            <text class="value">¥ {{contract.rentMonthlyFirstYear || 0}}</text>
+        </view>
+        <view class="item">
+            <text class="label">13到24月每期租金</text>
+            <text class="value">¥ {{contract.rentMonthlySecondYear || 0}}</text>
+        </view>
         <view class="item">
             <text class="label">约定购车款</text>
             <text class="value">¥ {{contract.sellPrice || 0}}</text>
@@ -116,7 +126,7 @@
         size="small" 
         plain 
         bind:click="onOpenSwapModal"
-        wx:if="{{contract && !contract.deleted}}"
+        wx:if="{{contract && !contract.deleted && contract.contractType !== 'rent_rto'}}"
         >更换车辆</van-button>
         </view>
 
