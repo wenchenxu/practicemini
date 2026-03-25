@@ -11,11 +11,53 @@ Page({
     page: 1,
     pageSize: 50,
     count: 0,
+    // 审核口令设置
+    auditMode: false,
+    auditCode: '',
+    ttlHours: 24,
   },
 
   onShow() {
     if (!ensureAdmin()) return;
     this.reload();
+    this.loadAuditSettings();
+  },
+
+  // ----- 审核口令设置 -----
+  async loadAuditSettings() {
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'auth-service',
+        data: { action: 'getAuditSettings' }
+      });
+      if (result?.ok) {
+        this.setData({
+          auditMode: !!result.auditMode,
+          auditCode: result.auditCode || '',
+          ttlHours: result.ttlHours ?? 24,
+        });
+      }
+    } catch (e) { /* 无权限不显示即可 */ }
+  },
+
+  onAuditModeChange(e) { this.setData({ auditMode: e.detail.value }); },
+  onAuditCodeInput(e)   { this.setData({ auditCode: e.detail.value.trim() }); },
+  onTtlInput(e)         { this.setData({ ttlHours: Number(e.detail.value) || 24 }); },
+
+  async saveAuditSettings() {
+    const { auditMode, auditCode, ttlHours } = this.data;
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'auth-service',
+        data: {
+          action: 'setAuditSettings',
+          payload: { auditMode, auditCode, ttlHours }
+        }
+      });
+      wx.showToast({ title: result?.ok ? '已保存' : '保存失败', icon: result?.ok ? 'success' : 'none' });
+    } catch (e) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+    }
   },
 
   onOpenidInput(e) { this.setData({ openid: e.detail.value.trim() }); },

@@ -28,12 +28,16 @@ async function handleCheckAccess(event, openid) {
   }
 
   // 1.2 审核模式 (从设置表读取)
-  const stDoc = await ST.orderBy('updatedAt', 'desc').limit(1).get();
+  // 注意：不用 orderBy('updatedAt') 避免无该字段时返回空；直接 limit(1)
+  const stDoc = await ST.limit(1).get();
   const st = stDoc.data?.[0] || {};
   const dbCode = String(st.auditCode || '').trim();
   const inputCode = String(auditToken || '').trim();
 
-  if (st.auditMode === true && inputCode && inputCode === dbCode) {
+  // 修复：用宽松判断代替 === true，防止数据库存储字符串 "true" 时失效
+  const auditModeOn = st.auditMode === true || st.auditMode === 'true';
+
+  if (auditModeOn && inputCode && inputCode === dbCode) {
     return {
       allowed: true,
       role: 'staff',
@@ -110,6 +114,34 @@ async function handleGetOpenid(openid) {
   return { openid };
 }
 
+// 6. 管理员设置审核口令 / 开关审核模式
+async function handleSetAuditSettings(event, openid) {
+  if (!(await checkAdmin(openid))) return { ok: false, msg: 'no-permission' };
+
+  const { auditCode, auditMode, ttlHours } = event || {};
+  const stDoc = await ST.limit(1).get();
+
+  const update = { updatedAt: db.serverDate() };
+  if (auditCode   !== undefined) update.auditCode  = String(auditCode).trim();
+  if (auditMode   !== undefined) update.auditMode  = auditMode === true || auditMode === 'true';
+  if (ttlHours    !== undefined) update.ttlHours   = Number(ttlHours) || 24;
+
+  if (stDoc.data.length > 0) {
+    await ST.doc(stDoc.data[0]._id).update({ data: update });
+  } else {
+    await ST.add({ data: { ...update, auditMode: false, auditCode: '', ttlHours: 24 } });
+  }
+  return { ok: true };
+}
+
+// 7. 获取当前审核设置（管理员用）
+async function handleGetAuditSettings(event, openid) {
+  if (!(await checkAdmin(openid))) return { ok: false, msg: 'no-permission' };
+  const stDoc = await ST.limit(1).get();
+  const st = stDoc.data?.[0] || {};
+  return { ok: true, auditMode: !!st.auditMode, auditCode: st.auditCode || '', ttlHours: st.ttlHours || 24 };
+}
+
 // === 主入口 ===
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext();
@@ -127,6 +159,10 @@ exports.main = async (event, context) => {
         return await handleRemove(payload, OPENID);
       case 'getOpenid':
         return await handleGetOpenid(OPENID);
+      case 'setAuditSettings':
+        return await handleSetAuditSettings(payload, OPENID);
+      case 'getAuditSettings':
+        return await handleGetAuditSettings(payload, OPENID);
       default:
         return { ok: false, msg: `Unknown action: ${action}` };
     }
