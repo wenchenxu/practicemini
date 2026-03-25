@@ -94,11 +94,11 @@
     <view class="detail-list">
       <view class="detail-row">
         <text class="label">交强险周期</text>
-        <text class="value">{{vehicle.liabInsStartStr || '-'}} 至 {{vehicle.liabInsEndStr || '-'}}</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.liabInsStartStr)}} 至 {{fmt.formatDateZh(vehicle.liabInsEndStr)}}</text>
       </view>
       <view class="detail-row">
         <text class="label">商业险周期</text>
-        <text class="value">{{vehicle.commInsStartStr || '-'}} 至 {{vehicle.commInsEndStr || '-'}}</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.commInsStartStr)}} 至 {{fmt.formatDateZh(vehicle.commInsEndStr)}}</text>
       </view>
     </view>
   </view>
@@ -112,7 +112,7 @@
     <view class="detail-list">
       <view class="detail-row">
         <text class="label">年审到期日</text>
-        <text class="value">{{vehicle.annualInspectionDateStr || '-'}}</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.annualInspectionDateStr)}}</text>
       </view>
     </view>
   </view>

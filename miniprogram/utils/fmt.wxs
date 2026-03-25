@@ -32,6 +32,16 @@ var formatTime = function(dateStr) {
     return y + '-' + m + '-' + day + ', ' + h + ':' + min + ':' + s;
   }
   
+  var formatDateZh = function(dateStr) {
+    if (!dateStr || dateStr === '-') return '-';
+    var parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return parts[0] + '年' + parts[1] + '月' + parts[2] + '日';
+    }
+    return dateStr;
+  }
+  
   module.exports = {
-    formatTime: formatTime
+    formatTime: formatTime,
+    formatDateZh: formatDateZh
   };
