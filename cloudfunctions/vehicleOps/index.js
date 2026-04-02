@@ -47,6 +47,8 @@ exports.main = async (event, context) => {
         return await getAllCitiesStats();
       case 'listAvailable':
         return await listAvailable(payload);
+      case 'exportCsv':
+        return await exportVehiclesToCsv(payload);
       case 'migrateBranches':
         return await migrateBranches();
       case 'autoReturnExpired':
@@ -729,13 +731,17 @@ async function getDashboardStats(payload) {
   }
 
   // 2. 准备查询条件
-  const cityMatch = cityCode ? { cityCode: cityCode } : {};
+  // 追加排除已售/报废条件的匹配
+  const baseMatch = { retired: _.neq(true) };
+  if (cityCode) {
+    baseMatch.cityCode = cityCode;
+  }
 
   // ----------------------------------------------------
   // A. 存量快照 (Snapshot)
   // ----------------------------------------------------
   const snapshotRes = await db.collection('vehicles').aggregate()
-    .match(cityMatch)
+    .match(baseMatch)
     .group({
       _id: null,
       total: $.sum(1),
@@ -797,7 +803,7 @@ async function getDashboardStats(payload) {
 
   const expiringRes = await db.collection('vehicles').where(
     _.and([
-      cityMatch,
+      baseMatch,
       _.or([
         { liabInsEnd: _.gte(new Date()).and(_.lte(future30d)) },
         { annualInspectionDate: _.gte(new Date()).and(_.lte(future30d)) }
@@ -1039,4 +1045,68 @@ async function autoReturnExpired() {
     console.error('[AutoReturn] Fatal Error:', err);
     return { ok: false, error: err.message };
   }
+}
+
+async function exportVehiclesToCsv(payload) {
+  const { cityCode, branchCode } = payload || {};
+  if (!cityCode) throw new Error('cityCode required');
+
+  const _ = db.command;
+  const where = { cityCode };
+  if (branchCode) {
+    where.branchCode = branchCode;
+  }
+
+  let allVehicles = [];
+  let page = 0;
+  const MAX_LIMIT = 1000;
+  const vehiclesCol = db.collection('vehicles');
+
+  while (true) {
+    const res = await vehiclesCol.where(where).skip(page * MAX_LIMIT).limit(MAX_LIMIT).get();
+    const list = res.data;
+    if (!list || list.length === 0) break;
+    allVehicles = allVehicles.concat(list);
+    page++;
+    if (list.length < MAX_LIMIT) break;
+  }
+
+  if (allVehicles.length === 0) {
+    throw new Error('No vehicles found for the selected criteria.');
+  }
+
+  // Sanitize array: remove _id to prevent upsert issues later if they re-import
+  const cleanData = allVehicles.map(v => {
+    delete v._id;
+    delete v._openid;
+    
+    // Normalize date objects to avoid [object Object] in CSV
+    for (const key in v) {
+      if (v[key] instanceof Date) {
+        v[key] = v[key].toISOString();
+      }
+    }
+    return v;
+  });
+
+  const csvStr = Papa.unparse(cleanData);
+
+  // Upload to Temporary File with UTF-8 BOM
+  const uploadRes = await cloud.uploadFile({
+    cloudPath: `temp_exports/vehicles_${cityCode}_${branchCode || 'all'}_${Date.now()}.csv`,
+    fileContent: Buffer.from('\ufeff' + csvStr, 'utf8')
+  });
+
+  const fileID = uploadRes.fileID;
+
+  // Get Temp URL
+  const tmp = await cloud.getTempFileURL({
+    fileList: [fileID],
+    maxAge: 60 * 60 * 1 // 1 hour validity
+  });
+
+  const url = tmp?.fileList?.[0]?.tempFileURL;
+  if (!url) throw new Error('Cannot acquire download URL');
+
+  return { ok: true, url, total: allVehicles.length };
 }

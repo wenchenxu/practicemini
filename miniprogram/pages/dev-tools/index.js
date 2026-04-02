@@ -1,17 +1,31 @@
 // pages/dev-tools/index.js
 const { ensureAdmin } = require('../../utils/guard');
+const { CITY_CODE_MAP, BRANCH_OPTIONS_BY_CITY } = require('../../utils/config');
 
 Page({
   data: {
     loading: false,
     delCity: '',
     delConfirm: '',
-    canDelete: false
+    canDelete: false,
+    
+    // Export CSV pickers
+    exportCities: [],
+    exportBranches: [],
+    exportCityIndex: -1,
+    exportBranchIndex: -1
   },
 
   onLoad() {
     // 只有管理员能进，虽然 guard 已经在 index 入口做了，这里双重保险
     ensureAdmin();
+
+    // Initialize City Pickers
+    const cities = Object.keys(CITY_CODE_MAP).map(k => ({
+      code: k,
+      name: CITY_CODE_MAP[k]
+    }));
+    this.setData({ exportCities: cities });
   },
 
   async onDeduplicateVehicles() {
@@ -361,5 +375,81 @@ Page({
         }
       }
     });
+  },
+
+  // --- Export Vehicles (CSV) Handlers ---
+
+  onExportCityChange(e) {
+    const idx = parseInt(e.detail.value, 10);
+    const city = this.data.exportCities[idx];
+    const branches = BRANCH_OPTIONS_BY_CITY[city.code] || [];
+    
+    this.setData({
+      exportCityIndex: idx,
+      exportBranchIndex: -1,
+      exportBranches: branches
+    });
+  },
+
+  onExportBranchChange(e) {
+    this.setData({
+      exportBranchIndex: parseInt(e.detail.value, 10)
+    });
+  },
+
+  async onExportCsv() {
+    const { exportCityIndex, exportBranchIndex, exportCities, exportBranches } = this.data;
+    if (exportCityIndex < 0) {
+      return wx.showToast({ title: '请选择城市', icon: 'none' });
+    }
+
+    const cityCode = exportCities[exportCityIndex].code;
+    let branchCode = null;
+    if (exportBranches && exportBranches.length > 0) {
+      if (exportBranchIndex < 0) {
+        return wx.showToast({ title: '请选择分公司', icon: 'none' });
+      }
+      branchCode = exportBranches[exportBranchIndex].code;
+    }
+
+    const that = this;
+    that.setData({ loading: true });
+    wx.showLoading({ title: '生成中...', mask: true });
+
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: {
+          action: 'exportCsv',
+          payload: { cityCode, branchCode }
+        }
+      });
+
+      wx.hideLoading();
+      that.setData({ loading: false });
+
+      if (result && result.ok) {
+        wx.showModal({
+          title: '导出成功',
+          content: '点击确定，复制下载链接到剪切板。在浏览器或微信中打开即可下载Excel文件。',
+          showCancel: false,
+          success: () => {
+            wx.setClipboardData({
+              data: result.url,
+              success() {
+                wx.showToast({ title: '链接已复制', icon: 'success' });
+              }
+            });
+          }
+        });
+      } else {
+        wx.showModal({ title: '导出失败', content: result?.error || '未知错误', showCancel: false });
+      }
+    } catch (e) {
+      console.error(e);
+      wx.hideLoading();
+      that.setData({ loading: false });
+      wx.showToast({ title: '调用异常', icon: 'none' });
+    }
   }
 });

@@ -4,6 +4,7 @@ const cloud = require('wx-server-sdk');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const fetch = require('node-fetch');
+const https = require('https');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -13,6 +14,30 @@ const COL_DRIVERS = db.collection('drivers');
 const COL_VEHICLES = db.collection('vehicles');
 const COL_HISTORY = db.collection('vehicle_history');
 const BIZ_TZ = 'Asia/Shanghai';
+
+// [修复] 绕过开发者工具代理证书不受信导致的 SSL alert 49 Node 崩溃
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false
+});
+
+async function safeDownloadCloudFile(fileID) {
+  try {
+    const tmp = await cloud.getTempFileURL({
+      fileList: [fileID],
+      maxAge: 3600
+    });
+    const url = tmp?.fileList?.[0]?.tempFileURL;
+    if (!url) throw new Error('Cannot get temp file url for ' + fileID);
+
+    const resp = await fetch(url, { agent: httpsAgent });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buffer = await resp.buffer();
+    return { fileContent: buffer };
+  } catch (e) {
+    throw e;
+  }
+}
+
 
 
 // [修改] 动态获取当前环境的云存储根路径
@@ -150,7 +175,7 @@ async function pickTemplateBuffer(opts) {
 
   for (const fileID of candidates) {
     try {
-      const res = await cloud.downloadFile({ fileID });
+      const res = await safeDownloadCloudFile(fileID);
       console.log('[Template Debug] Found main template:', fileID);
       return { fileID, buffer: res.fileContent };
     } catch (e) {
@@ -185,7 +210,7 @@ async function generateAttachmentDocx(opts) {
 
   let tplBuf;
   try {
-    const res = await cloud.downloadFile({ fileID: tplFileID });
+    const res = await safeDownloadCloudFile(tplFileID);
     tplBuf = res.fileContent;
   } catch (e) {
     console.warn(`[Attachment] Template missing: ${tplFileID}`);

@@ -43,6 +43,38 @@
       确认彻底删除
     </button>
   </view>
+
+  <view class="card" style="border: 2rpx solid #1677ff; background:#e6f7ff;">
+    <view class="title" style="color: #1677ff;">导出车辆记录 (CSV)</view>
+    <view class="desc">
+      选择城市和分公司，导出当前数据库中该节点的全量车辆记录为 CSV 格式，并复制下载链接供 PC/手机端下载。
+    </view>
+    
+    <view class="input-group">
+      <view class="label">选择城市:</view>
+      <picker class="input" mode="selector" range="{{exportCities}}" range-key="name" bindchange="onExportCityChange" value="{{exportCityIndex}}">
+        <view class="picker-inner">
+          <text wx:if="{{exportCityIndex >= 0}}">{{exportCities[exportCityIndex].name}}</text>
+          <text wx:else style="color:#999;">请选择城市...</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="input-group">
+      <view class="label">选择分公司:</view>
+      <picker class="input" mode="selector" range="{{exportBranches}}" range-key="name" bindchange="onExportBranchChange" value="{{exportBranchIndex}}" disabled="{{exportBranches.length === 0}}" style="{{exportBranches.length === 0 ? 'background:#f5f5f5;' : ''}}">
+        <view class="picker-inner">
+          <text wx:if="{{exportBranches.length === 0}}" style="color:#ccc;">此城市无配置的分公司</text>
+          <text wx:elif="{{exportBranchIndex >= 0}}">{{exportBranches[exportBranchIndex].name}}</text>
+          <text wx:else style="color:#999;">请选择分公司...</text>
+        </view>
+      </picker>
+    </view>
+
+    <button type="primary" bindtap="onExportCsv" loading="{{loading}}">
+      生成并导出CSV
+    </button>
+  </view>
   <view class="card" style="border: 2rpx solid #1677ff; background:#e6f7ff;">
     <view class="title" style="color:#1677ff;">CSV 智能导入 (Upsert)</view>
     <view class="desc">
