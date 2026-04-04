@@ -13,7 +13,11 @@ Page({
     exportCities: [],
     exportBranches: [],
     exportCityIndex: -1,
-    exportBranchIndex: -1
+    exportBranchIndex: -1,
+
+    // Fix Plate Typo
+    fixOldPlate: '',
+    fixNewPlate: ''
   },
 
   onLoad() {
@@ -451,5 +455,69 @@ Page({
       that.setData({ loading: false });
       wx.showToast({ title: '调用异常', icon: 'none' });
     }
+  },
+
+  // --- Fix Plate Typo Handlers ---
+  
+  onInputOldPlate(e) {
+    this.setData({ fixOldPlate: e.detail.value.trim().toUpperCase() });
+  },
+
+  onInputNewPlate(e) {
+    this.setData({ fixNewPlate: e.detail.value.trim().toUpperCase() });
+  },
+
+  async onFixPlate() {
+    const { fixOldPlate, fixNewPlate } = this.data;
+    if (!fixOldPlate || !fixNewPlate) {
+      return wx.showToast({ title: '参数不完整', icon: 'none' });
+    }
+    if (fixOldPlate === fixNewPlate) {
+      return wx.showToast({ title: '新旧车牌不能一样', icon: 'none' });
+    }
+
+    const that = this;
+    wx.showModal({
+      title: '谨慎操作',
+      content: `确定要把【${fixOldPlate}】修正为【${fixNewPlate}】吗？此操作将全面修改相关历史记录与合同关联，不可恢复！`,
+      confirmColor: '#d93025',
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        that.setData({ loading: true });
+        wx.showLoading({ title: '深层替换中...', mask: true });
+
+        try {
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: {
+              action: 'renamePlate',
+              payload: { oldPlate: fixOldPlate, newPlate: fixNewPlate }
+            }
+          });
+
+          wx.hideLoading();
+          that.setData({ loading: false });
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '修复成功',
+              content: `已成功替换主记录。\n同步修正时间线: ${result.updates.historyCount} 条\n同步修正合同关联: ${result.updates.contractsCount} 条。`,
+              showCancel: false,
+              success: () => {
+                that.setData({ fixOldPlate: '', fixNewPlate: '' });
+              }
+            });
+          } else {
+            wx.showModal({ title: '操作失败', content: result?.error || '未知错误', showCancel: false });
+          }
+        } catch (e) {
+          console.error(e);
+          wx.hideLoading();
+          that.setData({ loading: false });
+          wx.showToast({ title: '调用异常', icon: 'none' });
+        }
+      }
+    });
   }
 });

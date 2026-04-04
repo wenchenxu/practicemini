@@ -49,6 +49,8 @@ exports.main = async (event, context) => {
         return await listAvailable(payload);
       case 'exportCsv':
         return await exportVehiclesToCsv(payload);
+      case 'renamePlate':
+        return await renamePlate(payload);
       case 'migrateBranches':
         return await migrateBranches();
       case 'autoReturnExpired':
@@ -1109,4 +1111,57 @@ async function exportVehiclesToCsv(payload) {
   if (!url) throw new Error('Cannot acquire download URL');
 
   return { ok: true, url, total: allVehicles.length };
+}
+
+async function renamePlate(payload) {
+  const { oldPlate, newPlate } = payload || {};
+  const cleanOld = (oldPlate || '').trim();
+  const cleanNew = (newPlate || '').trim();
+
+  if (!cleanOld || !cleanNew) {
+    throw new Error('oldPlate and newPlate required');
+  }
+
+  const vehiclesCol = db.collection('vehicles');
+  const historyCol = db.collection('vehicle_history');
+  const contractsCol = db.collection('contracts');
+
+  // 1. Check if new plate already exists
+  const existRes = await vehiclesCol.where({ plate: cleanNew }).limit(1).get();
+  if (existRes.data && existRes.data.length > 0) {
+    throw new Error(`目标车牌（${cleanNew}）已经存在于数据库中，无法执行合并替换以防数据损毁！`);
+  }
+
+  // 2. Find old vehicle
+  const targetRes = await vehiclesCol.where({ plate: cleanOld }).limit(1).get();
+  if (!targetRes.data || targetRes.data.length === 0) {
+    throw new Error(`找不到原车辆（${cleanOld}），请核对车牌号。`);
+  }
+  const oldDocId = targetRes.data[0]._id;
+
+  // 3. Update vehicles collection (1 document)
+  await vehiclesCol.doc(oldDocId).update({
+    data: {
+      plate: cleanNew,
+      updatedAt: db.serverDate()
+    }
+  });
+
+  // 4. Mass update vehicle histories
+  const hisRes = await historyCol.where({ plate: cleanOld }).update({
+    data: { plate: cleanNew }
+  });
+
+  // 5. Mass update contracts
+  const conRes = await contractsCol.where({ 'fields.carPlate': cleanOld }).update({
+    data: { 'fields.carPlate': cleanNew, updatedAt: db.serverDate() }
+  });
+
+  return {
+    ok: true,
+    updates: {
+      historyCount: hisRes.stats.updated || 0,
+      contractsCount: conRes.stats.updated || 0
+    }
+  };
 }

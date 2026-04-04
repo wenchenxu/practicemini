@@ -87,6 +87,27 @@
     </button>
   </view>
 
+  <view class="card danger-zone" style="border: 2rpx solid #fa8c16; background:#fff7e6;">
+    <view class="title" style="color: #d46b08;">车牌错别字深层订正</view>
+    <view class="desc">
+      切勿直接在控制台修改车牌字眼！由核心底层控制该操作才能保证安全。在此替换车牌，系统会同时跨集合修正 <text style="font-weight:bold">车辆主体历史、系统时间线、以及所有历史绑定合同</text> 的底层外键映射，以免断连。
+    </view>
+    
+    <view class="input-group">
+      <view class="label">当前报错的旧车牌 (例如 粤A12344):</view>
+      <input class="input" placeholder="请输入旧车牌" bindinput="onInputOldPlate" value="{{fixOldPlate}}" />
+    </view>
+
+    <view class="input-group">
+      <view class="label">更新为正确的新车牌 (例如 粤A12345):</view>
+      <input class="input" placeholder="请输入新车牌" bindinput="onInputNewPlate" value="{{fixNewPlate}}" />
+    </view>
+
+    <button type="primary" style="background-color: #fa8c16; color: #fff;" bindtap="onFixPlate" loading="{{loading}}" disabled="{{!fixOldPlate || !fixNewPlate}}">
+      执行全库车牌安全置换
+    </button>
+  </view>
+
   <view class="card">
     <view class="title">城市转分公司数据迁移</view>
     <view class="desc">
