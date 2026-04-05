@@ -38,6 +38,13 @@ Page({
         
         wx.navigateTo({ url });
     },
+    goOffline() {
+        const { cityCode, city, branchCode, branchName } = this.data;
+        let url = `/pages/contract-offline/index?cityCode=${encodeURIComponent(cityCode)}&city=${encodeURIComponent(city)}`;
+        if (branchCode) url += `&branchCode=${branchCode}&branchName=${encodeURIComponent(branchName)}`;
+        
+        wx.navigateTo({ url });
+    },
     goList() {
         const { cityCode, city, branchCode, branchName } = this.data;
         let url = `/pages/contract-list/index?cityCode=${encodeURIComponent(cityCode)}&city=${encodeURIComponent(city)}`;

@@ -4,6 +4,7 @@
     "pages/index/index",
     "pages/city/index",
     "pages/contract-new/index",
+    "pages/contract-offline/index",
     "pages/contract-list/index",
     "pages/fadada-test/index",
     "pages/admin/whitelist/whitelist",

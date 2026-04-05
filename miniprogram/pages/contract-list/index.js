@@ -1044,7 +1044,21 @@ Page({
 
   editOne(e) {
     const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
     const { cityCode, city } = this.data;
+    
+    if (item && item.isOffline) {
+        wx.navigateTo({
+            url:
+              `/pages/contract-offline/index` +
+              `?id=${id}` +
+              `&mode=edit` +
+              `&cityCode=${encodeURIComponent(cityCode)}` +
+              `&city=${encodeURIComponent(city)}`
+          });
+          return;
+    }
+
     wx.navigateTo({
       url:
         `/pages/contract-new/index` +

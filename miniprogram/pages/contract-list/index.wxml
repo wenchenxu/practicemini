@@ -45,12 +45,12 @@
             bindtap="openDocFromRow"
             data-id="{{item._id}}"
         >
-            <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+            <text class="name">{{item.fields.clientName || '（未命名）'}} <text wx:if="{{item.isOffline}}" style="color:#d46b08; font-size:22rpx; margin-left:8rpx; border:1rpx solid #ffd591; padding:2rpx 8rpx; border-radius:4rpx; background:#fff7e6;">线下合同</text></text>
             <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
-        <!-- 无文件：禁用态 -->
+        <!-- 无文件或线下合同：禁用态 -->
         <view wx:else class="file-title disabled">
-          <text class="name">{{item.fields.clientName || '（未命名）'}}</text>
+          <text class="name">{{item.fields.clientName || '（未命名）'}} <text wx:if="{{item.isOffline}}" style="color:#d46b08; font-size:22rpx; margin-left:8rpx; border:1rpx solid #ffd591; padding:2rpx 8rpx; border-radius:4rpx; background:#fff7e6;">线下合同</text></text>
           <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
         <!-- 取消显示文件
@@ -68,7 +68,7 @@
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
         </view>
-        <view class="sub status-line">
+        <view class="sub status-line" wx:if="{{!item.isOffline}}">
             <view>签署状态：{{item._signStatusText|| '未发起签署'}}</view>
         </view>
         <!-- 暂时取消司机详情页 
@@ -106,33 +106,35 @@
         </view>
 
         <!-- 新增：发起签署并拿链接 -->
-        <button
-            class="mini-op"
-            data-id="{{item._id}}"
-            data-item="{{item}}"
-            bindtap="onSignFromRowV1"
-            size="mini"
-            type="primary"
-            loading="{{runningId === item._id}}"
-            disabled="{{item._signFinished}}"
-        >发起签署</button>
-        <button
-            class="mini-op refresh-btn"
-            size="mini"
-            type="default"
-            bindtap="onRefreshSignTaskStatus"
-            data-id="{{item._id}}"
-            data-sign-task-id="{{item.esign.signTaskId}}"
-            loading="{{refreshingId === item._id}}"
-            disabled="{{item._refreshDisabled || item._signFinished}}"
-        >{{item._refreshButtonText || '刷新状态'}}</button>
-        <button
-            data-id="{{item._id}}"
-            bindtap="onGetDownloadUrlFromRow"
-            size="mini"
-            type="default"
-            disabled="{{!item.esign || !item.esign.signTaskId}}"
-        >合同下载</button>
+        <block wx:if="{{!item.isOffline}}">
+          <button
+              class="mini-op"
+              data-id="{{item._id}}"
+              data-item="{{item}}"
+              bindtap="onSignFromRowV1"
+              size="mini"
+              type="primary"
+              loading="{{runningId === item._id}}"
+              disabled="{{item._signFinished}}"
+          >发起签署</button>
+          <button
+              class="mini-op refresh-btn"
+              size="mini"
+              type="default"
+              bindtap="onRefreshSignTaskStatus"
+              data-id="{{item._id}}"
+              data-sign-task-id="{{item.esign.signTaskId}}"
+              loading="{{refreshingId === item._id}}"
+              disabled="{{item._refreshDisabled || item._signFinished}}"
+          >{{item._refreshButtonText || '刷新状态'}}</button>
+          <button
+              data-id="{{item._id}}"
+              bindtap="onGetDownloadUrlFromRow"
+              size="mini"
+              type="default"
+              disabled="{{!item.esign || !item.esign.signTaskId}}"
+          >合同下载</button>
+        </block>
       </view>
       <!-- 调试用，看看最后拿到的链接 -->
       <!-- <text selectable="true">{{lastEsignUrl}}</text>-->

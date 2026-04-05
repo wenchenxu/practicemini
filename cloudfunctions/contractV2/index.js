@@ -280,6 +280,7 @@ exports.main = async (event, context) => {
       branchName = '',
       contractType = 'rent_std',
       contractTypeName = '纯租租赁',
+      isOffline = false,
       payload = {}
     } = event || {};
 
@@ -497,6 +498,7 @@ exports.main = async (event, context) => {
           contractTypeName,
           fields,
           contractStatus: 'active',
+          isOffline: !!isOffline,
           creatorOpenId: OPENID || '',
           creatorName: creatorName || '',
           deleted: false,
@@ -523,6 +525,17 @@ exports.main = async (event, context) => {
     });
 
     const { contractId, serialFormatted, finalFields } = txResult;
+
+    // === OFFLINE ABORT CHECK ===
+    if (isOffline) {
+      console.log(`[ContractV2] Offline Mode. Successfully saved contract ${contractId} (${serialFormatted}), skipping DOCX generation.`);
+      return { 
+        ok: true, 
+        _id: contractId, 
+        contractSerialNumberFormatted: serialFormatted,
+        isOffline: true 
+      };
+    }
 
     // === 事务外：渲染 DOCX + PDF（直接复用你原 createContract 的逻辑） ===
     const dataForDocx = {

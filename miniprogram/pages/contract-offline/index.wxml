@@ -1,0 +1,89 @@
+<view class="container">
+  <view class="header">
+    <view class="header-tag">{{city}} 线下合同补录</view>
+    <view class="header-info">
+      <text class="type-text">无需签署</text>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="card-title">基础配置</view>
+
+    <view wx:if="{{showTypePicker}}" class="row-picker">
+      <view class="row-label"><text class="req">*</text>合同类型</view>
+      <picker mode="selector" range="{{typeOptions}}" range-key="name" value="{{typeIndex}}" bindchange="onPickType" class="picker-flex">
+        <view class="picker-text {{typeIndex>=0?'':'placeholder'}}">
+          {{ typeIndex>=0 ? typeOptions[typeIndex].name : '请选择合同类型' }}
+        </view>
+      </picker>
+      <view class="row-arrow">›</view>
+    </view>
+
+    <view class="row-picker no-border">
+      <view class="row-label"><text class="req" wx:if="{{mode==='create'}}">*</text>选择可用车辆</view>
+      <picker mode="selector" range="{{vehiclePickerRange}}" value="{{vehiclePickerIndex}}" bindchange="onVehiclePickChange" class="picker-flex" disabled="{{mode==='edit'}}">
+        <view class="picker-text {{vehiclePickerIndex>=0?'':'placeholder'}}">
+          {{ vehiclePickerIndex >= 0 ? vehiclePickerRange[vehiclePickerIndex] : '请选择可用车辆' }}
+        </view>
+      </picker>
+      <view class="row-arrow" wx:if="{{mode==='create'}}">›</view>
+    </view>
+  </view>
+
+  <form bindsubmit="onSubmit">
+    <view class="section-card form-card">
+      <view class="card-title-row">
+        <view class="card-title" style="margin-bottom: 0;">补录关键信息</view>
+      </view>
+      
+      <view class="form-wrap">
+        <block wx:for="{{visibleFields}}" wx:key="name">
+          <block wx:if="{{ (item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto' }}">
+            <view class="form-item">
+              <label class="label">
+                <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
+                <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
+              </label>
+
+              <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ form[item.name] || '' }}" bindinput="onInput" data-name="{{item.name}}" maxlength="{{item.maxLength || -1}}" />
+
+              <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{ form[item.name] !== undefined ? form[item.name] : '' }}" bindinput="onInputNumber" data-name="{{item.name}}" />
+
+              <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{form[item.name] || ''}}" bindchange="onDateChange" data-name="{{item.name}}">
+                <view class="input-box picker-box {{form[item.name]?'':'ph'}}">
+                  {{ form[item.name] || '请选择日期' }}
+                  <text class="date-icon">📅</text>
+                </view>
+              </picker>
+            </view>
+          </block>
+        </block>
+
+        <block wx:if="{{selectedTypeCode === 'rent_rto'}}">
+          <view class="divider" style="height:1rpx; background:#f0f0f0; margin: 20rpx 0;"></view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>1—12期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFirstYear}}" bindinput="onInputNumber" data-name="rentMonthlyFirstYear" />
+          </view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>13—24期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlySecondYear}}" bindinput="onInputNumber" data-name="rentMonthlySecondYear" />
+          </view>
+          
+          <view class="form-item">
+            <label class="label"><text class="req">*</text>车辆购买售价</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.sellPrice}}" bindinput="onInputNumber" data-name="sellPrice" />
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="footer-actions">
+      <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}" class="submit-btn" style="background:#52c41a;">
+        {{ mode === 'edit' ? '保存修改' : '提交收录' }}
+      </button>
+    </view>
+  </form>
+</view>
