@@ -514,18 +514,18 @@ async function importOfflineContracts(payload) {
       // 防御性 trim 所有值
       const t = (v) => (v == null ? '' : String(v).trim());
 
-      const safePlate          = t(row.plate);
-      const safeClientId       = t(row.clientId);
-      const safeClientName     = t(row.clientName);
-      const safeClientPhone    = t(row.clientPhone);
-      const safeBranchCode     = t(row.branchCode);
-      const safeCityCode       = t(row.cityCode);           // CSV 可能直接带 cityCode
-      const safeContractType   = t(row.contractType) || 'offline';
-      const safeTypeName       = t(row.contractTypeName);
-      const safeStart          = t(row.contractValidPeriodStart);
-      const safeEnd            = t(row.contractValidPeriodEnd);
-      const safeRent           = t(row.rentMonthly);
-      const safeDeposit        = t(row.deposit);
+      const safePlate = t(row.plate);
+      const safeClientId = t(row.clientId);
+      const safeClientName = t(row.clientName);
+      const safeClientPhone = t(row.clientPhone);
+      const safeBranchCode = t(row.branchCode);
+      const safeCityCode = t(row.cityCode);           // CSV 可能直接带 cityCode
+      const safeContractType = t(row.contractType) || 'offline';
+      const safeTypeName = t(row.contractTypeName);
+      const safeStart = t(row.contractValidPeriodStart);
+      const safeEnd = t(row.contractValidPeriodEnd);
+      const safeRent = t(row.rentMonthly);
+      const safeDeposit = t(row.deposit);
 
       if (!safePlate || !safeClientId) {
         errorCount++;
@@ -543,9 +543,9 @@ async function importOfflineContracts(payload) {
         const now = db.serverDate();
 
         await db.runTransaction(async tx => {
-          const driversTx  = tx.collection('drivers');
+          const driversTx = tx.collection('drivers');
           const vehiclesTx = tx.collection('vehicles');
-          const historyTx  = tx.collection('vehicle_history');
+          const historyTx = tx.collection('vehicle_history');
           const contractsTx = tx.collection('contracts');
 
           // ==== 1. Driver Upsert ====
@@ -1084,7 +1084,7 @@ async function exportVehiclesToCsv(payload) {
   const cleanData = allVehicles.map(v => {
     delete v._id;
     delete v._openid;
-    
+
     // Normalize date objects to avoid [object Object] in CSV
     for (const key in v) {
       if (v[key] instanceof Date) {
@@ -1172,32 +1172,45 @@ async function renamePlate(payload) {
 async function backfillOffline() {
   const _ = db.command;
   try {
-    const lookupRes = await db.collection('contracts').where({
-      isOffline: _.neq(true),
-      'fields.contractSerialNumberFormatted': _.exists(false)
-    }).limit(100).get();
+    let totalUpdated = 0;
+    let keepGoing = true;
+    let sample = null;
 
-    const targets = lookupRes.data || [];
-    if (targets.length === 0) {
+    while (keepGoing) {
+      const lookupRes = await db.collection('contracts').where({
+        isOffline: _.neq(true),
+        'esign.signTaskId': _.exists(false),  
+        'file': _.exists(false)     // 批量导入的核心特征：完全没有文件对象
+      }).limit(100).get();
+
+      const targets = lookupRes.data || [];
+      if (targets.length === 0) {
+        keepGoing = false;
+        break;
+      }
+
+      if (!sample) sample = targets[0];
+
+      for (const doc of targets) {
+        await db.collection('contracts').doc(doc._id).update({
+          data: {
+            isOffline: true,
+            updatedAt: db.serverDate()
+          }
+        });
+        totalUpdated++;
+      }
+    }
+
+    if (totalUpdated === 0) {
       return { ok: true, msg: '没有找到需要修复的存量记录' };
     }
 
-    let updatedCount = 0;
-    for (const doc of targets) {
-      await db.collection('contracts').doc(doc._id).update({
-        data: {
-          isOffline: true,
-          updatedAt: db.serverDate()
-        }
-      });
-      updatedCount++;
-    }
-
-    return { 
-      ok: true, 
-      msg: `成功为 ${updatedCount} 条历史导入数据标记为了线下合同。` 
+    return {
+      ok: true,
+      msg: `成功标记了 ${totalUpdated} 条，示例如下：${sample.fields?.clientName || 'no_name'} - ${sample._id}`
     };
-  } catch(e) {
+  } catch (e) {
     console.error('[backfill] failed', e);
     return { ok: false, error: e.message };
   }
