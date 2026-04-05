@@ -55,6 +55,8 @@ exports.main = async (event, context) => {
         return await migrateBranches();
       case 'autoReturnExpired':
         return await autoReturnExpired();
+      case 'backfillOffline':
+        return await backfillOffline();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -623,6 +625,7 @@ async function importOfflineContracts(payload) {
               contractTypeName: derivedTypeName,
               deleted: false,
               contractStatus: 'active',
+              isOffline: true,
               cityCode: derivedCityCode,
               cityName: derivedCityName,  // Added City Name
               branchCode: safeBranchCode,
@@ -1164,4 +1167,38 @@ async function renamePlate(payload) {
       contractsCount: conRes.stats.updated || 0
     }
   };
+}
+
+async function backfillOffline() {
+  const _ = db.command;
+  try {
+    const lookupRes = await db.collection('contracts').where({
+      isOffline: _.neq(true),
+      'fields.contractSerialNumberFormatted': _.exists(false)
+    }).limit(100).get();
+
+    const targets = lookupRes.data || [];
+    if (targets.length === 0) {
+      return { ok: true, msg: '没有找到需要修复的存量记录' };
+    }
+
+    let updatedCount = 0;
+    for (const doc of targets) {
+      await db.collection('contracts').doc(doc._id).update({
+        data: {
+          isOffline: true,
+          updatedAt: db.serverDate()
+        }
+      });
+      updatedCount++;
+    }
+
+    return { 
+      ok: true, 
+      msg: `成功为 ${updatedCount} 条历史导入数据标记为了线下合同。` 
+    };
+  } catch(e) {
+    console.error('[backfill] failed', e);
+    return { ok: false, error: e.message };
+  }
 }

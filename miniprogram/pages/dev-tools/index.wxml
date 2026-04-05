@@ -140,4 +140,14 @@
     </button>
   </view>
 
+  <view class="card">
+    <view class="title">补齐脱机合同标签</view>
+    <view class="desc">
+      为数据库中以往批量导入的“线下合同”补齐 `isOffline: true` 标签，使前端能够正确隐藏签署按钮。
+    </view>
+    <button type="primary" bindtap="onBackfillOffline" loading="{{loading}}">
+      挂载线下合同标签
+    </button>
   </view>
+
+</view>
