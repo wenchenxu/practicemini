@@ -423,6 +423,11 @@ exports.main = async (event, context) => {
       }
       const vehicle = vehRes.data[0];
 
+      // ★ 强制从权威车库拉取核心资产属性，兜底前端表单(特别是当老旧/离线合同遗失了字段时)
+      fields.carModel = vehicle.model || fields.carModel || '';
+      fields.carVin = vehicle.vin || fields.carVin || '';
+      fields.carColor = vehicle.color || fields.carColor || '';
+
       // 旧状态轴（兼容老数据，没值就默认闲置 + 不在维修）
       const oldRentStatus =
         vehicle.rentStatus || 'available';          // 'available' | 'rented'
