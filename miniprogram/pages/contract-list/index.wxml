@@ -26,10 +26,11 @@
   </view>
   <!-- 顶部筛选 tabs -->
   <view class="tabs">
-    <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
-    <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
-    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
-    <!-- <view class="tab {{filter=='history'?'on':''}}" data-filter="history" bindtap="onFilterTap">历史</view> -->
+    <view class="tab {{filter=='active'?'on':''}}" data-filter="active" bindtap="onFilterTap">生效中 {{filterCounts.active ? '(' + filterCounts.active + ')' : ''}}</view>
+    <view class="tab {{filter=='expired'?'on':''}}" data-filter="expired" bindtap="onFilterTap">已结束 {{filterCounts.expired ? '(' + filterCounts.expired + ')' : ''}}</view>
+    <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签 {{filterCounts.waiting ? '(' + filterCounts.waiting + ')' : ''}}</view>
+    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签 {{filterCounts.signed ? '(' + filterCounts.signed + ')' : ''}}</view>
+    <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部 {{filterCounts.all ? '(' + filterCounts.all + ')' : ''}}</view>
   </view>
 
   <view wx:if="{{loading}}" class="empty">加载中...</view>

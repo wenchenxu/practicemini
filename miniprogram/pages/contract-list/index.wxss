@@ -21,18 +21,29 @@
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
   gap: 12rpx;
   margin-bottom: 20rpx;
+  padding-bottom: 4rpx; /* slight padding for aesthetic */
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  color: transparent;
 }
 
 .tab {
-  padding: 16rpx 28rpx;
+  padding: 10rpx 20rpx; /* smaller padding bounds */
   background: #f7f8fa;
   border-radius: 999rpx;
-  font-size: 28rpx;
+  font-size: 24rpx; /* smaller font */
   color: #555555;
   border: 1rpx solid #e6e6e6;
+  flex-shrink: 0; /* important for preventing text compress in flex */
 }
 
 .tab.on {

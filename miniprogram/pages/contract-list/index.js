@@ -27,11 +27,18 @@ Page({
     hasMore: true,
     lastCreatedAt: null, //上一页最后一条的创建时间
     lastId: '',          //同时带上 _id 作为并列条件的次级游标
-    filter: 'all',
+    filter: 'active',
     runningId: '',
     refreshingId: '',
     searchKeyword: '',
     selectedMonth: '', // 格式 'YYYY-MM'
+    filterCounts: {
+      active: 0,
+      expired: 0,
+      waiting: 0,
+      signed: 0,
+      all: 0
+    },
     // 为了调试
     lastEsignUrl: ''
   },
@@ -208,6 +215,7 @@ Page({
         lastCreatedAt: tail ? tail.createdAt : this.data.lastCreatedAt,
         lastId: tail ? tail._id : this.data.lastId
       });
+      this.updateFilterCounts();
     } catch (e) {
       console.error(e);
       wx.showToast({ title: '加载失败', icon: 'none' });
@@ -230,6 +238,19 @@ Page({
     if (this.data.list.length === 0 && this.data.hasMore) {
       this.loadMore();
     }
+  },
+
+  updateFilterCounts() {
+    const rawList = this.data.rawList || [];
+    this.setData({
+      filterCounts: {
+        active: this.applyFilter(rawList, 'active').length,
+        expired: this.applyFilter(rawList, 'expired').length,
+        waiting: this.applyFilter(rawList, 'waiting').length,
+        signed: this.applyFilter(rawList, 'signed').length,
+        all: rawList.length
+      }
+    });
   },
 
   async onGetDownloadUrlFromRow(e) {
@@ -1039,6 +1060,7 @@ Page({
   viewOne(e) {
     const id = e.currentTarget.dataset.id;
     const { city } = this.data;
+    this._needsRefresh = true;
     wx.navigateTo({ url: `/pages/contract-new/index?city=${encodeURIComponent(city)}&mode=view&id=${id}` });
   },
 
@@ -1046,7 +1068,7 @@ Page({
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
     const { cityCode, city } = this.data;
-    
+    this._needsRefresh = true;
     if (item && item.isOffline) {
         wx.navigateTo({
             url:
@@ -1154,6 +1176,12 @@ Page({
   },
 
   applyFilter(list, filter = this.data.filter) {
+    if (filter === 'active') {
+      return list.filter(item => item._statusClass === 'active');
+    }
+    if (filter === 'expired') {
+      return list.filter(item => item._statusClass === 'terminated' || item._statusClass === 'expired');
+    }
     if (filter === 'waiting') {
       return list.filter(item => {
         const status = item?.esign?.signTaskStatus;
@@ -1203,8 +1231,11 @@ Page({
   },
 
   onShow() {
-    // 从别的页（比如编辑/新建）返回时，强制刷新
-    this.refresh();
+    // 只有从别的页面返回时才刷新（保留搜索/筛选状态）
+    if (this._needsRefresh) {
+      this._needsRefresh = false;
+      this.refresh();
+    }
   },
 
   //下拉刷新
@@ -1246,6 +1277,7 @@ Page({
     // console.log('点击详情，Event:', e);
     const id = e.currentTarget.dataset.id;
     if (!id) { return; }
+    this._needsRefresh = true;
     wx.navigateTo({
       url: `/pages/contract-detail/index?id=${id}`
     });

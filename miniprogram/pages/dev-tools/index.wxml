@@ -150,4 +150,14 @@
     </button>
   </view>
 
+  <view class="card">
+    <view class="title">清理重复生效合同</view>
+    <view class="desc">
+      自动扫描全库，如果一辆车有多个“生效中”的合同，将保留最新的一份，其余历史重叠合同全部标记为退租。
+    </view>
+    <button type="primary" bindtap="onFixDuplicateContracts" loading="{{loading}}">
+      清理重复合同
+    </button>
+  </view>
+
 </view>

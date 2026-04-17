@@ -540,5 +540,26 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
+  },
+
+  async onFixDuplicateContracts() {
+    this.setData({ loading: true });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'vehicleOps',
+        data: { action: 'fixDuplicateContracts' }
+      });
+      const data = res.result || {};
+      if (data.ok) {
+        wx.showModal({ title: '清理完成', content: data.msg, showCancel: false });
+      } else {
+        wx.showModal({ title: '执行失败', content: data.error || '未知错误', showCancel: false });
+      }
+    } catch (e) {
+      console.error(e);
+      wx.showModal({ title: '报错', content: e.message, showCancel: false });
+    } finally {
+      this.setData({ loading: false });
+    }
   }
 });

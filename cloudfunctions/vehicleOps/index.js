@@ -57,6 +57,8 @@ exports.main = async (event, context) => {
         return await autoReturnExpired();
       case 'backfillOffline':
         return await backfillOffline();
+      case 'fixDuplicateContracts':
+        return await fixDuplicateContracts(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -1212,6 +1214,85 @@ async function backfillOffline() {
     };
   } catch (e) {
     console.error('[backfill] failed', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+async function fixDuplicateContracts(payload) {
+  const _ = db.command;
+  try {
+    let allActive = [];
+    let skip = 0;
+    while (true) {
+      // Gather all contracts that are currently active (or have no status defined, i.e., "legacy active")
+      const res = await db.collection('contracts').where(_.and([
+        { deleted: _.neq(true) },
+        _.or([
+          { contractStatus: _.exists(false) },
+          { contractStatus: 'active' }
+        ])
+      ])).skip(skip).limit(100).get();
+
+      if (!res.data || res.data.length === 0) break;
+      allActive = allActive.concat(res.data);
+      skip += 100;
+      if (res.data.length < 100) break;
+    }
+
+    if (allActive.length === 0) {
+      return { ok: true, msg: '没有找到生效中的合同' };
+    }
+
+    // Group by plate
+    const plateMap = {};
+    for (const c of allActive) {
+      const plate = c.fields && c.fields.carPlate ? c.fields.carPlate.trim() : '';
+      if (!plate) continue; // skip null plates
+      if (!plateMap[plate]) plateMap[plate] = [];
+      plateMap[plate].push(c);
+    }
+
+    let fixCount = 0;
+    let involvedPlates = 0;
+
+    for (const plate of Object.keys(plateMap)) {
+      const group = plateMap[plate];
+      if (group.length > 1) {
+        involvedPlates++;
+        
+        // Sort descending: newest periodStart first, then newest createdAt
+        group.sort((a, b) => {
+          const startA = a.fields?.contractValidPeriodStart || '';
+          const startB = b.fields?.contractValidPeriodStart || '';
+          if (startA !== startB) {
+            // "2024-05-01" vs "2024-01-01" -> "2024-05-01" comes first
+            return startB.localeCompare(startA);
+          }
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        // group[0] is the authentic active one. End all others.
+        for (let i = 1; i < group.length; i++) {
+          const target = group[i];
+          await db.collection('contracts').doc(target._id).update({
+            data: {
+              contractStatus: 'terminated',
+              updatedAt: db.serverDate()
+            }
+          });
+          fixCount++;
+        }
+      }
+    }
+
+    return { 
+      ok: true, 
+      msg: `成功扫描，发现 ${involvedPlates} 辆车存在重叠有效合同，共关闭 ${fixCount} 份历史残余合同。` 
+    };
+  } catch (e) {
+    console.error('[fixDuplicateContracts] failed', e);
     return { ok: false, error: e.message };
   }
 }
