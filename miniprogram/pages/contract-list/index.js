@@ -32,13 +32,6 @@ Page({
     refreshingId: '',
     searchKeyword: '',
     selectedMonth: '', // 格式 'YYYY-MM'
-    filterCounts: {
-      active: 0,
-      expired: 0,
-      waiting: 0,
-      signed: 0,
-      all: 0
-    },
     // 为了调试
     lastEsignUrl: ''
   },
@@ -215,7 +208,6 @@ Page({
         lastCreatedAt: tail ? tail.createdAt : this.data.lastCreatedAt,
         lastId: tail ? tail._id : this.data.lastId
       });
-      this.updateFilterCounts();
     } catch (e) {
       console.error(e);
       wx.showToast({ title: '加载失败', icon: 'none' });
@@ -238,19 +230,6 @@ Page({
     if (this.data.list.length === 0 && this.data.hasMore) {
       this.loadMore();
     }
-  },
-
-  updateFilterCounts() {
-    const rawList = this.data.rawList || [];
-    this.setData({
-      filterCounts: {
-        active: this.applyFilter(rawList, 'active').length,
-        expired: this.applyFilter(rawList, 'expired').length,
-        waiting: this.applyFilter(rawList, 'waiting').length,
-        signed: this.applyFilter(rawList, 'signed').length,
-        all: rawList.length
-      }
-    });
   },
 
   async onGetDownloadUrlFromRow(e) {

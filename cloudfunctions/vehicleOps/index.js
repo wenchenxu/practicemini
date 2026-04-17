@@ -59,6 +59,8 @@ exports.main = async (event, context) => {
         return await backfillOffline();
       case 'fixDuplicateContracts':
         return await fixDuplicateContracts(payload);
+      case 'revertDuplicateFix':
+        return await revertDuplicateFix();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -1260,17 +1262,21 @@ async function fixDuplicateContracts(payload) {
       if (group.length > 1) {
         involvedPlates++;
         
-        // Sort descending: newest periodStart first, then newest createdAt
+        // Sort descending: truest validation of periodStart timestamp, then createdAt
         group.sort((a, b) => {
-          const startA = a.fields?.contractValidPeriodStart || '';
-          const startB = b.fields?.contractValidPeriodStart || '';
-          if (startA !== startB) {
-            // "2024-05-01" vs "2024-01-01" -> "2024-05-01" comes first
-            return startB.localeCompare(startA);
+          const strA = a.fields?.contractValidPeriodStart;
+          const strB = b.fields?.contractValidPeriodStart;
+          
+          const timeA = (strA && !isNaN(new Date(strA).getTime())) ? new Date(strA).getTime() : 0;
+          const timeB = (strB && !isNaN(new Date(strB).getTime())) ? new Date(strB).getTime() : 0;
+
+          if (timeA !== timeB) {
+            return timeB - timeA;
           }
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
+          
+          const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return createdB - createdA;
         });
 
         // group[0] is the authentic active one. End all others.
@@ -1293,6 +1299,51 @@ async function fixDuplicateContracts(payload) {
     };
   } catch (e) {
     console.error('[fixDuplicateContracts] failed', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+async function revertDuplicateFix() {
+  const _ = db.command;
+  try {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    
+    let allTargets = [];
+    let skip = 0;
+    while (true) {
+      const res = await db.collection('contracts').where({
+        contractStatus: 'terminated',
+        updatedAt: _.gte(threeHoursAgo)
+      }).skip(skip).limit(100).get();
+
+      if (!res.data || res.data.length === 0) break;
+      allTargets = allTargets.concat(res.data);
+      skip += 100;
+      if (res.data.length < 100) break;
+    }
+
+    if (allTargets.length === 0) {
+      return { ok: true, msg: '没有找到过去三小时内被关闭的合并记录，无法回退。' };
+    }
+
+    let fixCount = 0;
+    for (const target of allTargets) {
+      // Revert terminal status back to active null explicitly to catch in UI dynamic logic
+      await db.collection('contracts').doc(target._id).update({
+        data: {
+          contractStatus: 'active',
+          updatedAt: db.serverDate()
+        }
+      });
+      fixCount++;
+    }
+
+    return { 
+      ok: true, 
+      msg: `成功回退：共恢复了 ${fixCount} 份合同的激活状态！` 
+    };
+  } catch (e) {
+    console.error('[revertDuplicateFix] failed', e);
     return { ok: false, error: e.message };
   }
 }
