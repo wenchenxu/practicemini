@@ -18,7 +18,7 @@ function deriveStatus(rentStatus, maintenanceStatus) {
 exports.main = async (event, context) => {
   // --- 拦截定时触发器 ---
   if (event.Type === 'Timer' && event.TriggerName === 'dailyAutoReturn') {
-    return await autoReturnExpired();
+    return await dev_autoReturnExpired();
   }
 
   const { action, payload = {} } = event || {};
@@ -28,15 +28,15 @@ exports.main = async (event, context) => {
       case 'updateStatus':
         return await updateStatus(payload);
       case 'importOfflineContracts':
-        return await importOfflineContracts(payload);
+        return await dev_importOfflineContracts(payload);
       case 'deduplicate': // <--- 新增这个 case
-        return await deduplicateVehicles(payload);
+        return await dev_deduplicateVehicles(payload);
       case 'fixDates':
-        return await fixCreatedAt();
+        return await dev_fixCreatedAt();
       case 'deleteByCity':
-        return await deleteByCity(payload);
+        return await dev_deleteByCity(payload);
       case 'importCsv':
-        return await upsertVehiclesFromCsv(payload);
+        return await dev_upsertVehiclesFromCsv(payload);
       case 'updateInsurance':
         return await updateInsurance(payload);
       case 'updateAnnualInspection':
@@ -48,19 +48,19 @@ exports.main = async (event, context) => {
       case 'listAvailable':
         return await listAvailable(payload);
       case 'exportCsv':
-        return await exportVehiclesToCsv(payload);
+        return await dev_exportVehiclesToCsv(payload);
       case 'renamePlate':
-        return await renamePlate(payload);
+        return await dev_renamePlate(payload);
       case 'migrateBranches':
-        return await migrateBranches();
+        return await dev_migrateBranches();
       case 'autoReturnExpired':
-        return await autoReturnExpired();
+        return await dev_autoReturnExpired();
       case 'backfillOffline':
-        return await backfillOffline();
+        return await dev_backfillOffline();
       case 'fixDuplicateContracts':
-        return await fixDuplicateContracts(payload);
+        return await dev_fixDuplicateContracts(payload);
       case 'revertDuplicateFix':
-        return await revertDuplicateFix();
+        return await dev_revertDuplicateFix();
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -226,7 +226,7 @@ async function updateStatus(payload) {
 }
 
 // --- 新增：去重函数 ---
-async function deduplicateVehicles() {
+async function dev_deduplicateVehicles() {
   const vehiclesCol = db.collection('vehicles');
   const MAX_LIMIT = 1000;
 
@@ -298,7 +298,7 @@ async function deduplicateVehicles() {
   };
 }
 
-async function fixCreatedAt() {
+async function dev_fixCreatedAt() {
   const vehiclesCol = db.collection('vehicles');
   const MAX_LIMIT = 100; // 每次处理 100 条防止超时
   let page = 0;
@@ -349,7 +349,7 @@ async function fixCreatedAt() {
   return { ok: true, fixed: fixedCount, totalScanned: page * MAX_LIMIT + (list ? list.length : 0) }; // 简单估算
 }
 
-async function deleteByCity(payload) {
+async function dev_deleteByCity(payload) {
   const { cityCode } = payload || {};
   if (!cityCode) throw new Error('cityCode required');
 
@@ -380,7 +380,7 @@ async function deleteByCity(payload) {
   return { ok: true, cityCode, deleted: deletedCount };
 }
 
-async function upsertVehiclesFromCsv(payload) {
+async function dev_upsertVehiclesFromCsv(payload) {
   const { fileID } = payload;
   if (!fileID) throw new Error('fileID required');
 
@@ -458,7 +458,7 @@ function parseBizDateCloud(str) {
   return new Date(`${str}T00:00:00+08:00`);
 }
 
-async function importOfflineContracts(payload) {
+async function dev_importOfflineContracts(payload) {
   const { fileID } = payload;
   if (!fileID) throw new Error('fileID required');
 
@@ -920,7 +920,7 @@ async function listAvailable(payload) {
   }
 }
 
-async function migrateBranches() {
+async function dev_migrateBranches() {
   const collections = ['vehicles', 'drivers', 'contracts'];
   const db = cloud.database();
   const _ = db.command;
@@ -958,7 +958,7 @@ async function migrateBranches() {
 // ==========================================
 // 定时任务：逾期自动退车 (Cron Job)
 // ==========================================
-async function autoReturnExpired() {
+async function dev_autoReturnExpired() {
   const collectionVehicles = db.collection('vehicles');
   const collectionContracts = db.collection('contracts');
 
@@ -1056,7 +1056,7 @@ async function autoReturnExpired() {
   }
 }
 
-async function exportVehiclesToCsv(payload) {
+async function dev_exportVehiclesToCsv(payload) {
   const { cityCode, branchCode } = payload || {};
   if (!cityCode) throw new Error('cityCode required');
 
@@ -1120,7 +1120,7 @@ async function exportVehiclesToCsv(payload) {
   return { ok: true, url, total: allVehicles.length };
 }
 
-async function renamePlate(payload) {
+async function dev_renamePlate(payload) {
   const { oldPlate, newPlate } = payload || {};
   const cleanOld = (oldPlate || '').trim();
   const cleanNew = (newPlate || '').trim();
@@ -1173,7 +1173,7 @@ async function renamePlate(payload) {
   };
 }
 
-async function backfillOffline() {
+async function dev_backfillOffline() {
   const _ = db.command;
   try {
     let totalUpdated = 0;
@@ -1220,7 +1220,7 @@ async function backfillOffline() {
   }
 }
 
-async function fixDuplicateContracts(payload) {
+async function dev_fixDuplicateContracts(payload) {
   const _ = db.command;
   try {
     let allActive = [];
@@ -1303,7 +1303,7 @@ async function fixDuplicateContracts(payload) {
   }
 }
 
-async function revertDuplicateFix() {
+async function dev_revertDuplicateFix() {
   const _ = db.command;
   try {
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
