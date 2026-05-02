@@ -1,0 +1,211 @@
+<wxs src="../../../utils/fmt.wxs" module="fmt" />
+<view class="page-container">
+  
+  <view class="card">
+    <view class="card-header">
+      <view class="plate-number">{{vehicle.plate}}</view>
+      <view class="tags-row">
+        <view class="tag tag-blue" wx:if="{{vehicle.rentStatus === 'rented'}}">已租</view>
+        <view class="tag tag-green" wx:else>闲置</view>
+        
+        <view class="tag tag-orange" wx:if="{{vehicle.maintenanceStatus === 'in_maintenance'}}">维修中</view>
+        <view class="tag tag-red" wx:if="{{vehicle.retired}}">已售/报废</view>
+      </view>
+    </view>
+
+    <view class="divider"></view>
+
+    <view class="info-grid">
+      <view class="grid-item">
+        <text class="label">车型</text>
+        <text class="value">{{vehicle.model || '-'}}</text>
+      </view>
+      <view class="grid-item">
+        <text class="label">颜色</text>
+        <text class="value">{{vehicle.color || '-'}}</text>
+      </view>
+      <view class="grid-item">
+        <text class="label">城市</text>
+        <text class="value">{{vehicle.cityName || '-'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{vehicle.rentStatus === 'rented' || driverName}}">
+    <view class="section-title">当前承租人</view>
+    <view class="info-grid">
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">姓名</text>
+        <text class="value">{{driverName || '-'}}</text>
+      </view>
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">证件号/ID</text>
+        <text class="value">{{driverId || '-'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 维修专属信息区 (仅当维修中时显示) -->
+  <view class="card" wx:if="{{vehicle.maintenanceStatus === 'in_maintenance'}}">
+    <view class="section-title">维修信息</view>
+    <view class="info-grid">
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">开始时间</text>
+        <text class="value">{{maintenanceStartAtStr || '-'}}</text>
+      </view>
+      <view class="grid-item" style="width: 50%;">
+        <text class="label">已维保时长</text>
+        <text class="value text-orange">{{maintenanceDurationText || '-'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">车辆操作</view>
+    <view class="action-row-fill">
+      <view class="btn-wrapper">
+        <van-button 
+          type="primary" 
+          block 
+          bind:click="onMarkAvailable" 
+          disabled="{{opBusy}}"
+        >退租解绑</van-button>
+      </view>
+      
+      <view class="btn-wrapper">
+        <van-button 
+          type="warning" 
+          block 
+          bind:click="onMarkMaintenance" 
+          disabled="{{opBusy}}"
+        >
+          {{vehicle.maintenanceStatus === 'in_maintenance' ? '结束维修' : '标记维修'}}
+        </van-button>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-header-row">
+      <view class="section-title">保险信息</view>
+      <van-button plain type="info" size="mini" bind:click="onStartEditIns">修改</van-button>
+    </view>
+    
+    <view class="detail-list">
+      <view class="detail-row">
+        <text class="label">交强险周期</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.liabInsStartStr)}} 至 {{fmt.formatDateZh(vehicle.liabInsEndStr)}}</text>
+      </view>
+      <view class="detail-row">
+        <text class="label">商业险周期</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.commInsStartStr)}} 至 {{fmt.formatDateZh(vehicle.commInsEndStr)}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-header-row">
+      <view class="section-title">年审信息</view>
+      <van-button plain type="info" size="mini" bind:click="onStartEditAnnual">修改</van-button>
+    </view>
+    
+    <view class="detail-list">
+      <view class="detail-row">
+        <text class="label">年审到期日</text>
+        <text class="value">{{fmt.formatDateZh(vehicle.annualInspectionDateStr)}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 专属维修历史卡片 -->
+  <view class="card">
+    <view class="section-title">维修历史记录</view>
+    <view class="timeline" wx:if="{{maintenanceHistory && maintenanceHistory.length > 0}}">
+      <view class="timeline-item" wx:for="{{maintenanceHistory}}" wx:key="_id">
+        <view class="timeline-dot {{item.eventType === 'maintenance_start' ? 'dot-orange' : 'dot-green'}}"></view>
+        <view class="timeline-content">
+          <view class="timeline-head">
+            <text class="timeline-event">{{item.eventType === 'maintenance_start' ? '开始维修' : '结束维修'}}</text>
+            <text class="timeline-time">{{item.timeStr}}</text>
+          </view>
+          <view class="timeline-desc" wx:if="{{item.operator}}">操作人：{{item.operator}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:else style="font-size:24rpx;color:#999;text-align:center;padding:20rpx 0;">暂无维修记录</view>
+  </view>
+
+  <view class="card" bindtap="toHistory">
+    <view class="card-header-arrow">
+      <view class="section-title" style="margin-bottom:0; border-left:none;">车辆完整历史记录</view>
+      <van-icon name="arrow" color="#969799" />
+    </view>
+  </view>
+
+  <view style="padding: 30rpx 24rpx 60rpx;" wx:if="{{rentStatus !== 'rented' && !vehicle.retired}}">
+    <van-button 
+      type="danger" 
+      block 
+      plain
+      bind:click="onMarkRetired" 
+      disabled="{{opBusy}}"
+      custom-style="border-style: dashed;"
+    >标记已售/报废</van-button>
+  </view>
+
+  <van-dialog
+    use-slot
+    title="修改保险信息"
+    show="{{ showInsEdit }}"
+    show-cancel-button
+    bind:confirm="onConfirmInsEdit"
+    bind:close="onCloseInsEdit"
+  >
+    <view style="padding: 30rpx;" wx:if="{{ showInsEdit }}">
+      <view class="input-item">
+        <view class="input-label">交强险开始：</view>
+        <picker mode="date" data-field="liabInsStart" bindchange="onInsDateChange" value="{{ editIns.liabInsStart }}">
+          <view class="picker-box">{{ editIns.liabInsStart || '请选择' }}</view>
+        </picker>
+      </view>
+      <view class="input-item">
+        <view class="input-label">交强险结束：</view>
+        <picker mode="date" data-field="liabInsEnd" bindchange="onInsDateChange" value="{{ editIns.liabInsEnd }}">
+          <view class="picker-box">{{ editIns.liabInsEnd || '请选择' }}</view>
+        </picker>
+      </view>
+      <view class="divider-dashed"></view>
+      <view class="input-item">
+        <view class="input-label">商业险开始：</view>
+        <picker mode="date" data-field="commInsStart" bindchange="onInsDateChange" value="{{ editIns.commInsStart }}">
+          <view class="picker-box">{{ editIns.commInsStart || '请选择' }}</view>
+        </picker>
+      </view>
+      <view class="input-item">
+        <view class="input-label">商业险结束：</view>
+        <picker mode="date" data-field="commInsEnd" bindchange="onInsDateChange" value="{{ editIns.commInsEnd }}">
+          <view class="picker-box">{{ editIns.commInsEnd || '请选择' }}</view>
+        </picker>
+      </view>
+    </view>
+  </van-dialog>
+
+  <van-dialog
+    use-slot
+    title="修改年审日期"
+    show="{{ showAnnualEdit }}"
+    show-cancel-button
+    bind:confirm="onConfirmAnnualEdit"
+    bind:close="onCloseAnnualEdit"
+  >
+    <view style="padding: 30rpx;" wx:if="{{ showAnnualEdit }}">
+      <view class="input-item">
+        <view class="input-label">年审到期日：</view>
+        <picker mode="date" bindchange="onAnnualDateChange" value="{{ editAnnualDate }}">
+          <view class="picker-box">{{ editAnnualDate || '请选择' }}</view>
+        </picker>
+      </view>
+    </view>
+  </van-dialog>
+
+</view>

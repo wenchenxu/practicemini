@@ -76,7 +76,7 @@ App({
         }
 
         if (!this.globalData.allowed) {
-            wx.reLaunch({ url: '/pages/no-access/no-access' });
+            wx.reLaunch({ url: '/pages/core/no-access/no-access' });
         }
 
         this.globalData.initialized = true;
