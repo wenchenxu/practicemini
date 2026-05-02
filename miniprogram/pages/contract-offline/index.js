@@ -15,6 +15,7 @@ const BASE_FIELDS = [
   // ---- Contract / Rent ----
   { name: 'contractDate', label: '签约日期', type: 'date', requiredWhen: 'always' },
   { name: 'rentDurationMonth', label: '租期（月）', type: 'number', requiredWhen: 'always', min: 1, max: 60 },
+  { name: 'termType', label: '年限选择', type: 'string', requiredWhen: 'never' },
   { name: 'contractValidPeriodStart', label: '生效日期', type: 'date', requiredWhen: 'always' },
   { name: 'contractValidPeriodEnd', label: '结束日期', type: 'date', requiredWhen: 'always' },
   { name: 'rentPaybyDayInMonth', label: '每月支付日', type: 'number', requiredWhen: 'always', help: '1-31号', min: 1, max: 31 },
@@ -166,6 +167,11 @@ Page({
     this.setData({ [`form.${name}`]: value });
   },
 
+  onTermTypeChange(e) {
+    const val = Number(e.detail.value) === 1 ? 'long_term' : 'standard';
+    this.setData({ 'form.termType': val });
+  },
+
   onDateChange(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value;
@@ -215,7 +221,10 @@ Page({
       // Type specific skips
       if (selectedTypeCode === 'rent_rto' && (f.name === 'rentMonthly' || f.name === 'rentToday')) continue;
       
-      if (f.required && (v === undefined || v === null || v === '')) return `${f.label}必填`;
+      if (f.required) {
+        if (f.name === 'contractValidPeriodEnd' && form.termType === 'long_term') continue;
+        if (v === undefined || v === null || v === '') return `${f.label}必填`;
+      }
     }
 
     if (selectedTypeCode === 'rent_rto') {
@@ -227,8 +236,8 @@ Page({
       if (!form.rentToday && form.rentToday !== 0) return '首日支付金必填';
     }
 
-    const { contractValidPeriodStart: s, contractValidPeriodEnd: e } = form;
-    if (s && e && e <= s) return '结束日期必须晚于开始日期';
+    const { contractValidPeriodStart: s, contractValidPeriodEnd: e, termType } = form;
+    if (termType !== 'long_term' && s && e && e <= s) return '结束日期必须晚于开始日期';
 
     return '';
   },
@@ -236,7 +245,10 @@ Page({
   toPersistObject() {
     const obj = {};
     for (const f of FIELDS) {
-      const v = this.data.form[f.name];
+      let v = this.data.form[f.name];
+      if (f.name === 'contractValidPeriodEnd' && this.data.form.termType === 'long_term') {
+        v = '长期有效';
+      }
       if (f.type === 'number') obj[f.name] = v === '' || v == null ? null : Number(v);
       else obj[f.name] = v !== undefined ? v : null;
     }

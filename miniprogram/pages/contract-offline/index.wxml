@@ -39,13 +39,20 @@
       <view class="form-wrap">
         <block wx:for="{{visibleFields}}" wx:key="name">
           <block wx:if="{{ (item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto' }}">
-            <view class="form-item">
+            <view class="form-item" wx:if="{{!(item.name === 'contractValidPeriodEnd' && form.termType === 'long_term')}}">
               <label class="label">
                 <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
                 <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
               </label>
 
-              <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ form[item.name] || '' }}" bindinput="onInput" data-name="{{item.name}}" maxlength="{{item.maxLength || -1}}" />
+              <input wx:if="{{item.type==='string' && item.name !== 'termType'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ form[item.name] || '' }}" bindinput="onInput" data-name="{{item.name}}" maxlength="{{item.maxLength || -1}}" />
+
+              <picker wx:elif="{{item.name === 'termType'}}" mode="selector" range="{{['标准（两年）', '长期']}}" bindchange="onTermTypeChange" disabled="{{mode==='view'}}">
+                <view class="input-box picker-box">
+                  {{form.termType === 'long_term' ? '长期' : '标准（两年）'}}
+                  <text class="date-icon" wx:if="{{mode!=='view'}}">▼</text>
+                </view>
+              </picker>
 
               <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{ form[item.name] !== undefined ? form[item.name] : '' }}" bindinput="onInputNumber" data-name="{{item.name}}" />
 
