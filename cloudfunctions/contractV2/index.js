@@ -72,8 +72,23 @@ const ATTACHMENT_CONFIG = {
     files: ['责任书.docx', '司机合规运营承诺函.docx']
   },
 
-  foshan: {
-    type: 'city',
+  fos_a: {
+    type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  fos_b: {
+    type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  suz_a: {
+    type: 'branch',
+    files: ['责任书.docx', '司机合规运营承诺函.docx']
+  },
+
+  suz_b: {
+    type: 'branch',
     files: ['责任书.docx', '司机合规运营承诺函.docx']
   },
 
@@ -93,11 +108,6 @@ const ATTACHMENT_CONFIG = {
   },
 
   jiaxing: {
-    type: 'city',
-    files: ['责任书.docx', '司机合规运营承诺函.docx']
-  },
-
-  suzhou: {
     type: 'city',
     files: ['责任书.docx', '司机合规运营承诺函.docx']
   }
@@ -534,11 +544,11 @@ exports.main = async (event, context) => {
     // === OFFLINE ABORT CHECK ===
     if (isOffline) {
       console.log(`[ContractV2] Offline Mode. Successfully saved contract ${contractId} (${serialFormatted}), skipping DOCX generation.`);
-      return { 
-        ok: true, 
-        _id: contractId, 
+      return {
+        ok: true,
+        _id: contractId,
         contractSerialNumberFormatted: serialFormatted,
-        isOffline: true 
+        isOffline: true
       };
     }
 

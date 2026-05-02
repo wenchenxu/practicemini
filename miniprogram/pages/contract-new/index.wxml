@@ -64,15 +64,22 @@
         <block wx:for="{{visibleFields || []}}" wx:key="name">
           <block wx:if="{{!(mode==='create' && item.hideOnCreate)}}">
             
-            <block wx:if="{{ (item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto' }}">
+            <block wx:if="{{ ((item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto') && ((item.name!=='rentMonthlyFirstYear' && item.name!=='rentMonthlySecondYear' && item.name!=='daysTillPayment' && item.name!=='sellPrice' && item.name!=='notesWhenSell' && item.name!=='termType') || selectedTypeCode === 'rent_rto') }}">
             
-              <view class="form-item item-{{item.name}}" wx:if="{{item.name !== 'rentPaybyDayInMonth' || cityCode !== 'changzhou'}}">
+              <view class="form-item item-{{item.name}}" wx:if="{{(item.name !== 'rentPaybyDayInMonth' || cityCode !== 'changzhou') && !(item.name === 'contractValidPeriodEnd' && form.termType === 'long_term')}}">
                 <label class="label">
                   <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
                   <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
                 </label>
 
-                <input wx:if="{{item.type==='string'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] || '') }}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
+                <input wx:if="{{item.type==='string' && item.name !== 'termType'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] || '') }}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
+
+                <picker wx:elif="{{item.name === 'termType'}}" mode="selector" range="{{['标准（两年）', '长期']}}" bindchange="onTermTypeChange" disabled="{{mode==='view'}}">
+                  <view class="input-box picker-box">
+                    {{form.termType === 'long_term' ? '长期' : '标准（两年）'}}
+                    <text class="date-icon" wx:if="{{mode!=='view'}}">▼</text>
+                  </view>
+                </picker>
 
                 <input wx:elif="{{item.type==='number'}}" class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] !== undefined ? form[item.name] : '') }}" bindinput="onInputNumber" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" />
 
@@ -114,32 +121,32 @@
           </block>
         </block>
 
-        <block wx:if="{{selectedTypeCode === 'rent_rto' && mode === 'create'}}">
+        <block wx:if="{{selectedTypeCode === 'rent_rto'}}">
           <view class="divider" style="height:1rpx; background:#f0f0f0; margin: 20rpx 0;"></view>
           
           <view class="form-item">
             <label class="label"><text class="req">*</text>1—12期每期租金</label>
-            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFirstYear}}" bindinput="onInputNumber" data-name="rentMonthlyFirstYear" />
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFirstYear}}" bindinput="onInputNumber" data-name="rentMonthlyFirstYear" disabled="{{mode==='view'}}" />
           </view>
           
           <view class="form-item">
             <label class="label"><text class="req">*</text>13—24期每期租金</label>
-            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlySecondYear}}" bindinput="onInputNumber" data-name="rentMonthlySecondYear" />
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlySecondYear}}" bindinput="onInputNumber" data-name="rentMonthlySecondYear" disabled="{{mode==='view'}}" />
           </view>
           
           <view class="form-item">
             <label class="label"><text class="req">*</text>签定之日起自然日内支付</label>
-            <input class="input-box" type="number" placeholder="请输入天数" placeholder-class="ph" value="{{form.daysTillPayment}}" bindinput="onInputNumber" data-name="daysTillPayment" />
+            <input class="input-box" type="number" placeholder="请输入天数" placeholder-class="ph" value="{{form.daysTillPayment}}" bindinput="onInputNumber" data-name="daysTillPayment" disabled="{{mode==='view'}}" />
           </view>
           
           <view class="form-item">
             <label class="label"><text class="req">*</text>约定购买车辆金额</label>
-            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.sellPrice}}" bindinput="onInputNumber" data-name="sellPrice" />
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.sellPrice}}" bindinput="onInputNumber" data-name="sellPrice" disabled="{{mode==='view'}}" />
           </view>
 
           <view class="form-item">
             <label class="label">合同完结后购车备注</label>
-            <input class="input-box" placeholder="如不填则显示“无”" placeholder-class="ph" value="{{form.notesWhenSell}}" bindinput="onInput" data-name="notesWhenSell" />
+            <input class="input-box" placeholder="如不填则显示“无”" placeholder-class="ph" value="{{form.notesWhenSell}}" bindinput="onInput" data-name="notesWhenSell" disabled="{{mode==='view'}}" />
           </view>
         </block>
         </view>

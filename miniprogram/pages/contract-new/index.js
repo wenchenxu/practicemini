@@ -34,6 +34,7 @@ const BASE_FIELDS = [
 
   // ---- Contract / Rent ----
   { name: 'rentDurationMonth', label: '租期（个月）', type: 'number', requiredWhen: 'always', min: 1, max: 60 },
+  { name: 'termType', label: '年限选择', type: 'string', requiredWhen: 'never' },
   { name: 'contractValidPeriodStart', label: '合同生效日期', type: 'date', requiredWhen: 'prod' },
   { name: 'contractValidPeriodEnd', label: '合同结束日期', type: 'date', requiredWhen: 'prod' },
 
@@ -47,13 +48,13 @@ const BASE_FIELDS = [
 
   // 新增：以租代购 (RTO) 专属字段
   // 注意：hideOnCreate 设为 true 是为了不让通用循环渲染它们，我们要手动用 wx:if 渲染
-  { name: 'rentMonthlyFirstYear', label: '1—12期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true },
+  { name: 'rentMonthlyFirstYear', label: '1—12期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'rentMonthlyFirstYearFormal', label: '1—12期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
-  { name: 'rentMonthlySecondYear', label: '13—24期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true },
+  { name: 'rentMonthlySecondYear', label: '13—24期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'rentMonthlySecondYearFormal', label: '13—24期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
-  { name: 'daysTillPayment', label: '自然日内支付首期（天）', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true },
-  { name: 'sellPrice', label: '合同完结后车辆购买售价', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true },
-  { name: 'notesWhenSell', label: '销售备注', type: 'string', requiredWhen: 'never', hideOnCreate: true },
+  { name: 'daysTillPayment', label: '自然日内支付首期（天）', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'sellPrice', label: '合同完结后车辆购买售价', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'notesWhenSell', label: '销售备注', type: 'string', requiredWhen: 'never', hideOnCreate: true, hideOnEdit: true, hideOnView: true },
 
   // ---- Deposit ----
   { name: 'deposit', label: '押金总额', type: 'number', requiredWhen: 'prod', min: 0 },
@@ -381,6 +382,11 @@ Page({
     this.setData({ 'form.rentPaybyDayInWeek': val });
   },
 
+  onTermTypeChange(e) {
+    const val = Number(e.detail.value) === 1 ? 'long_term' : 'standard';
+    this.setData({ 'form.termType': val });
+  },
+
   onDateChange(e) {
     const name = e.currentTarget.dataset.name;
     const value = e.detail.value; // yyyy-mm-dd
@@ -421,6 +427,9 @@ Page({
       // 如果是普通模式，跳过 rto 字段的基础校验 (它们本身是 requiredWhen:'never' 所以默认就跳过了)
 
       if (f.required) {
+        if (f.name === 'contractValidPeriodEnd' && form.termType === 'long_term') {
+          continue; // bypass required check for long_term
+        }
         if (f.type === 'string' && (!v || !String(v).trim())) {
           return `${f.label}为必填`;
         }
@@ -455,7 +464,7 @@ Page({
     // Expiry Date Validation: End must be strictly after Start
     const startStr = form.contractValidPeriodStart;
     const endStr = form.contractValidPeriodEnd;
-    if (startStr && endStr) {
+    if (form.termType !== 'long_term' && startStr && endStr) {
       const startTime = new Date(`${startStr}T00:00:00+08:00`).getTime();
       const endTime = new Date(`${endStr}T00:00:00+08:00`).getTime();
       if (endTime <= startTime) {
@@ -500,7 +509,13 @@ Page({
   toPersistObject() {
     const obj = {};
     for (const f of FIELDS) {
-      const v = this.data.form[f.name];
+      let v = this.data.form[f.name];
+
+      // 覆盖长效合同的结束日期
+      if (f.name === 'contractValidPeriodEnd' && this.data.form.termType === 'long_term') {
+        v = '长期有效';
+      }
+
       if (f.type === 'number') {
         obj[f.name] = (v === '' || v === undefined || v === null) ? null : Number(v);
       } else {
