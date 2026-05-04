@@ -513,7 +513,7 @@ Page({
           signerId: actorId,
           signerPhone: signerPhone,
           cityCode: item.cityCode,
-          // branchCode: item.branchCode, 苏州增加亿睿峰盖章
+          branchCode: item.branchCode, // 苏州增加亿睿峰盖章
           attachs: fddAttachs
         };
 
@@ -561,6 +561,78 @@ Page({
           }
         });
       }
+
+      wx.hideLoading();
+
+      // 4. 复制链接
+      wx.setClipboardData({
+        data: actorUrl,
+        success: () => {
+          wx.showModal({
+            title: '准备就绪',
+            content: '签署链接已刷新并复制。请司机使用此链接签署。',
+            showCancel: false,
+            confirmText: '好的',
+            success: () => this.onPullDownRefresh()
+          });
+        }
+      });
+
+    } catch (err) {
+      console.error('[Sign Error]', err);
+      wx.hideLoading();
+      wx.showModal({ title: '操作失败', content: err.message, showCancel: false });
+    }
+  },
+
+  async onSignFromRowUpdated(e) {
+    const { item } = e.currentTarget.dataset;
+    if (!item) return;
+
+    // 0. 如果已经签署完成，直接拦截
+    const esignData = item.esign || {};
+    if (this.isSignTaskFinished && this.isSignTaskFinished(esignData.signTaskStatus)) {
+      return wx.showToast({ title: '该合同签署已完成', icon: 'none' });
+    }
+
+    // 1. 准备变量
+    const rawName = item.fields?.clientName || '';
+    const rawPhone = item.fields?.clientPhone || '';
+    const signerName = rawName.replace(/[\r\n]/g, '').trim();
+    const signerPhone = rawPhone.replace(/[\r\n]/g, '').trim();
+
+    if (!signerPhone) return wx.showToast({ title: '缺少客户手机号', icon: 'none' });
+    if (!signerName) return wx.showToast({ title: '缺少客户姓名', icon: 'none' });
+
+    wx.showLoading({ title: '发起签署中...', mask: true });
+
+    try {
+      const fileData = item.file || {};
+      const mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'orchestrateSignTask',
+          payload: {
+            contractId: item._id,
+            fileData,
+            esignData,
+            mainWxFileId,
+            signerName,
+            signerPhone,
+            cityCode: item.cityCode,
+            branchCode: item.branchCode
+          }
+        }
+      });
+
+      if (!result || !result.success) {
+        throw new Error(result?.error || result?.msg || '签署接口返回异常');
+      }
+
+      const actorUrl = result.data?.actorUrl;
+      if (!actorUrl) throw new Error('未返回签署链接');
 
       wx.hideLoading();
 
