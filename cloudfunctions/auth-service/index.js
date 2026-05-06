@@ -37,7 +37,12 @@ async function handleCheckAccess(event, openid) {
   // 修复：用宽松判断代替 === true，防止数据库存储字符串 "true" 时失效
   const auditModeOn = st.auditMode === true || st.auditMode === 'true';
 
-  if (auditModeOn && inputCode && inputCode === dbCode) {
+  // 1.3 紧急备用口令（兜底，防止 DB 设置失效导致审核被拒）
+  // 如需更换，只需重新部署 auth-service 云函数，无需等待小程序审核
+  const EMERGENCY_TOKEN = process.env.AUDIT_EMERGENCY_TOKEN || '';
+  const isEmergencyMatch = EMERGENCY_TOKEN && inputCode === EMERGENCY_TOKEN;
+
+  if (isEmergencyMatch || (auditModeOn && inputCode && inputCode === dbCode)) {
     return {
       allowed: true,
       role: 'staff',
@@ -56,10 +61,10 @@ async function handleListWhitelist(event, openid) {
   const _ = db.command;
   const cond = keyword
     ? _.or([
-        { name: db.RegExp({ regexp: keyword, options: 'i' }) },
-        { openid: db.RegExp({ regexp: keyword, options: 'i' }) },
-        { role: db.RegExp({ regexp: keyword, options: 'i' }) },
-      ])
+      { name: db.RegExp({ regexp: keyword, options: 'i' }) },
+      { openid: db.RegExp({ regexp: keyword, options: 'i' }) },
+      { role: db.RegExp({ regexp: keyword, options: 'i' }) },
+    ])
     : {};
 
   const countRes = await WL.where(cond).count();
@@ -83,13 +88,13 @@ async function handleGrant(event, openid) {
   const exist = await WL.where({ openid: targetOpenid }).count();
   if (exist.total > 0) return { ok: true, msg: 'already exists' };
 
-  await WL.add({ 
-    data: { 
-      openid: targetOpenid, 
-      name, 
-      role, 
-      createdAt: Date.now() 
-    } 
+  await WL.add({
+    data: {
+      openid: targetOpenid,
+      name,
+      role,
+      createdAt: Date.now()
+    }
   });
   return { ok: true };
 }
@@ -122,9 +127,9 @@ async function handleSetAuditSettings(event, openid) {
   const stDoc = await ST.limit(1).get();
 
   const update = { updatedAt: db.serverDate() };
-  if (auditCode   !== undefined) update.auditCode  = String(auditCode).trim();
-  if (auditMode   !== undefined) update.auditMode  = auditMode === true || auditMode === 'true';
-  if (ttlHours    !== undefined) update.ttlHours   = Number(ttlHours) || 24;
+  if (auditCode !== undefined) update.auditCode = String(auditCode).trim();
+  if (auditMode !== undefined) update.auditMode = auditMode === true || auditMode === 'true';
+  if (ttlHours !== undefined) update.ttlHours = Number(ttlHours) || 24;
 
   if (stDoc.data.length > 0) {
     await ST.doc(stDoc.data[0]._id).update({ data: update });

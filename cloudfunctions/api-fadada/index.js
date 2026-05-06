@@ -14,8 +14,15 @@ const IS_PROD = ENV === 'prod';
 const TCB_ENV = process.env.TCB_ENV || '';
 const FORCE_ENV = process.env.FORCE_FADADA_ENV || '';
 
-// 只要云环境ID包含 'prod' 或者 'release'，就自动切换为生产环境
-const IS_PROD = FORCE_ENV === 'prod' || TCB_ENV.includes('prod') || TCB_ENV.includes('release');
+// 【修改这里】如果你的正式云环境ID不包含 'prod' 或 'release'，请直接填在下面！
+// 比如 'tusifu-9g8x7...'
+const EXACT_PROD_ENV_ID = 'cloudbase-9gvp1n95af42e30d';
+
+// 只要云环境ID匹配，就自动切换为生产环境
+const IS_PROD = FORCE_ENV === 'prod' ||
+  TCB_ENV.includes('prod') ||
+  TCB_ENV.includes('release') ||
+  TCB_ENV === EXACT_PROD_ENV_ID;
 
 const APP_ID = IS_PROD
   ? process.env.FADADA_APP_ID_PROD
@@ -266,7 +273,7 @@ async function orchestrateSignTask(payload) {
       signerId: signerPhone,
       signerPhone: signerPhone,
       cityCode: cityCode,
-      // branchCode: branchCode, // 暂时注释掉 branchCode，避免影响目前的苏州线上业务逻辑
+      branchCode: branchCode, // 暂时注释掉 branchCode，避免影响目前的苏州线上业务逻辑
       attachs: fddAttachs
     };
 

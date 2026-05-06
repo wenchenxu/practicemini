@@ -4,6 +4,7 @@ Thumbs.db
 $RECYCLE.BIN/
 .env
 cloudfunctions/*/.env
+cloudfunctions/**/.env
 
 # macOS
 .DS_Store
@@ -14,6 +15,7 @@ cloudfunctions/*/.env
 
 # Node.js
 node_modules/
+cloudfunctions/*/node_modules/
 cloudfunctions/**/node_modules/
 
 # local
