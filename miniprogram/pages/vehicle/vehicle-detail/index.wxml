@@ -60,6 +60,54 @@
     </view>
   </view>
 
+  <!-- ▼▼▼ 违章转移 子模块 ▼▼▼ -->
+  <view class="card">
+    <view class="section-title">违章转移</view>
+
+    <!-- 行1：违章转移签署（仅租用中可发起）+ 下载 -->
+    <view class="action-row-fill">
+      <view class="btn-wrapper">
+        <van-button
+          type="info"
+          block
+          bind:click="onSignViolationTransfer"
+          disabled="{{opBusy || vehicle.rentStatus !== 'rented'}}"
+        >违章转移签署</van-button>
+      </view>
+      <view class="btn-wrapper">
+        <van-button
+          type="default"
+          plain
+          block
+          bind:click="onDownloadViolationTransfer"
+          disabled="{{opBusy}}"
+        >下载违章转移</van-button>
+      </view>
+    </view>
+
+    <!-- 行2：终止违章转移（仅租用中可发起）+ 下载 -->
+    <view class="action-row-fill" style="margin-top: 20rpx;">
+      <view class="btn-wrapper">
+        <van-button
+          type="info"
+          plain
+          block
+          bind:click="onSignViolationTermination"
+          disabled="{{opBusy || vehicle.rentStatus !== 'rented'}}"
+        >终止违章转移</van-button>
+      </view>
+      <view class="btn-wrapper">
+        <van-button
+          type="default"
+          plain
+          block
+          bind:click="onDownloadViolationTermination"
+          disabled="{{opBusy}}"
+        >下载终止违章转移</van-button>
+      </view>
+    </view>
+  </view>
+
   <view class="card">
     <view class="section-title">车辆操作</view>
     <view class="action-row-fill">
@@ -84,6 +132,7 @@
       </view>
     </view>
   </view>
+
 
   <view class="card">
     <view class="card-header-row">

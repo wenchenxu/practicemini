@@ -3,6 +3,7 @@ const db = wx.cloud.database();
 const vehiclesCol = db.collection('vehicles');
 const driversCol  = db.collection('drivers');
 const contractsCol = db.collection('contracts');
+const violationRecordsCol = db.collection('violation_records');
 const BIZ_TZ = 'Asia/Shanghai';
 
 // 🛠️ 工具函数：将 Date 对象转为 'YYYY-MM-DD' (强制上海时区)
@@ -216,8 +217,9 @@ Page({
         loading: false
       });
 
-      // 7) 异步拉取独立的维修历史
+      // 7) 异步拉取维修历史 + 违章记录
       this.fetchMaintenanceHistory(vehicleId);
+      this.fetchViolationRecords(vehicleId, driverId);
 
     } catch (e) {
       console.error('[vehicle-detail] fetchDetail error', e);
@@ -261,16 +263,43 @@ Page({
     }
   },
 
-    // 「设为可出租」：结束租赁 & 解绑司机，不影响维修状态
-  onMarkAvailable() {
+  // 加载违章转移记录，用于下载按钮跨 session 持久化
+  async fetchViolationRecords(vehicleId, driverId) {
+    if (!vehicleId) return;
+    try {
+      const res = await violationRecordsCol
+        .where({ vehicleId })
+        .orderBy('createdAt', 'desc')
+        .limit(20)
+        .get();
+
+      const records = res.data || [];
+      // 最新一条违章转移的 signTaskId（按任意司机，取最新）
+      const latestTransfer = records.find(r => r.contractType === 'violation_transfer');
+      // 最新一条终止违章转移的 signTaskId（按当前司机匹配）
+      const latestTermination = records.find(r =>
+        r.contractType === 'violation_termination' &&
+        (!driverId || r.driverId === driverId)
+      );
+
+      this.setData({
+        violationTransferSignTaskId: latestTransfer?.signTaskId || '',
+        violationTerminationSignTaskId: latestTermination?.signTaskId || ''
+      });
+    } catch (err) {
+      console.error('[vehicle-detail] fetchViolationRecords error', err);
+    }
+  },
+
+
+  // 「设为可出租」：结束租赁 & 解绑司机，不影响维修状态
+  async onMarkAvailable() {
     const { vehicle, rentStatus, maintenanceStatus, driverName, opBusy } = this.data;
     if (opBusy) return;
     if (!vehicle || !vehicle._id) return;
 
     const hasDriver = !!vehicle.currentDriverId;
 
-    // 之后优化，暂时添加接口允许没有司机的车辆恢复闲置状态，方便工作流程
-    // 如果已经是闲置状态，且没有司机，直接提示即可，不需要弹窗
     if (rentStatus === 'available' && !hasDriver) {
       wx.showToast({ title: '车辆已是闲置状态', icon: 'none' });
       return;
@@ -278,24 +307,38 @@ Page({
 
     let content = '';
     if (maintenanceStatus === 'in_maintenance') {
-      content = `该车辆当前处于维修中，并绑定司机「${driverName || '未知'}」。此操作只会结束租赁并解绑司机，车辆仍保持维修状态。是否继续？`;
+      content = `该车辆当前处于维修中，并绑定司机「${driverName || '未知'}」。此操作只会结束租赁并解绑司机，车辆仍保持维修状态。`;
     } else if (rentStatus === 'rented') {
-      content = `该操作会结束当前租赁，并解绑司机「${driverName || '未知'}」，并将车辆设为可出租。是否继续？`;
+      content = `该操作会结束当前租赁，并解绑司机「${driverName || '未知'}」，将车辆设为可出租。`;
     } else {
-      // rentStatus 已经是 available 但仍有司机（理论上很少见）
-      // 只有当 rentStatus == 'available' 且 hasDriver == true 时才会走到这里
-      content = `当前车辆已标记为「闲置」，但仍绑定司机「${driverName || '未知'}」。此操作会解绑司机。是否继续？`;
+      content = `当前车辆已标记为「闲置」，但仍绑定司机「${driverName || '未知'}」。此操作会解绑司机。`;
     }
 
-    wx.showModal({
-      title: '确认结束租赁',
-      content,
-      success: (res) => {
-        if (!res.confirm) return;
-        this._doUpdateStatus('available');
-      }
-    });
+    // 第一步：常规确认弹窗
+    const first = await new Promise(resolve =>
+      wx.showModal({ title: '确认结束租赁', content, success: resolve })
+    );
+    if (!first.confirm) return;
+
+    // 第二步：输入"确认退租"才能继续（防误触）
+    const second = await new Promise(resolve =>
+      wx.showModal({
+        title: '⚠️ 操作不可逆!\n退租后无法发起终止违章转移合同。\n如确认退租，请在下方输入「确认退租」并点击确定。',
+        content: '',
+        editable: true,
+        placeholderText: '请输入：确认退租',
+        success: resolve
+      })
+    );
+    if (!second.confirm) return;
+    if ((second.content || '').trim() !== '确认退租') {
+      wx.showToast({ title: '输入不正确，已取消退租', icon: 'none', duration: 2000 });
+      return;
+    }
+
+    this._doUpdateStatus('available');
   },
+
 
     // 「标记维修」：维修状态 toggle，不动租赁状态 / 司机
   onMarkMaintenance() {
@@ -606,5 +649,232 @@ Page({
       wx.hideLoading();
       wx.showModal({ title: '保存失败', content: err.message, showCancel: false });
     }
+  },
+
+  // ▼▼▼ 违章转移 / 终止违章转移 签署 ▼▼▼
+  async _doViolationSign(contractType) {
+    const { vehicle, driverName, driverPhone } = this.data;
+    if (!vehicle) return;
+
+    if (!driverPhone) {
+      return wx.showToast({ title: '当前车辆未绑定司机手机号', icon: 'none' });
+    }
+    if (!driverName) {
+      return wx.showToast({ title: '当前车辆未绑定司机姓名', icon: 'none' });
+    }
+
+    // 先检查城市是否开通（本地判断，避免不必要的网络请求）
+    const SUPPORTED_CITIES = ['foshan', 'huizhou'];
+    if (!SUPPORTED_CITIES.includes((vehicle.cityCode || '').toLowerCase())) {
+      return wx.showModal({
+        title: '暂未开通',
+        content: '该城市的违章转移签署功能正在开通中，敬请期待。',
+        showCancel: false
+      });
+    }
+
+    wx.showLoading({ title: '准备文件...', mask: true });
+    try {
+      // 1. 获取模板文件的 cloud:// ID（由云函数返回，前端不需要知道具体路径）
+      const cfgRes = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getViolationFileId',
+          payload: { contractType }
+        }
+      });
+      const wxFileId = cfgRes.result?.data?.wxFileId;
+      if (!wxFileId) throw new Error(cfgRes.result?.msg || '获取模板文件 ID 失败');
+
+      // 2. 获取临时下载 URL（前端的 wx.cloud 会返回正确的公网 COS URL）
+      const tempRes = await wx.cloud.getTempFileURL({ fileList: [wxFileId] });
+      const tempUrl = tempRes.fileList[0]?.tempFileURL;
+      if (!tempUrl) throw new Error('无法获取模板文件临时链接');
+
+      // 3. 上传到法大大（和现有 contract-list 签署流程一致）
+      const contractTypeName = contractType === 'violation_transfer' ? '违章转移' : '终止违章转移';
+      const fileName = `${vehicle.plate || driverName}-${contractTypeName}申请书.docx`;
+
+      wx.showLoading({ title: '上传文件...', mask: true });
+      const upRes = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'uploadFileByUrl',
+          payload: { url: tempUrl, fileName, fileType: 'doc' }
+        }
+      });
+      const fddFileUrl = upRes.result?.data?.result?.data?.fddFileUrl || upRes.result?.data?.result?.fddFileUrl;
+      if (!fddFileUrl) throw new Error('模板上传失败 (无 fddFileUrl)');
+
+      // 4. 转换为 fileId
+      wx.showLoading({ title: '处理文件...', mask: true });
+      const cvRes = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'convertFddUrlToFileId',
+          payload: { fddFileUrl, fileType: 'doc', fileName }
+        }
+      });
+      const docFileId = cvRes.result?.data?.result?.data?.fileIdList?.[0]?.fileId || cvRes.result?.data?.result?.fileIdList?.[0]?.fileId;
+      if (!docFileId) throw new Error('文件 ID 转换失败');
+
+      // 5. 创建签署任务 + 获取签署链接（交给云函数完成）
+      wx.showLoading({ title: '创建签署任务...', mask: true });
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'orchestrateViolationSign',
+          payload: {
+            contractType,
+            docFileId,
+            signerName: driverName,
+            signerPhone: driverPhone,
+            cityCode: vehicle.cityCode,
+            branchCode: vehicle.branchCode,
+            plate: vehicle.plate
+          }
+        }
+      });
+
+      wx.hideLoading();
+
+      if (result?.unavailable) {
+        return wx.showModal({
+          title: '暂未开通',
+          content: result.msg || '该城市的违章转移签署功能正在开通中，敬请期待。',
+          showCancel: false
+        });
+      }
+
+      if (!result?.success) {
+        throw new Error(result?.error || result?.msg || '签署接口返回异常');
+      }
+
+      const actorUrl = result.data?.actorUrl;
+      const signTaskId = result.data?.signTaskId;
+      if (!actorUrl) throw new Error('未返回签署链接');
+
+      // 保存 signTaskId 到内存 + 写入 violation_records（跨 session 持久化）
+      if (signTaskId) {
+        const fieldKey = contractType === 'violation_transfer'
+          ? 'violationTransferSignTaskId'
+          : 'violationTerminationSignTaskId';
+        this.setData({ [fieldKey]: signTaskId });
+
+        // 异步写入，不阻塞 UI
+        const { vehicle, driverName, driverId, driverPhone } = this.data;
+        violationRecordsCol.add({
+          data: {
+            vehicleId: vehicle._id,
+            plate: vehicle.plate || '',
+            contractType,
+            signTaskId,
+            driverId: driverId || '',
+            driverName: driverName || '',
+            driverPhone: driverPhone || '',
+            cityCode: vehicle.cityCode || '',
+            branchCode: vehicle.branchCode || '',
+            createdAt: db.serverDate()
+          }
+        }).catch(err => console.error('[violationSign] DB save failed', err));
+      }
+
+      wx.setClipboardData({
+        data: actorUrl,
+        success: () => {
+          wx.showModal({
+            title: '准备就绪',
+            content: '签署链接已复制。请司机使用此链接完成签署。',
+            showCancel: false,
+            confirmText: '好的'
+          });
+        }
+      });
+
+    } catch (err) {
+      wx.hideLoading();
+      console.error('[violationSign]', err);
+      wx.showModal({ title: '操作失败', content: err.message || String(err), showCancel: false });
+    }
+  },
+
+  onSignViolationTransfer() {
+    this._doViolationSign('violation_transfer');
+  },
+
+  onSignViolationTermination() {
+    this._doViolationSign('violation_termination');
+  },
+
+  // ▼▼▼ 违章转移合同下载 ▼▼▼
+  async _doViolationDownload(contractType) {
+    const contractTypeName = contractType === 'violation_transfer' ? '违章转移' : '终止违章转移';
+    const { vehicle, driverName } = this.data;
+
+    // 从 data 里取存储的 signTaskId
+    const fieldKey = contractType === 'violation_transfer'
+      ? 'violationTransferSignTaskId'
+      : 'violationTerminationSignTaskId';
+    const signTaskId = this.data[fieldKey];
+
+    if (!signTaskId) {
+      return wx.showModal({
+        title: '尚未签署',
+        content: `请先完成「${contractTypeName}」签署流程，再下载合同。`,
+        showCancel: false
+      });
+    }
+
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getOwnerDownloadUrl',
+          payload: {
+            signTaskId,
+            customName: `${vehicle?.plate || driverName || '车辆'}-${contractTypeName}-${Date.now()}`
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      wx.hideLoading();
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: result?.msg || JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      await wx.setClipboardData({ data: url });
+      wx.showModal({
+        title: '链接已复制',
+        content: `${contractTypeName}合同下载链接已复制到剪贴板。有效期 1 小时，请尽快保存。`,
+        confirmText: '知道了',
+        showCancel: false
+      });
+
+    } catch (err) {
+      wx.hideLoading();
+      console.error(`[violationDownload:${contractType}]`, err);
+      wx.showToast({ title: err.message || '下载失败', icon: 'none' });
+    }
+  },
+
+  onDownloadViolationTransfer() {
+    this._doViolationDownload('violation_transfer');
+  },
+
+  onDownloadViolationTermination() {
+    this._doViolationDownload('violation_termination');
   }
 });
+

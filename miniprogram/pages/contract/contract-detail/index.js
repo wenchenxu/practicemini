@@ -532,5 +532,35 @@ Page({
       this.setData({ swapping: false });
       wx.hideLoading();
     }
+  },
+
+  // ▼▼▼ 跳转到对应车辆详情页 (通过车牌查询 vehicleId) ▼▼▼
+  async onGoToVehicle() {
+    const { contract } = this.data;
+    if (!contract) return;
+
+    const plate = contract.fields?.carPlate;
+    if (!plate) {
+      return wx.showToast({ title: '合同未绑定车辆', icon: 'none' });
+    }
+
+    wx.showLoading({ title: '查询中...', mask: true });
+    try {
+      const res = await db.collection('vehicles').where({ plate }).limit(1).get();
+      wx.hideLoading();
+
+      if (!res.data || res.data.length === 0) {
+        return wx.showToast({ title: '未找到对应车辆记录', icon: 'none' });
+      }
+
+      const vehicle = res.data[0];
+      wx.navigateTo({
+        url: `/pages/vehicle/vehicle-detail/index?id=${vehicle._id}&cityCode=${encodeURIComponent(contract.cityCode || '')}&city=${encodeURIComponent(contract.cityName || '')}`
+      });
+    } catch (e) {
+      wx.hideLoading();
+      console.error('[onGoToVehicle]', e);
+      wx.showToast({ title: '查询失败', icon: 'none' });
+    }
   }
 });

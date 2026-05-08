@@ -267,8 +267,6 @@ async function generateAttachmentDocx(opts) {
 
 // ===== 模板映射（和你现有 createContract 完全一致） =====
 
-// const ENV_BASE = 'cloud://cloudbase-9gvp1n95af42e30d.636c-cloudbase-9gvp1n95af42e30d-1379075990';
-
 const TPL_DIR = {
   branch: 'contractTemplate/branches', // branches/<branchCode>/<contractType>.docx
   city: 'contractTemplate/cities',   // cities/<cityCode>/<contractType>.docx

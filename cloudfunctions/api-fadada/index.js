@@ -306,6 +306,79 @@ async function orchestrateSignTask(payload) {
   return { actorUrl, signTaskId, updatesToDb };
 }
 
+// 违章转移 / 终止违章转移 签署流程
+// 文件上传已在前端完成，这里只负责 createTask + getActorUrl
+async function orchestrateViolationSign(payload) {
+  const { contractType, docFileId, signerName, signerPhone, cityCode, branchCode, plate } = payload;
+
+  // 城市开通名单（在云函数控制，前端也有本地判断）
+  const SUPPORTED_CITIES = ['foshan', 'huizhou'];
+  if (!SUPPORTED_CITIES.includes((cityCode || '').toLowerCase())) {
+    return {
+      unavailable: true,
+      msg: `该功能暂未在当前城市开通。`
+    };
+  }
+
+  if (!signerPhone) throw new Error('缺少承租人手机号');
+  if (!signerName)  throw new Error('缺少承租人姓名');
+  if (!docFileId)   throw new Error('缺少文件 ID（docFileId），请确保前端已完成文件上传');
+
+  const contractTypeName = contractType === 'violation_transfer' ? '违章转移' : '终止违章转移';
+  const subject = `${plate || signerName}-${contractTypeName}申请`;
+
+  // 1. 创建签署任务（使用自定义关键词）
+  const taskPayload = {
+    docFileId,
+    subject,
+    signerName,
+    signerId: signerPhone,
+    signerPhone,
+    cityCode,
+    branchCode,
+    corpSealKeyword: '申请单位',   // 违章合同中公司盖章关键词
+    personSignKeyword: '承租人',    // 违章合同中个人签名关键词
+    dateSignKeyword: '',             // 违章合同无日期控件
+    crossPageSeal: false,            // 违章合同无骑缝章
+    attachs: []
+  };
+
+  const taskRes = await post('/api/esign/createTaskV51', taskPayload);
+  if (taskRes.error || (!taskRes.ok && !taskRes.success)) throw new Error(taskRes.msg || JSON.stringify(taskRes.data || taskRes));
+
+  const signTaskId = taskRes.data?.signTaskId || taskRes.signTaskId || taskRes.data?.data?.signTaskId;
+  if (!signTaskId) throw new Error('未返回 signTaskId');
+
+  // 2. 获取签署链接
+  const actorRes = await post('/api/esign/getActorUrl', {
+    signTaskId,
+    actorId: signerPhone,
+    clientUserId: `driver:${signerPhone}`
+  });
+  if (actorRes.error || (!actorRes.ok && !actorRes.success && actorRes.code !== '100000')) throw new Error(JSON.stringify(actorRes.data || actorRes));
+
+  const actorUrl = actorRes.data?.actorSignTaskEmbedUrl || actorRes.actorSignTaskEmbedUrl || actorRes.data?.data?.actorSignTaskEmbedUrl;
+  if (!actorUrl) throw new Error('未返回签署链接');
+
+  return { actorUrl, signTaskId };
+}
+
+// 返回违章模板的 cloud:// 文件 ID（前端用来 getTempFileURL）
+function getViolationFileId(payload) {
+  const { contractType } = payload;
+  const storageBase = IS_PROD
+    ? process.env.CLOUD_STORAGE_BASE_PROD
+    : process.env.CLOUD_STORAGE_BASE_DEV;
+  const relativePath = contractType === 'violation_transfer'
+    ? process.env.VIOLATION_TRANSFER_DOCX_PATH
+    : process.env.VIOLATION_TERMINATION_DOCX_PATH;
+
+  if (!storageBase || !relativePath) throw new Error(`缺少模板文件配置（${contractType}），请检查云函数环境变量`);
+
+  return { wxFileId: `${storageBase}/${relativePath}` };
+}
+
+
 exports.main = async (event, context) => {
   try {
     const { action, payload = {} } = event || {};
@@ -326,6 +399,13 @@ exports.main = async (event, context) => {
         return { success: true, data: await saveContractEsign(payload) };
       case 'orchestrateSignTask':
         return { success: true, data: await orchestrateSignTask(payload) };
+      case 'orchestrateViolationSign': {
+        const violationResult = await orchestrateViolationSign(payload);
+        if (violationResult.unavailable) return { success: false, unavailable: true, msg: violationResult.msg };
+        return { success: true, data: violationResult };
+      }
+      case 'getViolationFileId':
+        return { success: true, data: getViolationFileId(payload) };
       case 'getOwnerDownloadUrl':
         return { success: true, data: await post('/api/esign/getOwnerDownloadUrl', payload) };
       //其他功能，未使用官方 Pre-request Script，待验证/修改

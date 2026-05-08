@@ -121,13 +121,22 @@
     <view class="edit-card">
       <view class="card-header-row">
         <view class="section-title" style="margin-bottom:0; border:none; padding:0;">车辆信息</view>
-        <van-button 
-        type="warning" 
-        size="small" 
-        plain 
-        bind:click="onOpenSwapModal"
-        wx:if="{{contract && !contract.deleted && contract.contractType !== 'rent_rto'}}"
-        >更换车辆</van-button>
+        <view style="display: flex; gap: 10rpx;">
+          <van-button
+            wx:if="{{contract && contract.fields && contract.fields.carPlate}}"
+            type="default"
+            size="small"
+            plain
+            bind:click="onGoToVehicle"
+          >车辆详情</van-button>
+          <van-button 
+          type="warning" 
+          size="small" 
+          plain 
+          bind:click="onOpenSwapModal"
+          wx:if="{{contract && !contract.deleted && contract.contractType !== 'rent_rto'}}"
+          >更换车辆</van-button>
+        </view>
         </view>
 
       <view class="read-row">
