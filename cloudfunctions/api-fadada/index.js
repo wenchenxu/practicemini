@@ -321,8 +321,8 @@ async function orchestrateViolationSign(payload) {
   }
 
   if (!signerPhone) throw new Error('缺少承租人手机号');
-  if (!signerName)  throw new Error('缺少承租人姓名');
-  if (!docFileId)   throw new Error('缺少文件 ID（docFileId），请确保前端已完成文件上传');
+  if (!signerName) throw new Error('缺少承租人姓名');
+  if (!docFileId) throw new Error('缺少文件 ID（docFileId），请确保前端已完成文件上传');
 
   const contractTypeName = contractType === 'violation_transfer' ? '违章转移' : '终止违章转移';
   const subject = `${plate || signerName}-${contractTypeName}申请`;
@@ -337,7 +337,7 @@ async function orchestrateViolationSign(payload) {
     cityCode,
     branchCode,
     corpSealKeyword: '申请单位',   // 违章合同中公司盖章关键词
-    personSignKeyword: '承租人',    // 违章合同中个人签名关键词
+    personSignKeyword: '承租司机',    // 违章合同中个人签名关键词
     dateSignKeyword: '',             // 违章合同无日期控件
     crossPageSeal: false,            // 违章合同无骑缝章
     attachs: []

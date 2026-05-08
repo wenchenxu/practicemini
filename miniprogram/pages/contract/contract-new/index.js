@@ -52,6 +52,14 @@ const BASE_FIELDS = [
   { name: 'rentMonthlyFirstYearFormal', label: '1—12期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'rentMonthlySecondYear', label: '13—24期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'rentMonthlySecondYearFormal', label: '13—24期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyThirdYear', label: '25—36期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyThirdYearFormal', label: '25—36期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyFourthYear', label: '37—48期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyFourthYearFormal', label: '37—48期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyFifthYear', label: '49—60期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlyFifthYearFormal', label: '49—60期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlySixthYear', label: '61—72期每期租金', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
+  { name: 'rentMonthlySixthYearFormal', label: '61—72期每期租金（大写）', type: 'string', requiredWhen: 'never', disabled: true, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'daysTillPayment', label: '自然日内支付首期（天）', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'sellPrice', label: '合同完结后车辆购买售价', type: 'number', requiredWhen: 'never', min: 0, hideOnCreate: true, hideOnEdit: true, hideOnView: true },
   { name: 'notesWhenSell', label: '销售备注', type: 'string', requiredWhen: 'never', hideOnCreate: true, hideOnEdit: true, hideOnView: true },
@@ -359,6 +367,11 @@ Page({
       depositServiceFee: 'depositServiceFeeFormal',
       rentMonthlyFirstYear: 'rentMonthlyFirstYearFormal',
       rentMonthlySecondYear: 'rentMonthlySecondYearFormal',
+      rentMonthlyThirdYear: 'rentMonthlyThirdYearFormal',
+      rentMonthlyFourthYear: 'rentMonthlyFourthYearFormal',
+      rentMonthlyFifthYear: 'rentMonthlyFifthYearFormal',
+      rentMonthlySixthYear: 'rentMonthlySixthYearFormal',
+
     };
     if (map[name]) {
       patch[`form.${map[name]}`] = numberToCN(value);
@@ -383,7 +396,8 @@ Page({
   },
 
   onTermTypeChange(e) {
-    const val = Number(e.detail.value) === 1 ? 'long_term' : 'standard';
+    const opts = ['standard', 'long_term_3', 'long_term_4', 'long_term_5'];
+    const val = opts[Number(e.detail.value)];
     this.setData({ 'form.termType': val });
   },
 
@@ -427,7 +441,7 @@ Page({
       // 如果是普通模式，跳过 rto 字段的基础校验 (它们本身是 requiredWhen:'never' 所以默认就跳过了)
 
       if (f.required) {
-        if (f.name === 'contractValidPeriodEnd' && form.termType === 'long_term') {
+        if (f.name === 'contractValidPeriodEnd' && form.termType && form.termType.startsWith('long_term')) {
           continue; // bypass required check for long_term
         }
         if (f.type === 'string' && (!v || !String(v).trim())) {
@@ -464,7 +478,7 @@ Page({
     // Expiry Date Validation: End must be strictly after Start
     const startStr = form.contractValidPeriodStart;
     const endStr = form.contractValidPeriodEnd;
-    if (form.termType !== 'long_term' && startStr && endStr) {
+    if (!(form.termType && form.termType.startsWith('long_term')) && startStr && endStr) {
       const startTime = new Date(`${startStr}T00:00:00+08:00`).getTime();
       const endTime = new Date(`${endStr}T00:00:00+08:00`).getTime();
       if (endTime <= startTime) {
@@ -494,6 +508,18 @@ Page({
       // 以租代购必填项
       if (!form.rentMonthlyFirstYear) return '请输入1—12期租金';
       if (!form.rentMonthlySecondYear) return '请输入13—24期租金';
+      
+      const tt = form.termType || 'standard';
+      if (tt === 'long_term_3' || tt === 'long_term_4' || tt === 'long_term_5') {
+        if (!form.rentMonthlyThirdYear) return '请输入25—36期租金';
+      }
+      if (tt === 'long_term_4' || tt === 'long_term_5') {
+        if (!form.rentMonthlyFourthYear) return '请输入37—48期租金';
+      }
+      if (tt === 'long_term_5') {
+        if (!form.rentMonthlyFifthYear) return '请输入49—60期租金';
+      }
+
       if (!form.daysTillPayment) return '请输入签订后支付天数';
       if (!form.sellPrice) return '请输入购买车辆金额';
     } else {
@@ -512,7 +538,7 @@ Page({
       let v = this.data.form[f.name];
 
       // 覆盖长效合同的结束日期
-      if (f.name === 'contractValidPeriodEnd' && this.data.form.termType === 'long_term') {
+      if (f.name === 'contractValidPeriodEnd' && this.data.form.termType && this.data.form.termType.startsWith('long_term')) {
         v = '长期有效';
       }
 
@@ -522,6 +548,28 @@ Page({
         obj[f.name] = v !== undefined ? v : null;
       }
     }
+
+    // 动态生成第三年及以后的租金文案 (给合同模板渲染使用)
+    const tt = this.data.form.termType || '';
+    if (tt.startsWith('long_term')) {
+      const parts = [];
+      if (obj.rentMonthlyThirdYear !== null) {
+        parts.push(`第 25 — 36 期车辆每期租金金额为人民币 ${obj.rentMonthlyThirdYear} 元（大写${obj.rentMonthlyThirdYearFormal || '零元整'}）`);
+      }
+      if (obj.rentMonthlyFourthYear !== null) {
+        parts.push(`第 37 — 48 期车辆每期租金金额为人民币 ${obj.rentMonthlyFourthYear} 元（大写${obj.rentMonthlyFourthYearFormal || '零元整'}）`);
+      }
+      if (obj.rentMonthlyFifthYear !== null) {
+        parts.push(`第 49 — 60 期车辆每期租金金额为人民币 ${obj.rentMonthlyFifthYear} 元（大写${obj.rentMonthlyFifthYearFormal || '零元整'}）`);
+      }
+      if (obj.rentMonthlySixthYear !== null) {
+        parts.push(`第 61 — 72 期车辆每期租金金额为人民币 ${obj.rentMonthlySixthYear} 元（大写${obj.rentMonthlySixthYearFormal || '零元整'}）`);
+      }
+      obj.thirdYearOnwardsRents = parts.length > 0 ? parts.join('\n') : ' ';
+    } else {
+      obj.thirdYearOnwardsRents = ' ';
+    }
+
     return obj;
   },
 

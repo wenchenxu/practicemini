@@ -66,7 +66,7 @@
             
             <block wx:if="{{ ((item.name!=='rentMonthly' && item.name!=='rentToday') || selectedTypeCode !== 'rent_rto') && ((item.name!=='rentMonthlyFirstYear' && item.name!=='rentMonthlySecondYear' && item.name!=='daysTillPayment' && item.name!=='sellPrice' && item.name!=='notesWhenSell' && item.name!=='termType') || selectedTypeCode === 'rent_rto') }}">
             
-              <view class="form-item item-{{item.name}}" wx:if="{{(item.name !== 'rentPaybyDayInMonth' || cityCode !== 'changzhou') && !(item.name === 'contractValidPeriodEnd' && form.termType === 'long_term')}}">
+              <view class="form-item item-{{item.name}}" wx:if="{{(item.name !== 'rentPaybyDayInMonth' || cityCode !== 'changzhou') && !(item.name === 'contractValidPeriodEnd' && form.termType && form.termType !== 'standard')}}">
                 <label class="label">
                   <text wx:if="{{item.required}}" class="req">*</text>{{item.label}}
                   <text class="tip" wx:if="{{item.help}}">({{item.help}})</text>
@@ -74,9 +74,9 @@
 
                 <input wx:if="{{item.type==='string' && item.name !== 'termType'}}" class="input-box" placeholder="请输入{{item.label}}" placeholder-class="ph" value="{{ (mode==='view' || item.disabled) ? util.def(form[item.name]) : (form[item.name] || '') }}" bindinput="onInput" data-name="{{item.name}}" disabled="{{item.disabled || mode==='view'}}" maxlength="{{item.maxLength || -1}}" />
 
-                <picker wx:elif="{{item.name === 'termType'}}" mode="selector" range="{{['标准（两年）', '长期']}}" bindchange="onTermTypeChange" disabled="{{mode==='view'}}">
+                <picker wx:elif="{{item.name === 'termType'}}" mode="selector" range="{{['标准（两年）', '三年（长期）', '四年（长期）', '五年（长期）']}}" bindchange="onTermTypeChange" disabled="{{mode==='view'}}">
                   <view class="input-box picker-box">
-                    {{form.termType === 'long_term' ? '长期' : '标准（两年）'}}
+                    {{form.termType === 'long_term_5' ? '五年（长期）' : (form.termType === 'long_term_4' ? '四年（长期）' : (form.termType === 'long_term_3' ? '三年（长期）' : '标准（两年）'))}}
                     <text class="date-icon" wx:if="{{mode!=='view'}}">▼</text>
                   </view>
                 </picker>
@@ -132,6 +132,21 @@
           <view class="form-item">
             <label class="label"><text class="req">*</text>13—24期每期租金</label>
             <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlySecondYear}}" bindinput="onInputNumber" data-name="rentMonthlySecondYear" disabled="{{mode==='view'}}" />
+          </view>
+
+          <view class="form-item" wx:if="{{form.termType === 'long_term_3' || form.termType === 'long_term_4' || form.termType === 'long_term_5'}}">
+            <label class="label"><text class="req">*</text>25—36期每期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyThirdYear}}" bindinput="onInputNumber" data-name="rentMonthlyThirdYear" disabled="{{mode==='view'}}" />
+          </view>
+
+          <view class="form-item" wx:if="{{form.termType === 'long_term_4' || form.termType === 'long_term_5'}}">
+            <label class="label"><text class="req">*</text>37—48期每期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFourthYear}}" bindinput="onInputNumber" data-name="rentMonthlyFourthYear" disabled="{{mode==='view'}}" />
+          </view>
+
+          <view class="form-item" wx:if="{{form.termType === 'long_term_5'}}">
+            <label class="label"><text class="req">*</text>49—60期每期租金</label>
+            <input class="input-box" type="number" placeholder="0" placeholder-class="ph" value="{{form.rentMonthlyFifthYear}}" bindinput="onInputNumber" data-name="rentMonthlyFifthYear" disabled="{{mode==='view'}}" />
           </view>
           
           <view class="form-item">
