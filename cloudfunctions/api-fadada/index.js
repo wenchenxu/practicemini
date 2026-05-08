@@ -340,7 +340,8 @@ async function orchestrateViolationSign(payload) {
     personSignKeyword: '承租司机',    // 违章合同中个人签名关键词
     dateSignKeyword: '',             // 违章合同无日期控件
     crossPageSeal: false,            // 违章合同无骑缝章
-    attachs: []
+    attachs: [],
+    contractType                     // 传递给 ECS，以便其根据合同类型加载特定章
   };
 
   const taskRes = await post('/api/esign/createTaskV51', taskPayload);
