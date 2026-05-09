@@ -161,6 +161,27 @@ async function renderDocxForContract(doc) {
     depositServiceFeeFormal: fields.depositServiceFeeFormal,
 
     depositRemaining: fields.depositRemaining,
+
+    // RTO 字段透传给 DOCX
+    rentMonthlyFirstYear: fields.rentMonthlyFirstYear,
+    rentMonthlyFirstYearFormal: fields.rentMonthlyFirstYearFormal,
+    rentMonthlySecondYear: fields.rentMonthlySecondYear,
+    rentMonthlySecondYearFormal: fields.rentMonthlySecondYearFormal,
+    rentMonthlyThirdYear: fields.rentMonthlyThirdYear,
+    rentMonthlyThirdYearFormal: fields.rentMonthlyThirdYearFormal,
+    rentMonthlyFourthYear: fields.rentMonthlyFourthYear,
+    rentMonthlyFourthYearFormal: fields.rentMonthlyFourthYearFormal,
+    rentMonthlyFifthYear: fields.rentMonthlyFifthYear,
+    rentMonthlyFifthYearFormal: fields.rentMonthlyFifthYearFormal,
+    rentMonthlySixthYear: fields.rentMonthlySixthYear,
+    rentMonthlySixthYearFormal: fields.rentMonthlySixthYearFormal,
+    thirdYearOnwardsRents: fields.thirdYearOnwardsRents,
+    daysTillPayment: fields.daysTillPayment,
+    sellPrice: fields.sellPrice,
+    notesWhenSell: fields.notesWhenSell || '无',
+    rentFrequency: fields.rentFrequency || '',
+    rentPaybyDayInWeek: fields.rentPaybyDayInWeek || '',
+    giftDaysInContract: fields.giftDaysInContract !== undefined ? fields.giftDaysInContract : '',
   };
 
   try { docx.render(dataForDocx); }

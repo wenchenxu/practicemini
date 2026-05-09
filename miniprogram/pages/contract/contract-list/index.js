@@ -245,6 +245,9 @@ Page({
     try {
       wx.showLoading({ title: '获取下载链接...', mask: true });
 
+      const docFileId = item?.esign?.docFileId || item?.esign?.fileId;
+      const downloadItems = docFileId ? [{ docId: docFileId }] : undefined;
+
       // 你可以传 customName（自定义下载文件名，不含扩展名时平台会按规则补）
       const { result } = await wx.cloud.callFunction({
         name: 'api-fadada',
@@ -252,6 +255,7 @@ Page({
           action: 'getOwnerDownloadUrl',
           payload: {
             signTaskId,
+            downloadItems,
             // 可选：如果要强制指定别的主体，就传对象
             // ownerId: { idType: 'corp', openId: 'xxxxxx' },
             customName: `${item.fields?.clientName || '合同'}-${Date.now()}`,

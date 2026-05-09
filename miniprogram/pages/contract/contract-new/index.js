@@ -565,7 +565,7 @@ Page({
       if (obj.rentMonthlySixthYear !== null) {
         parts.push(`第 61 — 72 期车辆每期租金金额为人民币 ${obj.rentMonthlySixthYear} 元（大写${obj.rentMonthlySixthYearFormal || '零元整'}）`);
       }
-      obj.thirdYearOnwardsRents = parts.length > 0 ? parts.join('\n') : ' ';
+      obj.thirdYearOnwardsRents = parts.length > 0 ? parts.join('；') : ' ';
     } else {
       obj.thirdYearOnwardsRents = ' ';
     }

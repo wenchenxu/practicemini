@@ -134,7 +134,7 @@
               size="mini"
               type="default"
               disabled="{{!item.esign || !item.esign.signTaskId}}"
-          >合同下载</button>
+          >主合同下载</button>
         </block>
       </view>
       <!-- 调试用，看看最后拿到的链接 -->
