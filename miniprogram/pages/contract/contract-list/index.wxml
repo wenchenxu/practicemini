@@ -130,7 +130,7 @@
           >{{item._refreshButtonText || '刷新状态'}}</button>
           <button
               data-id="{{item._id}}"
-              bindtap="onGetDownloadUrlFromRow"
+              bindtap="onGetDownloadUrlFromRowMaincontract"
               size="mini"
               type="default"
               disabled="{{!item.esign || !item.esign.signTaskId}}"

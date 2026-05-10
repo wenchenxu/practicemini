@@ -562,5 +562,134 @@ Page({
       console.error('[onGoToVehicle]', e);
       wx.showToast({ title: '查询失败', icon: 'none' });
     }
+  },
+
+  // ▼▼▼ 合同下载相关 ▼▼▼
+  onDownloadMainContractConfirm() {
+    const { contract } = this.data;
+    if (!contract?.esign?.signTaskId) {
+      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+    }
+    wx.showModal({
+      title: '提示',
+      content: '下载主合同 (.pdf)？',
+      success: (res) => {
+        if (res.confirm) {
+          this.doDownloadMainContract(contract);
+        }
+      }
+    });
+  },
+
+  onDownloadZipContractConfirm() {
+    const { contract } = this.data;
+    if (!contract?.esign?.signTaskId) {
+      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+    }
+    wx.showModal({
+      title: '提示',
+      content: '下载主合同与附件压缩包？',
+      success: (res) => {
+        if (res.confirm) {
+          this.doDownloadZipContract(contract);
+        }
+      }
+    });
+  },
+
+  async doDownloadMainContract(contract) {
+    const signTaskId = contract?.esign?.signTaskId;
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      const docFileId = contract?.esign?.docFileId || contract?.esign?.fileId;
+
+      // 调用新版直接获取单文件下载链接的接口
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getFile',
+          payload: {
+            signTaskId,
+            docId: docFileId
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      await wx.setClipboardData({ data: url });
+      wx.hideLoading();
+      wx.showModal({
+        title: '获取成功！',
+        content: '主合同下载链接已复制。有效期 1 小时，请尽快下载保存。',
+        confirmText: '知道了',
+        showCancel: false
+      });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '异常', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async doDownloadZipContract(contract) {
+    const signTaskId = contract?.esign?.signTaskId;
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      const downloadItems = undefined;
+
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getOwnerDownloadUrl',
+          payload: {
+            signTaskId,
+            downloadItems,
+            customName: `${contract.fields?.clientName || '合同'}-${Date.now()}`,
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      await wx.setClipboardData({ data: url });
+      wx.hideLoading();
+      wx.showModal({
+        title: '获取成功！',
+        content: '合同压缩包下载链接已复制。有效期 1 小时，请尽快下载保存。',
+        confirmText: '知道了',
+        showCancel: false
+      });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '异常', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
   }
 });

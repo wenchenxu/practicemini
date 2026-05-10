@@ -409,6 +409,8 @@ exports.main = async (event, context) => {
         return { success: true, data: getViolationFileId(payload) };
       case 'getOwnerDownloadUrl':
         return { success: true, data: await post('/api/esign/getOwnerDownloadUrl', payload) };
+      case 'getFile':
+        return { success: true, data: await post('/api/esign/getFile', payload) };
       //其他功能，未使用官方 Pre-request Script，待验证/修改
       case 'getCorpAuthUrl':
         return { success: true, data: await post('/api/esign/getCorpAuthUrl', payload) };

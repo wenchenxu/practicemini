@@ -245,8 +245,7 @@ Page({
     try {
       wx.showLoading({ title: '获取下载链接...', mask: true });
 
-      const docFileId = item?.esign?.docFileId || item?.esign?.fileId;
-      const downloadItems = docFileId ? [{ docId: docFileId }] : undefined;
+      const downloadItems = undefined; // Original state didn't filter
 
       // 你可以传 customName（自定义下载文件名，不含扩展名时平台会按规则补）
       const { result } = await wx.cloud.callFunction({
@@ -302,10 +301,69 @@ Page({
     }
   },
 
+  async onGetDownloadUrlFromRowMaincontract(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    const signTaskId = item?.esign?.signTaskId;
+    if (!signTaskId) {
+      return wx.showToast({ title: '请先发起并创建签署任务', icon: 'none' });
+    }
+
+    try {
+      wx.showLoading({ title: '获取下载链接...', mask: true });
+
+      const docFileId = item?.esign?.docFileId || item?.esign?.fileId;
+
+      // 调用新版直接获取单文件下载链接的接口
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getFile',
+          payload: {
+            signTaskId,
+            docId: docFileId
+          }
+        }
+      });
+
+      const url =
+        result?.data?.downloadUrl ||
+        result?.data?.data?.downloadUrl ||
+        result?.data?.ownerDownloadUrl;
+
+      if (!url) {
+        return wx.showModal({
+          title: '获取失败',
+          content: JSON.stringify(result),
+          showCancel: false
+        });
+      }
+
+      await wx.setClipboardData({ data: url });
+      wx.hideLoading();
+      // 弹窗提示，不带取消
+      wx.showModal({
+        title: '签署完毕！',
+        content: '主合同下载链接已复制。有效期 1 小时，请尽快下载保存。',
+        confirmText: '知道了',
+        showCancel: false
+      });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: err.message || '异常', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
   async onRefreshSignTaskStatus(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.list.find(x => x._id === id);
     const signTaskId = e.currentTarget.dataset.signTaskId || item?.esign?.signTaskId;
+
+    console.log('====== 当前签署任务ID (signTaskId) ======', signTaskId);
 
     if (!item) {
       return wx.showModal({ title: '提示', content: '未找到合同', showCancel: false });

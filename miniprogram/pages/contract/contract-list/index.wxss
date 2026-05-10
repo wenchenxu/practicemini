@@ -163,13 +163,22 @@
   display: flex;
   flex-direction: column;
   gap: 12rpx;
-  align-items: flex-end;
+  align-items: stretch;
   min-width: 200rpx;
+}
+
+.ops button {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 8rpx 0 !important;
+  font-size: 24rpx !important;
+  font-weight: normal !important;
 }
 
 .icon-row {
     display: flex;
     flex-direction: row;
+    justify-content: flex-end;
     gap: 12rpx;
 }
 

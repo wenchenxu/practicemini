@@ -118,6 +118,22 @@
       </view>
     </view>
 
+    <!-- 新增：合同下载 -->
+    <view class="edit-card">
+      <view class="card-header-row">
+        <view class="section-title" style="margin-bottom:0; border:none; padding:0;">合同下载</view>
+      </view>
+      <view style="display:flex; gap:20rpx; padding: 30rpx 0 10rpx 0;">
+        <view style="flex: 1;">
+          <van-button type="primary" size="normal" block bind:click="onDownloadMainContractConfirm">主合同下载</van-button>
+        </view>
+        <view style="flex: 1;">
+          <van-button type="info" size="normal" block plain bind:click="onDownloadZipContractConfirm">合同与附件下载</van-button>
+        </view>
+      </view>
+    </view>
+
+
     <view class="edit-card">
       <view class="card-header-row">
         <view class="section-title" style="margin-bottom:0; border:none; padding:0;">车辆信息</view>
