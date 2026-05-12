@@ -53,7 +53,10 @@ Page({
     editIns: {},        // 编辑时的临时对象（存字符串格式 'YYYY-MM-DD'）
     // 新增：年审弹窗控制
     showAnnualEdit: false,
-    editAnnualDate: '' // 暂存编辑时的日期字符串
+    editAnnualDate: '', // 暂存编辑时的日期字符串
+    // 新增：退租确认弹窗
+    showReturnConfirm: false,
+    returnConfirmInput: ''
   },
 
   onLoad(options) {
@@ -320,22 +323,29 @@ Page({
     );
     if (!first.confirm) return;
 
-    // 第二步：输入"确认退租"才能继续（防误触）
-    const second = await new Promise(resolve =>
-      wx.showModal({
-        title: '⚠️ 操作不可逆!\n退租后无法发起终止违章转移合同。\n如确认退租，请在下方输入「确认退租」并点击确定。',
-        content: '',
-        editable: true,
-        placeholderText: '请输入：确认退租',
-        success: resolve
-      })
-    );
-    if (!second.confirm) return;
-    if ((second.content || '').trim() !== '确认退租') {
+    // 第二步：打开自定义弹窗进行确认输入
+    this.setData({
+      showReturnConfirm: true,
+      returnConfirmInput: ''
+    });
+  },
+
+  onReturnConfirmInput(e) {
+    this.setData({ returnConfirmInput: e.detail.value });
+  },
+
+  onCloseReturnConfirm() {
+    this.setData({ showReturnConfirm: false });
+  },
+
+  onConfirmReturn() {
+    if ((this.data.returnConfirmInput || '').trim() !== '确认退租') {
       wx.showToast({ title: '输入不正确，已取消退租', icon: 'none', duration: 2000 });
+      this.setData({ showReturnConfirm: false });
       return;
     }
 
+    this.setData({ showReturnConfirm: false });
     this._doUpdateStatus('available');
   },
 

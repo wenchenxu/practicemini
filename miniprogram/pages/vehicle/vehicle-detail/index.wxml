@@ -257,4 +257,24 @@
     </view>
   </van-dialog>
 
+  <van-dialog
+    use-slot
+    title="⚠️ 操作不可逆!"
+    show="{{ showReturnConfirm }}"
+    show-cancel-button
+    bind:confirm="onConfirmReturn"
+    bind:close="onCloseReturnConfirm"
+  >
+    <view style="padding: 30rpx; font-size: 28rpx; color: #333; line-height: 1.5;">
+      <view style="margin-bottom: 20rpx;">退租后无法发起终止违章转移合同。</view>
+      <view style="margin-bottom: 20rpx;">如确认退租，请在下方输入「确认退租」：</view>
+      <input 
+        style="border: 1px solid #eee; height: 80rpx; min-height: 80rpx; line-height: 80rpx; padding: 0 20rpx; border-radius: 8rpx; width: 100%; box-sizing: border-box;" 
+        placeholder="请输入：确认退租" 
+        value="{{ returnConfirmInput }}"
+        bindinput="onReturnConfirmInput"
+      />
+    </view>
+  </van-dialog>
+
 </view>
