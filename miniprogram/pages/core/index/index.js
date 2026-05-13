@@ -1,6 +1,5 @@
 // pages/index/index.js
-import { CITY_CODE_MAP } from '../../../utils/cities';
-import { BRANCH_OPTIONS_BY_CITY } from '../../../utils/config';
+import { CITY_CODE_MAP, BRANCH_OPTIONS_BY_CITY } from '../../../utils/config';
 const { ensureAccess } = require('../../../utils/guard');
 
 Page({
@@ -13,9 +12,9 @@ Page({
   onShow() {
     const app = getApp();
     const apply = () => {
-        if (!ensureAccess()) return;
-        this.setData({ isAdmin: app.globalData.role === 'admin' });
-      };
+      if (!ensureAccess()) return;
+      this.setData({ isAdmin: app.globalData.role === 'admin' });
+    };
 
     if (app.globalData.initialized) {
       apply();
@@ -52,9 +51,9 @@ Page({
   },
 
   goWhitelist() {
-      wx.navigateTo({
-          url: '/pages/admin/whitelist/whitelist'
-      });
+    wx.navigateTo({
+      url: '/pages/admin/whitelist/whitelist'
+    });
   },
 
   goVehicles() {
