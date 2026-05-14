@@ -233,6 +233,7 @@ async function generateAttachmentDocx(opts) {
     paragraphLoop: true,
     linebreaks: true,
     delimiters: { start: '[[', end: ']]' },
+    nullGetter() { return ''; }, // 防止未定义变量导致渲染崩溃
   });
   doc.render(dataForDocx);
   const outBuf = doc.getZip().generate({ type: 'nodebuffer' });
@@ -711,6 +712,7 @@ exports.main = async (event, context) => {
       paragraphLoop: true,
       linebreaks: true,
       delimiters: { start: '[[', end: ']]' },
+      nullGetter() { return ''; }, // 防止未定义变量导致渲染崩溃
     });
 
     try {

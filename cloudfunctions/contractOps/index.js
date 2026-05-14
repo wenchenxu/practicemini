@@ -122,7 +122,7 @@ async function renderDocxForContract(doc) {
   // 1) 选模板并渲染 DOCX
   const { fileID: TEMPLATE_FILE_ID, buffer: content } = await pickTemplateBuffer({ cityCode, branchCode, contractType });
   const zip = new PizZip(content);
-  const docx = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: '[[', end: ']]' } });
+  const docx = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: '[[', end: ']]' }, nullGetter() { return ''; } });
 
   const dataForDocx = {
     contractNo: serialFormatted,
