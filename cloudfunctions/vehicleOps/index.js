@@ -37,6 +37,8 @@ exports.main = async (event, context) => {
         return await dev_deleteByCity(payload);
       case 'importCsv':
         return await dev_upsertVehiclesFromCsv(payload);
+      case 'updateModelsCsv':
+        return await dev_updateModelsFromCsv(payload);
       case 'updateInsurance':
         return await updateInsurance(payload);
       case 'updateAnnualInspection':
@@ -446,6 +448,77 @@ async function dev_upsertVehiclesFromCsv(payload) {
     total: rows.length,
     updated: updatedCount,
     inserted: insertedCount,
+    errors: errorCount
+  };
+}
+
+async function dev_updateModelsFromCsv(payload) {
+  const { fileID } = payload;
+  if (!fileID) throw new Error('fileID required');
+
+  // 1. 下载 CSV 文件
+  const downloadRes = await cloud.downloadFile({ fileID });
+  const csvContent = downloadRes.fileContent.toString('utf8');
+
+  // 2. 使用 PapaParse 解析
+  const parseResult = Papa.parse(csvContent, {
+    header: true,
+    skipEmptyLines: true
+  });
+
+  if (parseResult.errors.length > 0) {
+    console.warn('[CSV Parse Warning]', parseResult.errors);
+  }
+
+  const rows = parseResult.data;
+  if (!rows || rows.length === 0) return { ok: false, msg: 'empty-csv' };
+
+  const vehiclesCol = db.collection('vehicles');
+  const now = db.serverDate();
+
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+
+  // 3. 逐条匹配车牌并仅更新车型 (model)
+  for (const row of rows) {
+    const plate = row.plate ? row.plate.trim() : '';
+    const model = row.model ? row.model.trim() : '';
+    if (!plate) continue;
+
+    try {
+      const exist = await vehiclesCol.where({ plate }).get();
+
+      if (exist.data.length > 0) {
+        const docId = exist.data[0]._id;
+        await vehiclesCol.doc(docId).update({
+          data: {
+            model: model,
+            updatedAt: now
+          }
+        });
+        updatedCount++;
+      } else {
+        skippedCount++;
+      }
+    } catch (e) {
+      console.error(`Error updating model for plate ${plate}:`, e);
+      errorCount++;
+    }
+  }
+
+  // 4. 清理临时 CSV 文件
+  try {
+    await cloud.deleteFile({ fileList: [fileID] });
+  } catch (e) {
+    console.error('Delete temp file failed:', e);
+  }
+
+  return {
+    ok: true,
+    total: rows.length,
+    updated: updatedCount,
+    skipped: skippedCount,
     errors: errorCount
   };
 }

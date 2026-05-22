@@ -737,7 +737,7 @@ exports.main = async (event, context) => {
 
     // 先写回 DOCX
     await COL_CONTRACTS.doc(contractId).update({
-      data: { file: { docxFileID }, updatedAt: db.serverDate() }
+      data: { 'file.docxFileID': docxFileID, updatedAt: db.serverDate() }
     });
 
     // 再尝试 CI → PDF
@@ -821,7 +821,7 @@ exports.main = async (event, context) => {
       console.log('[ContractV2] Requesting CI:', ciUrl); // 调试日志
 
       // 3. 发起请求
-      const resp = await fetch(ciUrl);
+      const resp = await fetch(ciUrl, { agent: httpsAgent });
 
       // 4. 关键检查：CI 是否报错？
       // 如果 CI 没开通或参数错，通常返回 XML 格式的错误信息，Content-Type 是 application/xml
@@ -861,7 +861,7 @@ exports.main = async (event, context) => {
 
       // 8. 更新数据库
       await COL_CONTRACTS.doc(contractId).update({
-        data: { file: { pdfFileID }, updatedAt: db.serverDate() }
+        data: { 'file.pdfFileID': pdfFileID, updatedAt: db.serverDate() }
       });
 
       // 9. 成功后删除 DOCX (节省空间)

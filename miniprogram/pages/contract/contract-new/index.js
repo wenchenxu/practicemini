@@ -687,8 +687,27 @@ Page({
         wx.showToast({ title: '合同已生成', icon: 'success', duration: 2000 });
 
         if (fileID) {
-          const dres = await wx.cloud.downloadFile({ fileID });
-          await wx.openDocument({ filePath: dres.tempFilePath, fileType: 'pdf' });
+          // 检测返回的是 PDF 还是 DOCX（CI 转换失败时会降级返回 DOCX）
+          const isPdf = result.pdfFileID && result.pdfFileID === fileID;
+          const fileType = isPdf ? 'pdf' : 'docx';
+
+          try {
+            const dres = await wx.cloud.downloadFile({ fileID });
+            await wx.openDocument({ filePath: dres.tempFilePath, fileType });
+          } catch (openErr) {
+            // openDocument 在模拟器中会失败，但在真机上正常，不影响主流程
+            console.warn('[onSubmit] openDocument failed (expected in simulator):', openErr);
+          }
+
+          if (!isPdf) {
+            // 提示用户 PDF 未能生成，给的是 Word 文件
+            wx.showModal({
+              title: '提示',
+              content: '合同已生成（Word格式），PDF 版本稍后可在合同列表中重试。',
+              showCancel: false,
+              confirmText: '知道了'
+            });
+          }
         } else {
           wx.showModal({
             title: '提示',

@@ -669,8 +669,21 @@ Page({
     wx.showLoading({ title: '发起签署中...', mask: true });
 
     try {
-      const fileData = item.file || {};
-      const mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
+      let fileData = item.file || {};
+      let mainWxFileId = fileData.pdfFileID || fileData.docxFileID || item.fileID;
+
+      // 如果列表数据因为数据库同步延迟导致 file 为空，尝试重新拉取最新记录
+      if (!mainWxFileId) {
+        wx.showLoading({ title: '同步最新数据...', mask: true });
+        const freshRes = await wx.cloud.database().collection('contracts').doc(item._id).get();
+        const freshItem = freshRes.data || {};
+        fileData = freshItem.file || {};
+        mainWxFileId = fileData.pdfFileID || fileData.docxFileID || freshItem.fileID;
+        
+        if (!mainWxFileId) {
+           throw new Error('未找到主合同文件 (后台可能仍在同步，请下拉刷新后再试)');
+        }
+      }
 
       const { result } = await wx.cloud.callFunction({
         name: 'api-fadada',

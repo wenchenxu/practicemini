@@ -245,6 +245,64 @@ Page({
     });
   },
 
+  async onImportModelOnly() {
+    const that = this;
+
+    // 1. 选择文件
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['csv'],
+      success: async (chooseRes) => {
+        const filePath = chooseRes.tempFiles[0].path;
+
+        that.setData({ loading: true });
+        wx.showLoading({ title: '上传中...' });
+
+        try {
+          // 2. 上传到云存储 (临时中转)
+          const cloudPath = `temp_imports/${Date.now()}_model_update.csv`;
+          const uploadRes = await wx.cloud.uploadFile({
+            cloudPath,
+            filePath,
+          });
+
+          const fileID = uploadRes.fileID;
+
+          wx.showLoading({ title: '正在处理数据...' });
+
+          // 3. 调用云函数处理
+          const { result } = await wx.cloud.callFunction({
+            name: 'vehicleOps',
+            data: {
+              action: 'updateModelsCsv',
+              payload: { fileID }
+            }
+          });
+
+          that.setData({ loading: false });
+          wx.hideLoading();
+
+          if (result && result.ok) {
+            wx.showModal({
+              title: '更新完成',
+              content: `共处理 ${result.total} 条。\n成功更新车型: ${result.updated} 辆\n未找到车辆 (忽略): ${result.skipped} 辆\n失败/错误: ${result.errors} 条`,
+              showCancel: false
+            });
+          } else {
+            wx.showModal({ title: '导入失败', content: result.msg || '未知错误', showCancel: false });
+          }
+
+        } catch (e) {
+          console.error(e);
+          that.setData({ loading: false });
+          wx.hideLoading();
+          wx.showToast({ title: '异常', icon: 'none' });
+        }
+      }
+    });
+  },
+
   async onMigrateBranches() {
     const that = this;
     wx.showModal({

@@ -87,6 +87,17 @@
     </button>
   </view>
 
+  <view class="card" style="border: 2rpx solid #1677ff; background:#e6f7ff;">
+    <view class="title" style="color:#1677ff;">CSV 车型批量修正 (仅更新车型)</view>
+    <view class="desc">
+      上传包含 <text style="font-weight:bold;">plate (车牌)</text> 和 <text style="font-weight:bold;">model (车型)</text> 的 CSV 文件。
+      系统将仅更新匹配到的已存在车辆的 `model` 字段，绝不触碰车辆的状态、司机等任何其他信息，车牌不存在时自动忽略（不新增车辆）。
+    </view>
+    <button type="primary" bindtap="onImportModelOnly" loading="{{loading}}">
+      选择文件并修正车型
+    </button>
+  </view>
+
   <view class="card danger-zone" style="border: 2rpx solid #fa8c16; background:#fff7e6;">
     <view class="title" style="color: #d46b08;">车牌错别字深层订正</view>
     <view class="desc">
