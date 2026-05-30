@@ -60,8 +60,8 @@
     </view>
   </view>
 
-  <!-- ▼▼▼ 违章转移 子模块 ▼▼▼ -->
-  <view class="card">
+  <!-- 违章转移 子模块 (已隐藏/停用) -->
+  <view class="card" wx:if="{{false}}">
     <view class="section-title">违章转移</view>
 
     <!-- 行1：违章转移签署（仅租用中可发起）+ 下载 -->

@@ -101,6 +101,18 @@
             <text class="label">13到24月每期租金</text>
             <text class="value">¥ {{contract.rentMonthlySecondYear || 0}}</text>
         </view>
+        <view class="item" wx:if="{{contract.rentDurationMonth > 24}}">
+            <text class="label">25到36月每期租金</text>
+            <text class="value">¥ {{contract.rentMonthlyThirdYear || 0}}</text>
+        </view>
+        <view class="item" wx:if="{{contract.rentDurationMonth > 36}}">
+            <text class="label">37到48月每期租金</text>
+            <text class="value">¥ {{contract.rentMonthlyFourthYear || 0}}</text>
+        </view>
+        <view class="item" wx:if="{{contract.rentDurationMonth > 48}}">
+            <text class="label">49到60月每期租金</text>
+            <text class="value">¥ {{contract.rentMonthlyFifthYear || 0}}</text>
+        </view>
         <view class="item">
             <text class="label">约定购车款</text>
             <text class="value">¥ {{contract.sellPrice || 0}}</text>
