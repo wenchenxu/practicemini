@@ -290,20 +290,32 @@ async function orchestrateSignTask(payload) {
   const actorRes = await post('/api/esign/getActorUrl', {
     signTaskId,
     actorId: signerPhone,
-    clientUserId: `driver:${signerPhone}`
+    clientUserId: `driver:${signerPhone}`,
+    // 把签署链接包进个人授权页 (仅 ident_info)，司机同意授权后自动进入签署页。
+    // 授权成功后即可通过 /sign-task/actor/list 查到 joinIdentNo，用于身份证核验。
+    withIdentAuth: true,
+    accountName: signerPhone
   });
   if (actorRes.error || (!actorRes.ok && !actorRes.success && actorRes.code !== '100000')) throw new Error(JSON.stringify(actorRes.data || actorRes));
 
   const actorUrl = actorRes.data?.actorSignTaskEmbedUrl || actorRes.actorSignTaskEmbedUrl || actorRes.data?.data?.actorSignTaskEmbedUrl;
   if (!actorUrl) throw new Error('未返回签署链接');
 
+  // 授权链路链接（ECS 生成失败时为空，此时退回纯签署链接，不阻断签署）
+  const identAuthUrl = actorRes.identAuthUrl || actorRes.data?.identAuthUrl || '';
+
   updatesToDb['esign.lastActorUrl'] = actorUrl;
+  if (identAuthUrl) {
+    updatesToDb['esign.lastIdentAuthUrl'] = identAuthUrl;
+    updatesToDb['esign.identAuthRequested'] = true;
+  }
 
   if (Object.keys(updatesToDb).length > 0) {
     await saveContractEsign({ contractId, ...updatesToDb });
   }
 
-  return { actorUrl, signTaskId, updatesToDb };
+  // 优先返回授权+签署的组合链接，前端照旧复制给司机即可
+  return { actorUrl: identAuthUrl || actorUrl, signTaskId, updatesToDb };
 }
 
 // 违章转移 / 终止违章转移 签署流程
@@ -396,6 +408,8 @@ exports.main = async (event, context) => {
         return { success: true, data: await post('/api/esign/getActorUrl', payload) };
       case 'getSignTaskDetail':
         return { success: true, data: await post('/api/esign/getSignTaskDetail', payload) };
+      case 'getActorList':
+        return { success: true, data: await post('/api/esign/getActorList', payload) };
       case 'saveContractEsign':
         return { success: true, data: await saveContractEsign(payload) };
       case 'orchestrateSignTask':

@@ -691,5 +691,110 @@ Page({
     } finally {
       wx.hideLoading();
     }
+  },
+
+  // ▼▼▼ 核验司机身份证 ▼▼▼
+  // 用本地保存的司机身份证号，与法大大签署任务里参与方的实名证件号 (joinIdentNo) 做比对
+  async onVerifyDriverId() {
+    const { contract } = this.data;
+    const signTaskId = contract?.esign?.signTaskId;
+    if (!signTaskId) {
+      return wx.showToast({ title: '暂无签署任务', icon: 'none' });
+    }
+
+    // 本地保存的身份证号（兼容 fields 下与顶层两种结构）
+    const localId = (contract?.fields?.clientId || contract?.clientId || '').toString().trim();
+    if (!localId) {
+      return wx.showToast({ title: '本地未保存身份证号', icon: 'none' });
+    }
+
+    // 司机的 actorId 即手机号，用于在参与方列表里定位司机本人
+    const localPhone = (contract?.fields?.clientPhone || contract?.clientPhone || '').toString().trim();
+
+    wx.showLoading({ title: '核验中...', mask: true });
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: {
+          action: 'getActorList',
+          payload: { signTaskId }
+        }
+      });
+      wx.hideLoading();
+
+      const ecs = result?.data || {};
+      // 首次联调用：打印完整返回，便于核对法大大真实的字段路径
+      console.log('[onVerifyDriverId] full response =', JSON.stringify(ecs, null, 2));
+      const actors = Array.isArray(ecs.actors) ? ecs.actors : [];
+      const remoteId = this._extractDriverIdentNo(actors, localPhone);
+
+      // 没拿到证件号：区分“老合同（未走授权流程）”与“新合同但仍拿不到”两种情况。
+      // 后者把原始返回打出来供人工核对真实字段路径（与下载按钮一致的兜底方式）。
+      if (!remoteId) {
+        if (!contract?.esign?.identAuthRequested) {
+          return wx.showModal({
+            title: '无法核验',
+            content: '该合同签署时未包含身份信息授权（老合同），暂不支持核验。新发起的合同签署后即可核验。',
+            showCancel: false
+          });
+        }
+        return wx.showModal({
+          title: '未获取到法大大身份证号',
+          content: '可能司机尚未完成实名认证或未同意授权，或返回结构有变。原始返回：\n' + JSON.stringify(ecs.raw || ecs),
+          showCancel: false
+        });
+      }
+
+      // 归一化比较：去空格、统一结尾 X 为大写
+      const norm = (v) => v.toString().trim().toUpperCase();
+
+      if (norm(localId) === norm(remoteId)) {
+        wx.showModal({
+          title: '核验通过',
+          content: '身份证核验正确，请返回',
+          showCancel: false
+        });
+      } else {
+        wx.showModal({
+          title: '身份证不一致',
+          content: `本地保存：${localId}\n法大大核验：${remoteId}`,
+          showCancel: false
+        });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      console.error('[onVerifyDriverId]', err);
+      wx.showToast({ title: err.message || '核验失败', icon: 'none' });
+    }
+  },
+
+  // 从参与方数组中提取司机的实名证件号 (joinIdentNo)。
+  // 法大大文档字段路径常不可靠，这里防御式匹配：优先手机号，其次个人类型，最后唯一带证件号者。
+  _extractDriverIdentNo(actors, localPhone) {
+    if (!Array.isArray(actors) || actors.length === 0) return '';
+
+    const getIdent = (a) => {
+      if (!a || typeof a !== 'object') return '';
+      return (a.joinIdentNo || a.identNo || a.actorIdentNo || '').toString().trim();
+    };
+    const isPerson = (a) => {
+      const t = (a.actorType || a.idType || a.type || '').toString().toLowerCase();
+      return t.indexOf('person') > -1;
+    };
+    const phoneMatch = (a) => {
+      if (!localPhone) return false;
+      return JSON.stringify(a).indexOf(localPhone) > -1;
+    };
+
+    // 1) 优先：手机号命中且带证件号的参与方（司机本人）
+    let hit = actors.find(a => phoneMatch(a) && getIdent(a));
+    // 2) 其次：个人类型且带证件号
+    if (!hit) hit = actors.find(a => isPerson(a) && getIdent(a));
+    // 3) 兜底：列表中唯一一个带证件号者
+    if (!hit) {
+      const withId = actors.filter(a => getIdent(a));
+      if (withId.length === 1) hit = withId[0];
+    }
+    return hit ? getIdent(hit) : '';
   }
 });

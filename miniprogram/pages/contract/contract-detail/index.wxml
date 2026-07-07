@@ -143,6 +143,9 @@
           <van-button type="info" size="normal" block plain bind:click="onDownloadZipContractConfirm">合同与附件下载</van-button>
         </view>
       </view>
+      <view style="padding: 0 0 10rpx 0;">
+        <van-button type="warning" size="normal" block plain bind:click="onVerifyDriverId">核验司机身份证</van-button>
+      </view>
     </view>
 
 
