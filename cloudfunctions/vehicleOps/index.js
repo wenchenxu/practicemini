@@ -1,6 +1,8 @@
 // 云函数入口文件
 const cloud = require('wx-server-sdk');
 const Papa = require('papaparse');
+const https = require('https');
+require('dotenv').config();
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
@@ -13,6 +15,76 @@ function deriveStatus(rentStatus, maintenanceStatus) {
   if (maintenanceStatus === 'in_maintenance') return 'maintenance';
   if (rentStatus === 'rented') return 'rented';
   return 'available';
+}
+
+// ===== 飞书推送通知 =====
+// Webhook URL 从 .env 文件读取（不入 Git）
+const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
+
+const EVENT_LABELS = {
+  'rent_start':         { label: '🟢 新签起租',      color: 'green' },
+  'rent_end':           { label: '🟠 退租',          color: 'orange' },
+  'maintenance_start':  { label: '🔴 开始维修',      color: 'red' },
+  'maintenance_end':    { label: '🟢 结束维修',      color: 'green' },
+  'vehicle_retired':    { label: '⚫ 报废/已售',     color: 'grey' },
+  '换车退租':           { label: '🔵 换车-旧车退租',  color: 'blue' },
+  '换车起租':           { label: '🔵 换车-新车起租',  color: 'blue' },
+  'offline_rent_start': { label: '🟦 线下合同起租',   color: 'turquoise' }
+};
+
+async function notifyFeishu(record) {
+  if (!FEISHU_WEBHOOK_URL) {
+    console.warn('[飞书推送] 未配置 FEISHU_WEBHOOK_URL，跳过推送');
+    return;
+  }
+  try {
+    const _feishuUrl = new URL(FEISHU_WEBHOOK_URL);
+    const meta = EVENT_LABELS[record.eventType] || { label: record.eventType, color: 'blue' };
+    const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
+    const lines = [
+      `**车牌**：${record.plate || '未知'}`,
+      `**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
+    ];
+    if (record.driverName) lines.push(`**司机**：${record.driverName}`);
+    if (record.contractId) lines.push(`**合同编号**：${record.contractId}`);
+    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    lines.push(`**操作人**：${record.operator || '系统'}`);
+    lines.push(`**时间**：${timeStr}`);
+
+    const body = JSON.stringify({
+      msg_type: 'interactive',
+      card: {
+        header: {
+          title: { tag: 'plain_text', content: meta.label },
+          template: meta.color
+        },
+        elements: [{
+          tag: 'div',
+          text: { tag: 'lark_md', content: lines.join('\n') }
+        }]
+      }
+    });
+
+    await new Promise((resolve) => {
+      const req = https.request({
+        hostname: _feishuUrl.hostname,
+        path: _feishuUrl.pathname + _feishuUrl.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      }, (res) => { res.resume(); resolve(); });
+      req.on('error', (e) => { console.error('[飞书推送失败]', e.message); resolve(); });
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+      req.write(body);
+      req.end();
+    });
+    console.log('[飞书推送] 已发送:', record.plate, record.eventType);
+  } catch (e) {
+    console.error('[飞书推送失败]', e.message);
+  }
 }
 
 exports.main = async (event, context) => {
@@ -180,6 +252,18 @@ async function updateStatus(payload) {
       operator: payload.operator || null,
       createdAt: now
     }
+  });
+
+  // 4.5) 飞书推送通知
+  await notifyFeishu({
+    plate: veh.plate || '',
+    eventType,
+    fromStatus: fromStatusLabel,
+    toStatus: toStatusLabel,
+    driverName: veh.currentDriverName || null,
+    contractId: null,
+    operator: payload.operator || null,
+    cityName: veh.cityName || ''
   });
 
   // 5) 如果是退租操作，标记关联合同为 '退租'（仅限手动操作，定时器有自己的标记逻辑）
@@ -619,7 +703,7 @@ async function dev_importOfflineContracts(payload) {
         // ★ 关键修复：每行事务创建独立的 serverDate，避免跨事务复用同一指令对象
         const now = db.serverDate();
 
-        await db.runTransaction(async tx => {
+        const _txRes = await db.runTransaction(async tx => {
           const driversTx = tx.collection('drivers');
           const vehiclesTx = tx.collection('vehicles');
           const historyTx = tx.collection('vehicle_history');
@@ -734,6 +818,20 @@ async function dev_importOfflineContracts(payload) {
               }
             });
           }
+
+          return { wasRented };
+        });
+
+        // 飞书推送通知（事务外，不影响业务流程）
+        await notifyFeishu({
+          plate: safePlate,
+          eventType: 'offline_rent_start',
+          fromStatus: _txRes.wasRented ? '已租' : '闲置',
+          toStatus: '已租',
+          driverName: safeClientName,
+          contractId: null,
+          operator: 'system-offline-import',
+          cityName: derivedCityName || ''
         });
 
         successCount++;

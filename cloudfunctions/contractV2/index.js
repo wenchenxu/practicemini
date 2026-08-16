@@ -5,6 +5,7 @@ const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const fetch = require('node-fetch');
 const https = require('https');
+require('dotenv').config();
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -277,6 +278,76 @@ const TPL_DIR = {
 
 // ========== 主入口 ==========
 
+// ===== 飞书推送通知 =====
+// Webhook URL 从 .env 文件读取（不入 Git）
+const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
+
+const EVENT_LABELS = {
+  'rent_start':         { label: '🟢 新签起租',      color: 'green' },
+  'rent_end':           { label: '🟠 退租',          color: 'orange' },
+  'maintenance_start':  { label: '🔴 开始维修',      color: 'red' },
+  'maintenance_end':    { label: '🟢 结束维修',      color: 'green' },
+  'vehicle_retired':    { label: '⚫ 报废/已售',     color: 'grey' },
+  '换车退租':           { label: '🔵 换车-旧车退租',  color: 'blue' },
+  '换车起租':           { label: '🔵 换车-新车起租',  color: 'blue' },
+  'offline_rent_start': { label: '🟦 线下合同起租',   color: 'turquoise' }
+};
+
+async function notifyFeishu(record) {
+  if (!FEISHU_WEBHOOK_URL) {
+    console.warn('[飞书推送] 未配置 FEISHU_WEBHOOK_URL，跳过推送');
+    return;
+  }
+  try {
+    const _feishuUrl = new URL(FEISHU_WEBHOOK_URL);
+    const meta = EVENT_LABELS[record.eventType] || { label: record.eventType, color: 'blue' };
+    const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
+    const lines = [
+      `**车牌**：${record.plate || '未知'}`,
+      `**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
+    ];
+    if (record.driverName) lines.push(`**司机**：${record.driverName}`);
+    if (record.contractId) lines.push(`**合同编号**：${record.contractId}`);
+    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    lines.push(`**操作人**：${record.operator || '系统'}`);
+    lines.push(`**时间**：${timeStr}`);
+
+    const body = JSON.stringify({
+      msg_type: 'interactive',
+      card: {
+        header: {
+          title: { tag: 'plain_text', content: meta.label },
+          template: meta.color
+        },
+        elements: [{
+          tag: 'div',
+          text: { tag: 'lark_md', content: lines.join('\n') }
+        }]
+      }
+    });
+
+    await new Promise((resolve) => {
+      const req = https.request({
+        hostname: _feishuUrl.hostname,
+        path: _feishuUrl.pathname + _feishuUrl.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      }, (res) => { res.resume(); resolve(); });
+      req.on('error', (e) => { console.error('[飞书推送失败]', e.message); resolve(); });
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+      req.write(body);
+      req.end();
+    });
+    console.log('[飞书推送] 已发送:', record.plate, record.eventType);
+  } catch (e) {
+    console.error('[飞书推送失败]', e.message);
+  }
+}
+
 exports.main = async (event, context) => {
   const { OPENID, ENV } = cloud.getWXContext();
   console.log(`[ContractV2] Running in ENV: ${ENV}`); // 确认当前环境
@@ -535,10 +606,27 @@ exports.main = async (event, context) => {
         });
       }
 
-      return { contractId, serialFormatted, finalFields: fields };
+      return {
+        contractId,
+        serialFormatted,
+        finalFields: fields,
+        notifyData: {
+          plate: vehicle.plate || '',
+          eventType: 'rent_start',
+          fromStatus: fromStatusLabel,
+          toStatus: toStatusLabel,
+          driverName: clientName,
+          contractId: serialFormatted,
+          operator: payload.operator || null,
+          cityName: cityName || ''
+        }
+      };
     });
 
-    const { contractId, serialFormatted, finalFields } = txResult;
+    const { contractId, serialFormatted, finalFields, notifyData } = txResult;
+
+    // 飞书推送通知（事务外，不影响业务流程）
+    if (notifyData) await notifyFeishu(notifyData);
 
     // === OFFLINE ABORT CHECK ===
     if (isOffline) {
