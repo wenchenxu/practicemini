@@ -294,13 +294,13 @@ async function notifyFeishu(record) {
     const meta = EVENT_LABELS[record.eventType] || { label: record.eventType, color: 'blue' };
     const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
-    const lines = [
-      `**车牌**：${record.plate || '未知'}`,
-      `**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
-    ];
+    const lines = [];
+    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    lines.push(`**车牌**：${record.plate || '未知'}`);
+    lines.push(`**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
+    );
     if (record.driverName) lines.push(`**司机**：${record.driverName}`);
     if (record.contractId) lines.push(`**合同编号**：${record.contractId}`);
-    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
     lines.push(`**操作人**：${record.operator || '系统'}`);
     lines.push(`**时间**：${timeStr}`);
 
