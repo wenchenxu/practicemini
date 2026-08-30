@@ -1,0 +1,10 @@
+{
+  "name": "dailyReport",
+  "version": "1.0.0",
+  "description": "每日/周/月车辆状态汇总报告",
+  "main": "index.js",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "wx-server-sdk": "~3.0.1"
+  }
+}

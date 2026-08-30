@@ -21,6 +21,11 @@ function deriveStatus(rentStatus, maintenanceStatus) {
 // Webhook URL 从 .env 文件读取（不入 Git）
 const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
 
+const CITY_NAMES = {
+  guangzhou: '广州', suzhou: '苏州', foshan: '佛山', huizhou: '惠州',
+  jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
+};
+
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
   'rent_end':           { label: '🟠 退租',          color: 'orange' },
@@ -263,7 +268,7 @@ async function updateStatus(payload) {
     driverName: veh.currentDriverName || null,
     contractId: null,
     operator: payload.operator || null,
-    cityName: veh.cityName || ''
+    cityName: veh.cityName || CITY_NAMES[veh.cityCode] || veh.cityCode || ''
   });
 
   // 5) 如果是退租操作，标记关联合同为 '退租'（仅限手动操作，定时器有自己的标记逻辑）

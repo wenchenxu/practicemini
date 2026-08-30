@@ -269,9 +269,13 @@ async function renderDocxForContract(doc) {
 }
 
 // ===== 飞书推送通知 =====
-// ===== 飞书推送通知 =====
 // Webhook URL 从 .env 文件读取（不入 Git）
 const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
+
+const CITY_NAMES = {
+  guangzhou: '广州', suzhou: '苏州', foshan: '佛山', huizhou: '惠州',
+  jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
+};
 
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
@@ -587,7 +591,7 @@ exports.main = async (event, context) => {
                   driverName: contract.fields.clientName,
                   contractId: id,
                   operator: 'swapVehicle',
-                  cityName: contract.cityName || ''
+                  cityName: contract.cityName || CITY_NAMES[contract.cityCode] || contract.cityCode || ''
                 },
                 {
                   plate: newVehicleData.plate,
@@ -597,7 +601,7 @@ exports.main = async (event, context) => {
                   driverName: contract.fields.clientName,
                   contractId: id,
                   operator: 'swapVehicle',
-                  cityName: contract.cityName || ''
+                  cityName: contract.cityName || CITY_NAMES[contract.cityCode] || contract.cityCode || ''
                 }
               ]
             };

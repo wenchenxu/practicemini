@@ -282,6 +282,11 @@ const TPL_DIR = {
 // Webhook URL 从 .env 文件读取（不入 Git）
 const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
 
+const CITY_NAMES = {
+  guangzhou: '广州', suzhou: '苏州', foshan: '佛山', huizhou: '惠州',
+  jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
+};
+
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
   'rent_end':           { label: '🟠 退租',          color: 'orange' },
@@ -618,7 +623,7 @@ exports.main = async (event, context) => {
           driverName: clientName,
           contractId: serialFormatted,
           operator: payload.operator || null,
-          cityName: cityName || ''
+          cityName: cityName || CITY_NAMES[cityCode] || cityCode || ''
         }
       };
     });
