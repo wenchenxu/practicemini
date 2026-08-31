@@ -304,8 +304,8 @@ async function notifyFeishu(record) {
     lines.push(`**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
     );
     if (record.driverName) lines.push(`**司机**：${record.driverName}`);
-    if (record.contractId) lines.push(`**合同编号**：${record.contractId}`);
-    lines.push(`**操作人**：${record.operator || '系统'}`);
+    // if (record.contractId) lines.push(`**合同编号**：${record.contractId}`);
+    // lines.push(`**操作人**：${record.operator || '系统'}`);
     lines.push(`**时间**：${timeStr}`);
 
     const body = JSON.stringify({
