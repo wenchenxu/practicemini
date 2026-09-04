@@ -37,6 +37,10 @@ exports.main = async (event, context) => {
   if (event.action === 'test') {
     return await runReport();
   }
+  // 手动生成自定义区间报告（补报/测试用）
+  if (event.action === 'generate') {
+    return await generateCustomReport(event);
+  }
   return { ok: false, error: 'unknown-trigger' };
 };
 
@@ -74,18 +78,18 @@ async function runReport() {
   const monthlyStart = new Date(`${bjYear}-${bjMonth}-01T00:00:00+08:00`);   // 本月 1 号 00:00
   const reportDate = `${bjYear}-${bjMonth}-${bjDay}`;
 
-  // --- 构建 vehicleId → cityName 映射 ---
-  const vehicleCityMap = await buildVehicleCityMap();
+  // --- 拉取全部车辆（供城市映射 + 实时快照共用）---
+  const vehicles = await fetchAllVehicles();
 
   // --- 生成并存储日报（每天，存库不推送）---
-  const dailyContent = await buildPeriodReport('日报', dailyStart, now, vehicleCityMap);
+  const dailyContent = await buildPeriodReport('日报', dailyStart, now, vehicles);
   await saveReport('daily', `车辆日报 ${bjMonth}/${bjDay}`, dailyContent, dailyStart, now, reportDate);
   console.log('[Report] Daily report saved');
 
   // --- 生成并存储 + 推送 周报（周日）---
   let weeklyContent = null;
   if (isSunday) {
-    weeklyContent = await buildPeriodReport('周报', weeklyStart, now, vehicleCityMap);
+    weeklyContent = await buildPeriodReport('周报', weeklyStart, now, vehicles);
     await saveReport('weekly', `车辆周报 ${bjMonth}/${bjDay}`, weeklyContent, weeklyStart, now, reportDate);
     console.log('[Report] Weekly report saved');
     await pushFeishu(`车辆周报 ${bjMonth}/${bjDay}`, weeklyContent);
@@ -95,7 +99,7 @@ async function runReport() {
   // --- 生成并存储 + 推送 月报（月末）---
   let monthlyContent = null;
   if (isLastDayOfMonth) {
-    monthlyContent = await buildPeriodReport('月报', monthlyStart, now, vehicleCityMap);
+    monthlyContent = await buildPeriodReport('月报', monthlyStart, now, vehicles);
     await saveReport('monthly', `车辆月报 ${bjMonth}`, monthlyContent, monthlyStart, now, reportDate);
     console.log('[Report] Monthly report saved');
     await pushFeishu(`车辆月报 ${bjMonth}`, monthlyContent);
@@ -115,23 +119,80 @@ async function runReport() {
 // 存储报告到数据库
 // ========================================
 async function saveReport(reportType, title, content, periodStart, periodEnd, reportDate) {
-  await db.collection('reports').add({
-    data: {
-      reportType,   // 'daily' | 'weekly' | 'monthly'
-      title,
-      content,
-      periodStart,
-      periodEnd,
-      reportDate,   // 'YYYY-MM-DD' 格式，方便按日期查询
-      createdAt: db.serverDate()
-    }
-  });
+  try {
+    await db.collection('reports').add({
+      data: {
+        reportType,   // 'daily' | 'weekly' | 'monthly' | 'custom'
+        title,
+        content,
+        periodStart,
+        periodEnd,
+        reportDate,   // 'YYYY-MM-DD' 格式，方便按日期查询
+        createdAt: db.serverDate()
+      }
+    });
+    return true;
+  } catch (e) {
+    // 保存失败不阻断推送（常见原因：reports 集合尚未在云控制台创建）
+    console.error('[Report] 保存报告失败（不影响推送）:', e.message);
+    return false;
+  }
 }
 
 // ========================================
-// 构建 vehicleId → cityName 映射
+// 手动生成自定义区间报告（action: 'generate'）
+// 参数：
+//   startDate  必填，'YYYY-MM-DD'，如 '2026-08-01'
+//   endDate    必填，'YYYY-MM-DD'，如 '2026-08-31'
+//   label      可选，报告标题前缀，默认 '月报'
+//   push       可选，是否推送飞书，默认 true
 // ========================================
-async function buildVehicleCityMap() {
+async function generateCustomReport(event) {
+  const { startDate, endDate, label = '月报', push = true } = event;
+
+  if (!startDate || !endDate) {
+    return { ok: false, error: 'startDate 和 endDate 必填，格式 YYYY-MM-DD' };
+  }
+
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+    return { ok: false, error: '日期格式错误，请用 YYYY-MM-DD（如 2026-08-01）' };
+  }
+
+  // 时间区间：startDate 00:00:00 ~ endDate 23:59:59（北京时间）
+  const start = new Date(`${startDate}T00:00:00+08:00`);
+  const end = new Date(`${endDate}T23:59:59+08:00`);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start >= end) {
+    return { ok: false, error: '日期无效，或 startDate 晚于 endDate' };
+  }
+
+  const vehicles = await fetchAllVehicles();
+  const content = await buildPeriodReport(label, start, end, vehicles);
+  const title = `车辆${label} ${startDate} ~ ${endDate}`;
+
+  // 存入数据库（失败不阻断）
+  const saved = await saveReport('custom', title, content, start, end, `${startDate}_${endDate}`);
+
+  // 推送飞书
+  let pushResult = null;
+  if (push) {
+    pushResult = await pushFeishu(title, content);
+  }
+
+  return {
+    ok: true,
+    title,
+    saved,
+    pushResult,
+    content   // 返回报告全文，方便在控制台直接查看
+  };
+}
+
+// ========================================
+// 拉取全部车辆（供城市映射 + 实时快照共用）
+// ========================================
+async function fetchAllVehicles() {
   const col = db.collection('vehicles');
   let allVehicles = [];
   let page = 0;
@@ -139,7 +200,8 @@ async function buildVehicleCityMap() {
 
   while (true) {
     const res = await col.skip(page * LIMIT).limit(LIMIT).field({
-      _id: true, cityCode: true, cityName: true, plate: true
+      _id: true, cityCode: true, cityName: true, branchCode: true, branchName: true,
+      plate: true, rentStatus: true, maintenanceStatus: true, retired: true
     }).get();
     if (!res.data || res.data.length === 0) break;
     allVehicles = allVehicles.concat(res.data);
@@ -147,19 +209,105 @@ async function buildVehicleCityMap() {
     if (res.data.length < LIMIT) break;
   }
 
+  console.log(`[Report] Fetched ${allVehicles.length} vehicles`);
+  return allVehicles;
+}
+
+// ========================================
+// 纯函数：vehicleId → 城市名 映射
+// ========================================
+function buildVehicleCityMap(vehicles) {
   const map = {};
-  for (const v of allVehicles) {
+  for (const v of vehicles) {
     const cityName = v.cityName || CITY_NAMES[v.cityCode] || v.cityCode || '未知';
     map[v._id] = cityName;
   }
-  console.log(`[Report] Vehicle city map built: ${Object.keys(map).length} vehicles`);
   return map;
+}
+
+// ========================================
+// 纯函数：实时快照，按 城市 + 分公司 分组
+// 返回格式化好的文本行数组
+// ========================================
+function buildSnapshotText(vehicles) {
+  // --- 按 cityCode + branchCode 分组统计 ---
+  const groups = {};
+  const cityTotals = {};
+
+  for (const v of vehicles) {
+    if (v.retired) continue; // 排除已售/报废
+
+    const cityKey = v.cityCode || '';
+    const branchKey = v.branchCode || '';
+    const key = `${cityKey}|${branchKey}`;
+
+    if (!groups[key]) {
+      groups[key] = {
+        cityCode: cityKey,
+        branchCode: branchKey,
+        branchName: '',
+        total: 0, rented: 0, available: 0, maintenance: 0
+      };
+    }
+    const g = groups[key];
+    g.total++;
+    if (v.rentStatus === 'rented') g.rented++;
+    else if (v.rentStatus === 'available') g.available++;
+    if (v.maintenanceStatus === 'in_maintenance') g.maintenance++;
+    if (!g.branchName && v.branchName) g.branchName = v.branchName;
+
+    // 城市合计
+    if (!cityTotals[cityKey]) {
+      cityTotals[cityKey] = { total: 0, rented: 0, available: 0, maintenance: 0 };
+    }
+    const t = cityTotals[cityKey];
+    t.total++;
+    if (v.rentStatus === 'rented') t.rented++;
+    else if (v.rentStatus === 'available') t.available++;
+    if (v.maintenanceStatus === 'in_maintenance') t.maintenance++;
+  }
+
+  // --- 按城市名 → 分公司 排序输出 ---
+  const cityOrder = Object.keys(cityTotals).sort((a, b) => {
+    const nameA = CITY_NAMES[a] || a || '未知';
+    const nameB = CITY_NAMES[b] || b || '未知';
+    return nameA.localeCompare(nameB, 'zh');
+  });
+
+  const lines = [];
+  for (const cityKey of cityOrder) {
+    const cityName = CITY_NAMES[cityKey] || cityKey || '未知';
+
+    // 该城市下的所有分组
+    const cityGroups = Object.values(groups)
+      .filter(g => g.cityCode === cityKey)
+      .sort((a, b) => (a.branchCode || '').localeCompare(b.branchCode || ''));
+
+    if (cityGroups.length === 1 && !cityGroups[0].branchCode) {
+      // 无分公司：直接输出城市一行
+      const g = cityGroups[0];
+      lines.push(`${cityName}：总${g.total} 已租${g.rented} 闲置${g.available} 维修${g.maintenance}`);
+    } else {
+      // 有分公司：先输出城市合计，再逐个分公司
+      const t = cityTotals[cityKey];
+      lines.push(`${cityName}：总${t.total} 已租${t.rented} 闲置${t.available} 维修${t.maintenance}`);
+      for (const g of cityGroups) {
+        const branchLabel = g.branchName || g.branchCode;
+        lines.push(`  ${cityName}·${branchLabel}：总${g.total} 已租${g.rented} 闲置${g.available} 维修${g.maintenance}`);
+      }
+    }
+  }
+
+  return lines;
 }
 
 // ========================================
 // 构建单个周期报告
 // ========================================
-async function buildPeriodReport(label, startTime, endTime, vehicleCityMap) {
+async function buildPeriodReport(label, startTime, endTime, vehicles) {
+  // --- 城市映射（用于事件计数）---
+  const vehicleCityMap = buildVehicleCityMap(vehicles);
+
   // --- 查询区间内所有 vehicle_history ---
   let allHistory = [];
   let page = 0;
@@ -191,17 +339,8 @@ async function buildPeriodReport(label, startTime, endTime, vehicleCityMap) {
     eventCounts[cityName][evtLabel] = (eventCounts[cityName][evtLabel] || 0) + 1;
   }
 
-  // --- 查询实时车辆状态快照 ---
-  const snapshotRes = await db.collection('vehicles').aggregate()
-    .match({ retired: _.neq(true) })
-    .group({
-      _id: '$cityName',
-      total:       $.sum(1),
-      rented:      $.sum($.cond({ if: $.eq(['$rentStatus', 'rented']),        then: 1, else: 0 })),
-      available:   $.sum($.cond({ if: $.eq(['$rentStatus', 'available']),     then: 1, else: 0 })),
-      maintenance: $.sum($.cond({ if: $.eq(['$maintenanceStatus', 'in_maintenance']), then: 1, else: 0 }))
-    })
-    .end();
+  // --- 实时车辆状态快照（按城市/分公司分组，复用已拉取的车辆数据）---
+  const snapshotLines = buildSnapshotText(vehicles);
 
   // --- 格式化报告 ---
   const fmt = new Intl.DateTimeFormat('zh-CN', {
@@ -235,15 +374,11 @@ async function buildPeriodReport(label, startTime, endTime, vehicleCityMap) {
 
   // ━━━ 实时车辆状态 ━━━
   report += `\n【实时车辆状态】\n`;
-  if (!snapshotRes.list || snapshotRes.list.length === 0) {
+  if (snapshotLines.length === 0) {
     report += `无车辆数据\n`;
   } else {
-    const sorted = snapshotRes.list.sort((a, b) =>
-      (a._id || '').localeCompare(b._id || '')
-    );
-    for (const item of sorted) {
-      const cityName = item._id || '未知';
-      report += `${cityName}：总${item.total} 已租${item.rented} 闲置${item.available} 维修${item.maintenance}\n`;
+    for (const line of snapshotLines) {
+      report += line + `\n`;
     }
   }
 
