@@ -9,7 +9,7 @@ App({
     async onLaunch() {
         // 1. 定义两个环境的 ID (请替换成你实际的 ID)
         const ENV_PROD = 'cloudbase-9gvp1n95af42e30d'; // 旧环境ID (线上)
-        const ENV_DEV  = 'dev-4gzrr3qf9d8c8caa';  // 新环境ID (测试)
+        const ENV_DEV  = 'dev-d0gkbgouhfab4a5c2';  // 新环境ID (测试)
 
         let envId = ENV_DEV; // 默认为开发环境
 
@@ -32,11 +32,11 @@ App({
             this.globalData.isProd = false;
         }
 
-        // 警告：直连生产服务器，操作需谨慎！！
-        
+        // 警告：直连生产服务器时，取消下面四行注释即可
+        /*
         envId = ENV_PROD; 
         this.globalData.isProd = true;
-        console.warn('🚨🚨🚨 当前已强制连接到【生产环境 Prod】，请小心操作！ 🚨🚨🚨'); 
+        console.warn('🚨🚨🚨 当前已强制连接到【生产环境 Prod】，请小心操作！ 🚨🚨🚨'); */
         
         console.log(`[onLaunch] Current envVersion: ${envVersion}, using env: ${envId}`);
         

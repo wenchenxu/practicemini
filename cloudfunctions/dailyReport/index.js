@@ -26,16 +26,22 @@ const EVENT_TYPES = [
 ];
 
 // ===== 飞书推送配置 =====
-const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
+// Webhook 从 .env 读取（不入 Git），按运行环境自动选择：
+// 生产环境用 FEISHU_WEBHOOK_URL_PROD，其他环境（dev）用 FEISHU_WEBHOOK_URL_DEV（留空=不推送）
+const ENV_ID = process.env.TENCENTCLOUD_NAMESPACE || '';
+const IS_PROD = ENV_ID === 'cloudbase-9gvp1n95af42e30d';
+const FEISHU_WEBHOOK_URL = (IS_PROD
+  ? process.env.FEISHU_WEBHOOK_URL_PROD
+  : process.env.FEISHU_WEBHOOK_URL_DEV) || '';
 
 exports.main = async (event, context) => {
   // 定时触发器
   if (event.Type === 'Timer' && event.TriggerName === 'dailyReport8PM') {
     return await runReport();
   }
-  // 手动测试
+  // 手动测试（可传 force: 'weekly' | 'monthly' | 'all' 强制生成对应报告，便于验证）
   if (event.action === 'test') {
-    return await runReport();
+    return await runReport(event.force || null);
   }
   // 手动生成自定义区间报告（补报/测试用）
   if (event.action === 'generate') {
@@ -47,30 +53,41 @@ exports.main = async (event, context) => {
 // ========================================
 // 主入口
 // ========================================
-async function runReport() {
+async function runReport(force = null) {
   const now = new Date(); // 触发时为 12:00 UTC = 20:00 Beijing
 
-  // --- 北京时间日期 ---
+  // --- 北京时间日期（纯数值计算，不依赖 locale 文本）---
+  // ★ 教训：云函数 Node 16 的 ICU 与本地 Node 22 不同，en-CA 的 weekday
+  //   文本（如 "Sun." 带句点）和月份格式（可能为文本 "Sep"）会随 ICU 版本
+  //   变化，导致 === 'Sun' 恒为 false。星期/月份判断必须用纯数值。
   const bjParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
-    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+    year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(now);
 
-  const bjYear  = bjParts.find(p => p.type === 'year').value;
-  const bjMonth = bjParts.find(p => p.type === 'month').value;
-  const bjDay   = bjParts.find(p => p.type === 'day').value;
-  const bjWeekday = bjParts.find(p => p.type === 'weekday').value;
+  const bjYearNum  = Number(bjParts.find(p => p.type === 'year').value);
+  const bjMonthNum = Number(bjParts.find(p => p.type === 'month').value);
+  const bjDayNum   = Number(bjParts.find(p => p.type === 'day').value);
+  const bjYear  = String(bjYearNum);
+  const bjMonth = String(bjMonthNum).padStart(2, '0');
+  const bjDay   = String(bjDayNum).padStart(2, '0');
 
-  const isSunday = (bjWeekday === 'Sun');
+  // 星期几：取北京当天正午的绝对时间戳再算 UTC 星期（0 = 周日），与 locale 无关
+  const weekdayNum = new Date(`${bjYear}-${bjMonth}-${bjDay}T12:00:00+08:00`).getUTCDay();
 
-  // 判断今天是否是本月最后一天
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const tomorrowParts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai', month: '2-digit'
-  }).formatToParts(tomorrow);
-  const isLastDayOfMonth = tomorrowParts.find(p => p.type === 'month').value !== bjMonth;
+  // 是否本月最后一天：与当月总天数直接数值比较
+  // Date.UTC(年, 月(1-based), 0) = 该月最后一天
+  const daysInMonth = new Date(Date.UTC(bjYearNum, bjMonthNum, 0)).getUTCDate();
 
-  console.log(`[Report] Beijing date: ${bjYear}-${bjMonth}-${bjDay} (${bjWeekday}), isSunday=${isSunday}, isLastDayOfMonth=${isLastDayOfMonth}`);
+  let isSunday = (weekdayNum === 0);
+  let isLastDayOfMonth = (bjDayNum === daysInMonth);
+
+  // 手动测试时可用 force 强制生成周报/月报（定时触发不传 force，不受影响）
+  if (force === 'weekly' || force === 'all') isSunday = true;
+  if (force === 'monthly' || force === 'all') isLastDayOfMonth = true;
+
+  const weekdayName = ['日', '一', '二', '三', '四', '五', '六'][weekdayNum];
+  console.log(`[Report] Beijing date: ${bjYear}-${bjMonth}-${bjDay} (周${weekdayName}), isSunday=${isSunday}, isLastDayOfMonth=${isLastDayOfMonth}${force ? `, force=${force}` : ''}`);
 
   // --- 计算各报告的时间区间 ---
   const dailyStart  = new Date(now.getTime() - 24 * 60 * 60 * 1000);          // 昨晚 20:00
@@ -82,36 +99,54 @@ async function runReport() {
   const vehicles = await fetchAllVehicles();
 
   // --- 生成并存储日报（每天，存库不推送）---
-  const dailyContent = await buildPeriodReport('日报', dailyStart, now, vehicles);
-  await saveReport('daily', `车辆日报 ${bjMonth}/${bjDay}`, dailyContent, dailyStart, now, reportDate);
-  console.log('[Report] Daily report saved');
-
-  // --- 生成并存储 + 推送 周报（周日）---
-  let weeklyContent = null;
-  if (isSunday) {
-    weeklyContent = await buildPeriodReport('周报', weeklyStart, now, vehicles);
-    await saveReport('weekly', `车辆周报 ${bjMonth}/${bjDay}`, weeklyContent, weeklyStart, now, reportDate);
-    console.log('[Report] Weekly report saved');
-    await pushFeishu(`车辆周报 ${bjMonth}/${bjDay}`, weeklyContent);
-    console.log('[Report] Weekly report pushed to Feishu');
+  let dailySaved = false;
+  try {
+    const dailyContent = await buildPeriodReport('日报', dailyStart, now, vehicles);
+    dailySaved = await saveReport('daily', `车辆日报 ${bjMonth}/${bjDay}`, dailyContent, dailyStart, now, reportDate);
+    console.log('[Report] Daily report saved:', dailySaved);
+  } catch (e) {
+    console.error('[Report] 日报生成失败:', e.message);
   }
 
-  // --- 生成并存储 + 推送 月报（月末）---
-  let monthlyContent = null;
+  // --- 生成并存储 + 推送 周报（周日；独立容错，不影响月报）---
+  let weeklyResult = null;
+  if (isSunday) {
+    try {
+      const weeklyContent = await buildPeriodReport('周报', weeklyStart, now, vehicles);
+      const weeklySaved = await saveReport('weekly', `车辆周报 ${bjMonth}/${bjDay}`, weeklyContent, weeklyStart, now, reportDate);
+      console.log('[Report] Weekly report saved:', weeklySaved);
+      const weeklyPush = await pushFeishu(`车辆周报 ${bjMonth}/${bjDay}`, weeklyContent);
+      console.log('[Report] Weekly report pushed to Feishu');
+      weeklyResult = { saved: weeklySaved, pushed: !!(weeklyPush && (weeklyPush.code === 0 || weeklyPush.StatusCode === 0)) };
+    } catch (e) {
+      console.error('[Report] 周报生成失败:', e.message);
+      weeklyResult = { error: e.message };
+    }
+  }
+
+  // --- 生成并存储 + 推送 月报（月末；独立容错）---
+  let monthlyResult = null;
   if (isLastDayOfMonth) {
-    monthlyContent = await buildPeriodReport('月报', monthlyStart, now, vehicles);
-    await saveReport('monthly', `车辆月报 ${bjMonth}`, monthlyContent, monthlyStart, now, reportDate);
-    console.log('[Report] Monthly report saved');
-    await pushFeishu(`车辆月报 ${bjMonth}`, monthlyContent);
-    console.log('[Report] Monthly report pushed to Feishu');
+    try {
+      const monthlyContent = await buildPeriodReport('月报', monthlyStart, now, vehicles);
+      const monthlySaved = await saveReport('monthly', `车辆月报 ${bjMonth}`, monthlyContent, monthlyStart, now, reportDate);
+      console.log('[Report] Monthly report saved:', monthlySaved);
+      const monthlyPush = await pushFeishu(`车辆月报 ${bjMonth}`, monthlyContent);
+      console.log('[Report] Monthly report pushed to Feishu');
+      monthlyResult = { saved: monthlySaved, pushed: !!(monthlyPush && (monthlyPush.code === 0 || monthlyPush.StatusCode === 0)) };
+    } catch (e) {
+      console.error('[Report] 月报生成失败:', e.message);
+      monthlyResult = { error: e.message };
+    }
   }
 
   return {
     ok: true,
     reportDate,
-    daily: { saved: true },
-    weekly: isSunday ? { saved: true, pushed: true } : null,
-    monthly: isLastDayOfMonth ? { saved: true, pushed: true } : null
+    weekday: weekdayName,
+    daily: { saved: dailySaved },
+    weekly: weeklyResult,
+    monthly: monthlyResult
   };
 }
 
