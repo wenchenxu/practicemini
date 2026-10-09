@@ -535,6 +535,19 @@ async function dev_upsertVehiclesFromCsv(payload) {
       updateData[f] = (d && !isNaN(d.getTime())) ? d : raw; // 解析失败保留原值，便于人工排查
     }
 
+    // 年检日期修正：CSV 里填的是"上次年检日"（一定 <= 今天），
+    // 但系统字段 annualInspectionDate 的语义是"下次年检到期日"（业务规则：上次年检 + 1 年）。
+    // 若导入日期不晚于今天（上海时区），自动 +1 年；若本来就是未来日期（如业务人员直接填到期日）则原样保留。
+    if (updateData.annualInspectionDate instanceof Date && !isNaN(updateData.annualInspectionDate.getTime())) {
+      const nowSh = new Date(Date.now() + 8 * 3600 * 1000); // 换算到上海时区再看"今天"
+      const todayStartSh = new Date(
+        `${nowSh.getUTCFullYear()}-${String(nowSh.getUTCMonth() + 1).padStart(2, '0')}-${String(nowSh.getUTCDate()).padStart(2, '0')}T00:00:00+08:00`
+      );
+      if (updateData.annualInspectionDate.getTime() <= todayStartSh.getTime()) {
+        updateData.annualInspectionDate.setFullYear(updateData.annualInspectionDate.getFullYear() + 1);
+      }
+    }
+
     try {
       const exist = await vehiclesCol.where({ plate }).get();
 
