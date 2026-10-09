@@ -520,6 +520,21 @@ async function dev_upsertVehiclesFromCsv(payload) {
     delete updateData._id;
     delete updateData.currentDriverClientId;
 
+    // 保险/年检日期字段：字符串 → Date 对象（上海时区0点）
+    // 与小程序端 updateInsurance/updateAnnualInspection 存储类型保持一致，
+    // 否则 getDashboardStats 的 Date 范围查询（到期提醒）匹配不到字符串类型的值
+    const BIZ_DATE_FIELDS = ['annualInspectionDate', 'liabInsStart', 'liabInsEnd', 'commInsStart', 'commInsEnd'];
+    for (const f of BIZ_DATE_FIELDS) {
+      const raw = updateData[f];
+      if (raw === undefined) continue; // CSV 未提供该列 → 不覆盖数据库已有值
+      if (raw === null || String(raw).trim() === '') {
+        updateData[f] = null; // 列存在但为空 → 显式清空
+        continue;
+      }
+      const d = parseBizDateCloud(String(raw).trim());
+      updateData[f] = (d && !isNaN(d.getTime())) ? d : raw; // 解析失败保留原值，便于人工排查
+    }
+
     try {
       const exist = await vehiclesCol.where({ plate }).get();
 
