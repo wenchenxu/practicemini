@@ -711,6 +711,47 @@ exports.main = async (event, context) => {
 
     const { contractId, driverId, serialFormatted, finalFields, notifyData } = txResult;
 
+    // ===== 事务外：续租/重租时终结同车牌旧合同 =====
+    // 新合同生效后，该车的旧合同（active / expired / 未标记）生命周期结束：
+    //   - 同一司机续签 → 'renewed'（已续租）
+    //   - 换司机重租   → 'terminated'（旧合同随车辆重新出租而结束）
+    // 否则旧合同会永远停留在"到期提醒"栏。失败仅记日志，不影响主流程
+    // （残留的重复生效合同可用 dev 工具"清理重复生效合同"补扫）。
+    try {
+      const _cmd = db.command;
+      const plate = finalFields.carPlate;
+      if (plate) {
+        const staleRes = await COL_CONTRACTS.where(_cmd.and([
+          { 'fields.carPlate': plate },
+          { deleted: _cmd.neq(true) },
+          { _id: _cmd.neq(contractId) },
+          _cmd.or([
+            { contractStatus: _cmd.exists(false) },
+            { contractStatus: null },
+            { contractStatus: 'active' },
+            { contractStatus: 'expired' }
+          ])
+        ])).limit(20).get();
+
+        for (const stale of (staleRes.data || [])) {
+          const sameDriver =
+            stale.fields && stale.fields.clientId &&
+            stale.fields.clientId === finalFields.clientId;
+          await COL_CONTRACTS.doc(stale._id).update({
+            data: {
+              contractStatus: sameDriver ? 'renewed' : 'terminated',
+              terminatedAt: db.serverDate(),
+              replacedByContractId: contractId,
+              updatedAt: db.serverDate()
+            }
+          });
+          console.log(`[ContractV2] Closed stale contract ${stale._id} -> ${sameDriver ? 'renewed' : 'terminated'} (plate: ${plate})`);
+        }
+      }
+    } catch (staleErr) {
+      console.error('[ContractV2] Failed to close stale contracts:', staleErr && staleErr.message);
+    }
+
     // ===== 司机证件照搬移（事务外）=====
     // 放在 DOCX 渲染之前：渲染可能耗时 15s+ 甚至超时，必须保证文件先落位。
     // 搬移失败不中断合同主流程（记录回退指向 temp 文件，仍可查看）。

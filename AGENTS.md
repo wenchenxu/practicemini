@@ -30,6 +30,15 @@ Nginx 反向代理（api.tusifu.cn / api-stg.tusifu.cn）
 3.1 contracts（合同）
 合同创建时自动更新：driver + vehicle
 
+contractStatus 状态机（合同生命周期轴，2026-10 起）：
+- 无值 / 'active'   → 生效中（旧数据无值，按 contractValidPeriodEnd 动态判断是否过期）
+- 'expired'         → 已到期：AutoReturn 定时器（每天 00:05）自动回库时标记，车辆 rentStatus 已变 available，但合同仍在"到期提醒"栏等待业务员人工处理（续租或确认收车）
+- 'terminated'      → 退租：车辆中心"退租解绑"（vehicleOps rent_end）标记；或 contractOps terminate（人工确认收车）
+- 'renewed'         → 已续租：contractV2 创建新合同时，自动终结同车牌旧合同（同司机 renewed / 换司机 terminated），并写 replacedByContractId
+
+合同中心 Tab（服务端筛选）：生效中 | 到期提醒（30 天窗口 + 已过期置顶，按到期日升序）| 已结束 | 全部。
+签署状态（esign.signTaskStatus）以列表项角标展示（待签红 / 已签绿 / 异常橙），不再是独立 Tab。
+
 3.2 drivers（司机）
 唯一约束：clientId（身份证号）
 

@@ -24,17 +24,18 @@
       <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">✕</view>
     </view>
   </view>
-  <!-- 顶部筛选 tabs -->
+  <!-- 顶部筛选 tabs：合同状态轴（签署状态已改为列表项角标） -->
   <view class="tabs">
     <view class="tab {{filter=='active'?'on':''}}" data-filter="active" bindtap="onFilterTap">生效中</view>
-    <view class="tab {{filter=='expired'?'on':''}}" data-filter="expired" bindtap="onFilterTap">已结束</view>
-    <view class="tab {{filter=='waiting'?'on':''}}" data-filter="waiting" bindtap="onFilterTap">待签</view>
-    <view class="tab {{filter=='signed'?'on':''}}" data-filter="signed" bindtap="onFilterTap">已签</view>
+    <view class="tab {{filter=='expiring'?'on':''}}" data-filter="expiring" bindtap="onFilterTap">到期提醒</view>
+    <view class="tab {{filter=='ended'?'on':''}}" data-filter="ended" bindtap="onFilterTap">已结束</view>
     <view class="tab {{filter=='all'?'on':''}}" data-filter="all" bindtap="onFilterTap">全部</view>
   </view>
 
   <view wx:if="{{loading}}" class="empty">加载中...</view>
-  <view wx:elif="{{list.length === 0}}" class="empty">暂无合同</view>
+  <view wx:elif="{{list.length === 0}}" class="empty">
+    {{filter === 'expiring' ? '暂无到期提醒：30 天内无即将到期或待处理的过期合同' : '暂无合同'}}
+  </view>
 
   <block wx:for="{{list}}" wx:key="_id">
     <view class="row">
@@ -46,12 +47,18 @@
             bindtap="openDocFromRow"
             data-id="{{item._id}}"
         >
-            <text class="name">{{item.fields.clientName || '（未命名）'}} <text wx:if="{{item.isOffline}}" style="color:#d46b08; font-size:22rpx; margin-left:8rpx; border:1rpx solid #ffd591; padding:2rpx 8rpx; border-radius:4rpx; background:#fff7e6;">线下合同</text></text>
+            <text class="name">{{item.fields.clientName || '（未命名）'}}
+              <text wx:if="{{item.isOffline}}" class="tag tag-offline">线下合同</text>
+              <text wx:elif="{{item._signBadge}}" class="sign-badge sb-{{item._signBadge.type}}">{{item._signBadge.text}}</text>
+            </text>
             <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
         <!-- 无文件或线下合同：禁用态 -->
         <view wx:else class="file-title disabled">
-          <text class="name">{{item.fields.clientName || '（未命名）'}} <text wx:if="{{item.isOffline}}" style="color:#d46b08; font-size:22rpx; margin-left:8rpx; border:1rpx solid #ffd591; padding:2rpx 8rpx; border-radius:4rpx; background:#fff7e6;">线下合同</text></text>
+          <text class="name">{{item.fields.clientName || '（未命名）'}}
+            <text wx:if="{{item.isOffline}}" class="tag tag-offline">线下合同</text>
+            <text wx:elif="{{item._signBadge}}" class="sign-badge sb-{{item._signBadge.type}}">{{item._signBadge.text}}</text>
+          </text>
           <text class="plate">{{item.fields.carPlate || '无牌照'}}</text>
         </view>
         <!-- 取消显示文件
@@ -62,15 +69,15 @@
         <view class="sub">
           {{item._createTime || '—'}}
         </view>
-        <view class="sub" style="margin-top: 4rpx; display: flex; align-items: center; justify-content: space-between;">
-           <text>{{item._validityPeriod}}</text>
+        <view class="sub validity-row">
+           <view class="validity-left">
+             <text>{{item._validityPeriod}}</text>
+             <text wx:if="{{item._expireBadge}}" class="expire-badge eb-{{item._expireBadge.type}}">{{item._expireBadge.text}}</text>
+           </view>
            <text class="status-pill {{item._statusClass}}">{{item._statusLabel}}</text>
         </view>
         <view class="sub">
           <!--{{item.branchName || '—'}}｜--> {{item.contractTypeName || '—'}}
-        </view>
-        <view class="sub status-line" wx:if="{{!item.isOffline}}">
-            <view>签署状态：{{item._signStatusText|| '未发起签署'}}</view>
         </view>
         <!-- 暂时取消司机详情页 
         <view class="driver-action">
@@ -99,12 +106,22 @@
                 <image class="icon" src="/assets/icons/edit64.png" mode="widthFix" />
             </view>
             <!-- 暂时关闭软删除，隐藏删除按钮 -->
-            <!-- 
+            <!--
             <view class="icon-btn danger" hover-class="icon-btn--hover" bindtap="delOne" data-id="{{item._id}}">
                 <image class="icon" src="/assets/icons/delete64.png" mode="widthFix" />
             </view>
-            --> 
+            -->
         </view>
+
+        <!-- 到期提醒：已过期且车辆已自动回库的合同，业务员联系司机后确认收车 -->
+        <button
+            wx:if="{{item._confirmable}}"
+            class="mini-op confirm-return-btn"
+            size="mini"
+            type="warn"
+            bindtap="onConfirmReturn"
+            data-id="{{item._id}}"
+        >确认收车</button>
 
         <!-- 新增：发起签署并拿链接 -->
         <block wx:if="{{!item.isOffline}}">

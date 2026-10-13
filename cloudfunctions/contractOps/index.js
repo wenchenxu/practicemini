@@ -432,6 +432,49 @@ exports.main = async (event, context) => {
       }
     }
 
+    // 确认收车：人工终结已到期的合同（AutoReturn 已自动回库的场景）。
+    // 只标记合同数据，不改车辆状态——车辆应已由定时器自动回库或车辆中心退租处理。
+    if (action === 'terminate') {
+      const { id, reason } = event;
+      if (!id) return { ok: false, error: 'missing-id' };
+
+      try {
+        const docRes = await COL.doc(id).get();
+        const doc = docRes && docRes.data;
+        if (!doc) return { ok: false, error: 'contract-not-found' };
+
+        // 终结校验：仅允许已到期的合同（expired 持久化状态，或旧数据动态过期）
+        let alreadyExpired = doc.contractStatus === 'expired';
+        if (!alreadyExpired && !doc.contractStatus) {
+          const endStr = doc.fields && doc.fields.contractValidPeriodEnd;
+          if (endStr && /^\d{4}-\d{2}-\d{2}$/.test(endStr)) {
+            const expireTimeMs = new Date(`${endStr}T06:00:00+08:00`).getTime();
+            alreadyExpired = !isNaN(expireTimeMs) && Date.now() >= expireTimeMs;
+          }
+        }
+        if (doc.contractStatus === 'terminated' || doc.contractStatus === 'renewed') {
+          return { ok: false, error: '该合同已结束，无需重复操作' };
+        }
+        if (!alreadyExpired) {
+          return { ok: false, error: '该合同尚未到期；在租合同请到车辆中心办理退租解绑' };
+        }
+
+        const up = await COL.doc(id).update({
+          data: {
+            contractStatus: 'terminated',
+            terminatedAt: db.serverDate(),
+            terminationReason: reason || '人工确认收车',
+            updatedAt: db.serverDate()
+          }
+        });
+        console.log('[contractOps] terminate ok', id);
+        return { ok: true, updated: (up.stats ? up.stats.updated : 1) };
+      } catch (e) {
+        console.error('[contractOps] terminate error', e);
+        return { ok: false, error: e.message || 'terminate-failed' };
+      }
+    }
+
     // 新增：更新租金支付设置
     if (action === 'updateRentSettings') {
         const { id, payload } = event;

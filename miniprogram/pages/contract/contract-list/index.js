@@ -4,6 +4,9 @@ const COL = db.collection('contracts');
 const PAGE_SIZE = 20;
 const { ensureAccess } = require('../../../utils/guard');
 
+// 到期提醒窗口（天）：到期日距今 <= 30 天的合同进入"到期提醒"
+const EXPIRING_WINDOW_DAYS = 30;
+
 const SIGN_TASK_STATUS_TEXT = {
   task_created: '任务创建中',
   finish_creation: '已创建',
@@ -17,6 +20,25 @@ const SIGN_TASK_STATUS_TEXT = {
   abolishing: '作废中',
   revoked: '已作废'
 };
+
+// 签署角标：异常类状态显示具体文案（角标要短，不用 SIGN_TASK_STATUS_TEXT 的长文本）
+const SIGN_BADGE_WARN = {
+  task_terminated: '签署异常',
+  abolishing: '作废中',
+  revoked: '已作废',
+  expired: '签署逾期'
+};
+
+// —— 日期工具 ——
+function getYmd(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function addDaysYmd(baseYmd, days) {
+  const [y, m, day] = baseYmd.split('-').map(Number);
+  const dd = new Date(y, m - 1, day + days);
+  return getYmd(dd);
+}
 
 Page({
   data: {
@@ -32,6 +54,7 @@ Page({
     refreshingId: '',
     searchKeyword: '',
     selectedMonth: '', // 格式 'YYYY-MM'
+    lastEnd: '',       // 到期提醒 Tab 的游标（按到期日升序翻页）
     // 为了调试
     lastEsignUrl: ''
   },
@@ -63,24 +86,8 @@ Page({
   },
 
   async refresh() {
-    this.setData({ list: [], rawList: [], hasMore: true, lastId: '', lastCreatedAt: null });
+    this.setData({ list: [], rawList: [], hasMore: true, lastId: '', lastCreatedAt: null, lastEnd: '' });
     await this.fetch();
-    // 如果逻辑在 JS 计算，判断签约状态
-    /* 
-    const data = await this.fetch();
-    if (Array.isArray(data)) {
-        const list = data.map(item => {
-          const esign = item.esign || {};
-          let statusText = '未生成电子签';
-          if (esign.lastActorUrl) {
-            statusText = '成功获取签约链接';
-          } else if (esign.signTaskId) {
-            statusText = '获取签约链接失败';
-          }
-          return { ...item, _fddStatusText: statusText };
-        });
-        this.setData({ list });
-      } */
   },
 
   // 新增：搜索输入（防抖）
@@ -115,7 +122,10 @@ Page({
     this.setData({ loading: true });
 
     try {
-      const { cityCode, branchCode, searchKeyword, selectedMonth, lastCreatedAt, lastId } = this.data;
+      const { cityCode, branchCode, searchKeyword, selectedMonth, filter, lastCreatedAt, lastEnd, lastId } = this.data;
+
+      const todayStr = getYmd(new Date());
+      const thresholdStr = addDaysYmd(todayStr, EXPIRING_WINDOW_DAYS);
 
       // 1. 基础条件：城市 + 未删除
       let whereBase = { cityCode: cityCode, deleted: _.neq(true) };
@@ -164,30 +174,84 @@ Page({
         ]);
       }
 
-      // 4. 构建带分页的查询
-      let condition = COL.where(whereBase);
-
-      // 分页游标（createdAt < lastCreatedAt，或时间相同则 _id < lastId）
-      if (lastCreatedAt) {
-        condition = COL.where(
-          _.and([
-            whereBase,
-            _.or([
-              { createdAt: _.lt(this.data.lastCreatedAt) },
-              _.and([
-                { createdAt: this.data.lastCreatedAt },
-                { _id: _.lt(this.data.lastId) }
-              ])
-            ])
+      // 4. 合同状态 Tab（服务端筛选，避免客户端过滤的分页陷阱）
+      // 状态轴：无/active=生效中；expired=已到期待处理（自动回库）；terminated=退租；renewed=已续租
+      if (filter === 'active') {
+        // 生效中：状态为 active/未标记，且未到期（到期日字符串比较，"长期有效">任何日期）
+        whereBase = _.and([
+          whereBase,
+          _.or([
+            { contractStatus: _.exists(false) },
+            { contractStatus: null },
+            { contractStatus: 'active' }
+          ]),
+          _.or([
+            { 'fields.contractValidPeriodEnd': _.gt(todayStr) },
+            { 'fields.contractValidPeriodEnd': '' },
+            { 'fields.contractValidPeriodEnd': null }
           ])
-        );
+        ]);
+      } else if (filter === 'expiring') {
+        // 到期提醒：30 天内到期 + 已过期未终结（active/expired）的合同
+        // 按到期日升序 → 已过期的自动置顶
+        whereBase = _.and([
+          whereBase,
+          _.or([
+            { contractStatus: _.exists(false) },
+            { contractStatus: null },
+            { contractStatus: 'active' },
+            { contractStatus: 'expired' }
+          ]),
+          { 'fields.contractValidPeriodEnd': _.and([_.lte(thresholdStr), _.neq(''), _.neq(null)]) }
+        ]);
+      } else if (filter === 'ended') {
+        // 已结束：退租 或 已续租（被后续合同替代）
+        whereBase = _.and([
+          whereBase,
+          _.or([
+            { contractStatus: 'terminated' },
+            { contractStatus: 'renewed' }
+          ])
+        ]);
       }
 
-      const res = await condition
-        .orderBy('createdAt', 'desc')
-        .orderBy('_id', 'desc')
-        .limit(PAGE_SIZE)
-        .get();
+      // 5. 分页游标
+      // 普通Tab：createdAt 倒序；到期提醒：到期日升序（过期置顶）
+      const byExpiry = filter === 'expiring';
+      const cursorVal = byExpiry ? lastEnd : lastCreatedAt;
+      if (cursorVal) {
+        whereBase = _.and([
+          whereBase,
+          byExpiry
+            ? _.or([
+                { 'fields.contractValidPeriodEnd': _.gt(lastEnd) },
+                _.and([
+                  { 'fields.contractValidPeriodEnd': lastEnd },
+                  { _id: _.lt(lastId) }
+                ])
+              ])
+            : _.or([
+                { createdAt: _.lt(lastCreatedAt) },
+                _.and([
+                  { createdAt: lastCreatedAt },
+                  { _id: _.lt(lastId) }
+                ])
+              ])
+        ]);
+      }
+
+      let condition = COL.where(whereBase);
+      if (byExpiry) {
+        condition = condition
+          .orderBy('fields.contractValidPeriodEnd', 'asc')
+          .orderBy('_id', 'desc');
+      } else {
+        condition = condition
+          .orderBy('createdAt', 'desc')
+          .orderBy('_id', 'desc');
+      }
+
+      const res = await condition.limit(PAGE_SIZE).get();
 
       const page = res.data.map(d =>
         this.decorateContractItem({
@@ -197,15 +261,15 @@ Page({
       );
 
       const rawList = this.data.rawList.concat(page);
-      const newList = this.applyFilter(rawList); // 应用客户端的状态Tab过滤
 
       // 记录新的游标
       const tail = res.data[res.data.length - 1];
       this.setData({
-        list: newList,
+        list: rawList,
         rawList,
         hasMore: res.data.length === PAGE_SIZE,
         lastCreatedAt: tail ? tail.createdAt : this.data.lastCreatedAt,
+        lastEnd: tail ? (tail.fields && tail.fields.contractValidPeriodEnd) || '' : this.data.lastEnd,
         lastId: tail ? tail._id : this.data.lastId
       });
     } catch (e) {
@@ -218,17 +282,48 @@ Page({
 
   loadMore() { this.fetch(); },
 
-  // 顶部筛选（现在先做前端过滤，真正的筛选你以后可以做到数据库里）
+  // 顶部筛选（服务端筛选：切换 Tab 重新拉取）
   onFilterTap(e) {
     const filter = e.currentTarget.dataset.filter;
-    const rawList = this.data.rawList || [];
-    this.setData({
-      filter,
-      list: this.applyFilter(rawList, filter)
+    if (!filter || filter === this.data.filter) return;
+    this.setData({ filter });
+    this.refresh();
+  },
+
+  // 确认收车：针对 AutoReturn 已自动回库（contractStatus=expired）的合同，
+  // 业务员联系司机后人工确认结束。合同转入"已结束"，离开"到期提醒"。
+  // 注意：车辆仍在租的合同不走这里，请到车辆中心"退租解绑"办理完整退租。
+  async onConfirmReturn(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.list.find(x => x._id === id);
+    if (!item) return wx.showToast({ title: '未找到合同', icon: 'none' });
+
+    const { confirm } = await wx.showModal({
+      title: '确认收车',
+      content: `确认「${item.fields?.clientName || '该司机'}」的合同已收车结束？确认后合同转入「已结束」。`,
+      confirmText: '确认收车'
     });
-    // 如果当前列表为空且还有更多，尝试自动加载下一页
-    if (this.data.list.length === 0 && this.data.hasMore) {
-      this.loadMore();
+    if (!confirm) return;
+
+    try {
+      wx.showLoading({ title: '处理中...', mask: true });
+      const res = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'terminate', id }
+      });
+      wx.hideLoading();
+
+      const r = res?.result || {};
+      if (r.ok) {
+        wx.showToast({ title: '已确认收车', icon: 'success' });
+        this.refresh();
+      } else {
+        wx.showModal({ title: '操作失败', content: r.error || '请稍后重试', showCancel: false });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      console.error(err);
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' });
     }
   },
 
@@ -417,7 +512,7 @@ Page({
 
       this.setData({
         rawList: mappedRawList,
-        list: this.applyFilter(mappedRawList)
+        list: mappedRawList
       });
       // 成功弹窗
       wx.showModal({
@@ -816,7 +911,7 @@ Page({
     const end = item.fields?.contractValidPeriodEnd || '未指定';
     const validityPeriod = `${start} 至 ${end}`;
 
-    // 合同状态：优先使用持久化的 contractStatus，否则动态计算（兼容旧数据）
+    // —— 合同状态轴：优先持久化 contractStatus，旧数据按到期日动态回退 ——
     let statusLabel = '生效中';
     let statusClass = 'active';
 
@@ -824,6 +919,9 @@ Page({
     if (persisted === 'terminated') {
       statusLabel = '退租';
       statusClass = 'terminated';
+    } else if (persisted === 'renewed') {
+      statusLabel = '已续租';
+      statusClass = 'renewed';
     } else if (persisted === 'expired') {
       statusLabel = '已到期';
       statusClass = 'expired';
@@ -832,11 +930,40 @@ Page({
       if (end !== '未指定') {
         try {
           const expireTimeMs = new Date(`${end}T06:00:00+08:00`).getTime();
-          if (Date.now() >= expireTimeMs) {
+          if (!isNaN(expireTimeMs) && Date.now() >= expireTimeMs) {
             statusLabel = '已到期';
             statusClass = 'expired';
           }
         } catch (e) { }
+      }
+    }
+
+    // —— 到期倒计时标签（仅未终结的合同显示）——
+    // 与 AutoReturn 的到期判定保持一致：到期日 06:00 (UTC+8) 视为过期
+    let expireBadge = null;
+    if ((statusClass === 'active' || statusClass === 'expired') && /^\d{4}-\d{2}-\d{2}$/.test(end)) {
+      const expireTimeMs = new Date(`${end}T06:00:00+08:00`).getTime();
+      if (!isNaN(expireTimeMs)) {
+        const diffDays = Math.ceil((expireTimeMs - Date.now()) / 86400000);
+        if (diffDays < 0) {
+          expireBadge = { text: `已过期 ${-diffDays} 天`, type: 'over' };
+        } else if (diffDays === 0) {
+          expireBadge = { text: '今天到期', type: 'over' };
+        } else if (diffDays <= EXPIRING_WINDOW_DAYS) {
+          expireBadge = { text: `剩 ${diffDays} 天`, type: 'soon' };
+        }
+      }
+    }
+
+    // —— 签署状态角标（线下合同无电子签，不显示）——
+    let signBadge = null;
+    if (!item.isOffline) {
+      if (this.isSignTaskFinished(signTaskStatus)) {
+        signBadge = { text: '已签', type: 'signed' };
+      } else if (SIGN_BADGE_WARN[signTaskStatus]) {
+        signBadge = { text: SIGN_BADGE_WARN[signTaskStatus], type: 'warn' };
+      } else {
+        signBadge = { text: '待签', type: 'unsigned' };
       }
     }
 
@@ -846,30 +973,12 @@ Page({
       _signFinished: this.isSignTaskFinished(signTaskStatus),
       _validityPeriod: validityPeriod,
       _statusLabel: statusLabel,
-      _statusClass: statusClass
+      _statusClass: statusClass,
+      _expireBadge: expireBadge,
+      _signBadge: signBadge,
+      // AutoReturn 已自动回库、待业务员人工确认收车
+      _confirmable: persisted === 'expired'
     };
-  },
-
-  applyFilter(list, filter = this.data.filter) {
-    if (filter === 'active') {
-      return list.filter(item => item._statusClass === 'active');
-    }
-    if (filter === 'expired') {
-      return list.filter(item => item._statusClass === 'terminated' || item._statusClass === 'expired');
-    }
-    if (filter === 'waiting') {
-      return list.filter(item => {
-        const status = item?.esign?.signTaskStatus;
-        return (
-          !status ||
-          ['fill_progress', 'fill_completed', 'sign_progress', 'sign_completed'].includes(status)
-        );
-      });
-    }
-    if (filter === 'signed') {
-      return list.filter(item => this.isSignTaskFinished(item?.esign?.signTaskStatus));
-    }
-    return list;
   },
 
   formatTime(serverDate) {

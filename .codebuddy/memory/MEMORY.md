@@ -1,5 +1,14 @@
 # 项目长期记忆
 
+## 合同到期提醒系统（2026-10 完成，待部署云函数）
+- 合同中心 Tab 改为合同状态轴：生效中 / 到期提醒 / 已结束 / 全部；签署状态改列表项角标（待签红/已签绿/异常橙），不再做独立 Tab。
+- "到期提醒"= 到期日 ≤30 天 + 已过期未终结；服务端查询（修复客户端过滤分页陷阱）；按到期日升序 → 已过期自动置顶；倒计时标签 `已过期X天`/`今天到期`/`剩X天`。
+- contractStatus 状态机：无/active(生效中) → expired(AutoReturn 00:05 自动回库标记) → terminated(手动退租解绑/人工确认收车) / renewed(续租时旧合同标记)。`长期有效`合同不进提醒栏。
+- **关键数据层修复**：contractV2 新增"新合同创建后终结同车牌旧合同"逻辑（同司机→renewed，换司机→terminated，写 replacedByContractId），否则续租后旧合同永远留在提醒栏。
+- contractOps 新增 `terminate` action（仅允许 expired/动态过期状态终止，车辆仍在租的拒绝）。
+- 改动：contract-list 的 js/wxml/wxss + contractOps + contractV2 + AGENTS.md(3.1 状态机)。两个云函数需「上传并部署：所有文件」重新部署。
+- 按钮样式：`.tab` 上下 padding 18rpx（字体 24rpx 不变）。
+
 ## 飞书通知系统（已完成）
 - 4 个云函数（vehicleOps / contractV2 / contractOps / dailyReport）在写 vehicle_history 后推送飞书卡片。
 - 每个云函数目录有自己的 `.env`（已被 .gitignore 排除），存 `FEISHU_WEBHOOK_URL`，用 `dotenv` 读取。
