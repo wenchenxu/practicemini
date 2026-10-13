@@ -24,6 +24,7 @@
         <view class="name">{{item.name || '未录入姓名'}}</view>
         <view class="line">身份证：{{item.clientId || '无'}}</view>
         <view class="line">手机号：{{item.phone || '无'}}</view>
+        <view class="line">证件：{{item.docCount > 0 ? item.docCount + '/4 张' : '未上传'}}</view>
       </view>
       <view class="row-arrow">›</view>
     </view>

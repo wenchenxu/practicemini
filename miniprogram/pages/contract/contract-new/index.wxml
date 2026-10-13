@@ -167,6 +167,27 @@
         </view>
     </view>
 
+    <!-- 司机证件照（选填）：拍照或相册上传，提交时才传云端 -->
+    <view class="section-card" wx:if="{{mode==='create'}}">
+      <view class="card-title">司机证件（选填）</view>
+      <view class="doc-tip">可拍照或从相册选择司机身份证、驾驶证，上传后可在合同详情和司机中心查看。不传不影响合同创建。</view>
+      <view class="doc-grid">
+        <view class="doc-slot" wx:for="{{driverDocSlots}}" wx:key="key" data-index="{{index}}" bindtap="onChooseDriverDoc">
+          <block wx:if="{{item.localPath}}">
+            <image class="doc-img" src="{{item.localPath}}" mode="aspectFill" data-index="{{index}}" catchtap="onPreviewDriverDoc" />
+            <view class="doc-del" data-index="{{index}}" catchtap="onRemoveDriverDoc">×</view>
+          </block>
+          <block wx:else>
+            <view class="doc-add">
+              <view class="doc-add-icon">＋</view>
+              <view class="doc-add-text">拍摄/选择</view>
+            </view>
+          </block>
+          <view class="doc-label">{{item.label}}</view>
+        </view>
+      </view>
+    </view>
+
     <view wx:if="{{mode!=='view'}}" class="footer-actions">
       <button type="primary" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving}}" class="submit-btn">
         {{ mode==='create' ? '生成合同' : '保存修改并重新生成' }}

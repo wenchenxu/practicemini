@@ -148,6 +148,21 @@
       </view>
     </view>
 
+    <!-- 司机证件照 -->
+    <view class="edit-card">
+      <view class="card-header-row">
+        <view class="section-title" style="margin-bottom:0; border:none; padding:0;">司机证件</view>
+      </view>
+      <view wx:if="{{!driverDocsLoaded}}" class="docs-empty">证件加载中...</view>
+      <view wx:elif="{{driverDocImages.length === 0}}" class="docs-empty">暂无证件照片（可在新建合同时上传，或在司机最新合同中补传）</view>
+      <view wx:else class="docs-grid">
+        <view class="docs-cell" wx:for="{{driverDocImages}}" wx:key="key" data-index="{{index}}" bindtap="onPreviewDriverDocImage">
+          <image class="docs-img" src="{{item.url}}" mode="aspectFill" />
+          <view class="docs-label">{{item.label}}</view>
+        </view>
+      </view>
+    </view>
+
 
     <view class="edit-card">
       <view class="card-header-row">

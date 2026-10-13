@@ -5,6 +5,7 @@ const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const fetch = require('node-fetch');
 const https = require('https');
+const crypto = require('crypto');
 require('dotenv').config();
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -276,6 +277,56 @@ const TPL_DIR = {
   def: 'contractTemplate/defaults/default.docx'
 };
 
+// ========== 司机证件照（选填） ==========
+
+const DRIVER_DOC_KEYS = ['idCardFront', 'idCardBack', 'licenseFront', 'licenseBack'];
+
+// 身份证号不允许出现在文件路径里（tempFileURL 是带完整路径的公网链接），
+// 用 clientId 的 SHA-256 前 16 位作为司机目录名
+function hashDriverKey(clientId) {
+  return crypto.createHash('sha256').update(String(clientId || '')).digest('hex').slice(0, 16);
+}
+
+// 解析并校验前端传来的 driverDocs: [{key, tempFileID, ext}]
+// 只接受白名单 key + cloud:// 开头的云存储 fileID，防御脏数据
+function parseDriverDocs(raw) {
+  const map = {};
+  if (!Array.isArray(raw)) return map;
+  for (const item of raw) {
+    if (!item || !item.key || !item.tempFileID) continue;
+    if (DRIVER_DOC_KEYS.indexOf(item.key) === -1) continue;
+    const fid = String(item.tempFileID);
+    if (fid.indexOf('cloud://') !== 0) continue;
+    map[item.key] = {
+      tempFileID: fid,
+      ext: /^[a-zA-Z0-9]{1,5}$/.test(item.ext || '') ? item.ext : 'jpg'
+    };
+  }
+  return map;
+}
+
+// 事务外搬移：temp-driver-docs/ → driver-docs/{cityCode}/{clientIdHash}/{type}_{ts}.{ext}
+// 成功后删除 temp；失败则回退指向 temp 文件（temp 仍在，保证详情页可见、不丢数据）
+async function moveDriverDocFiles(opts) {
+  const { cityCode, clientId, uploads } = opts;
+  const results = {};
+  for (const key of Object.keys(uploads)) {
+    const { tempFileID, ext } = uploads[key];
+    try {
+      const { fileContent } = await safeDownloadCloudFile(tempFileID);
+      const cloudPath = `driver-docs/${sanitizePathComponent(cityCode) || 'unknown'}/${hashDriverKey(clientId)}/${key}_${Date.now()}.${ext}`;
+      const upRes = await cloud.uploadFile({ cloudPath, fileContent });
+      results[key] = { fileID: upRes.fileID, ok: true };
+      // 搬移成功，删除 temp 源文件
+      try { await cloud.deleteFile({ fileList: [tempFileID] }); } catch (e) { /* ignore */ }
+    } catch (e) {
+      console.error(`[ContractV2] move driver doc "${key}" failed:`, e && e.message);
+      results[key] = { fileID: tempFileID, ok: false };
+    }
+  }
+  return results;
+}
+
 // ========== 主入口 ==========
 
 // ===== 飞书推送通知 =====
@@ -379,6 +430,10 @@ exports.main = async (event, context) => {
       return { ok: false, error: 'cityCode-required' };
     }
 
+    // ===== 司机证件照（选填）：前端已上传到 temp-driver-docs/ 的临时文件 =====
+    // 事务内只写库不搬文件，事务外统一搬移到正式目录
+    const driverDocUploads = parseDriverDocs(event.driverDocs);
+
     // 查找当前操作人的名字（从白名单）
     let creatorName = '';
     try {
@@ -466,10 +521,13 @@ exports.main = async (event, context) => {
       if (!carPlate) throw new Error('vehicle-plate-required');
 
       // 3) 司机 upsert（按 clientId）
+      // 注意：documents 字段（证件照）在此处绝不整体覆盖——
+      // 没传照片的老司机合同流程完全不受影响；新照片由事务外搬移逻辑按 key 局部合并写入
       const drvRes = await driversTx.where({ clientId }).get();
+      let driverId = '';
       if (!drvRes.data || drvRes.data.length === 0) {
         // 新司机
-        await driversTx.add({
+        const addDrvRes = await driversTx.add({
           data: {
             clientId,
             name: clientName || '',
@@ -483,13 +541,16 @@ exports.main = async (event, context) => {
             branchCode: branchCode || '', // 新增：分公司代码
             status: '租车中',
             lastContractId: null,
+            documents: {}, // 司机证件照（idCardFront 等），事务外填充
             createdAt: now,
             updatedAt: now
           }
         });
+        driverId = addDrvRes._id;
       } else {
-        // 老司机，增量更新
+        // 老司机，增量更新（不碰 documents 字段）
         const driverDoc = drvRes.data[0];
+        driverId = driverDoc._id;
         await driversTx.doc(driverDoc._id).update({
           data: {
             name: clientName || driverDoc.name || '',
@@ -584,6 +645,18 @@ exports.main = async (event, context) => {
       });
 
       // 5) 创建合同记录
+      // 司机证件快照：签约时点该司机已有的证件照 fileID（本次新传的由事务外搬移逻辑补写覆盖）。
+      // 旧合同/无证件司机 → 空对象，前端查看时回退读 driver.documents
+      const driverDocsSnapshot = {};
+      if (drvRes.data && drvRes.data.length > 0 && drvRes.data[0].documents) {
+        const existingDocs = drvRes.data[0].documents;
+        for (const k of DRIVER_DOC_KEYS) {
+          if (existingDocs[k] && existingDocs[k].fileID) {
+            driverDocsSnapshot[k] = existingDocs[k].fileID;
+          }
+        }
+      }
+
       const addRes = await contractsTx.add({
         data: {
           cityCode,
@@ -600,7 +673,8 @@ exports.main = async (event, context) => {
           deleted: false,
           createdAt: now,
           updatedAt: now,
-          attachments: []
+          attachments: [],
+          driverDocs: driverDocsSnapshot
         }
       });
 
@@ -619,6 +693,7 @@ exports.main = async (event, context) => {
 
       return {
         contractId,
+        driverId,
         serialFormatted,
         finalFields: fields,
         notifyData: {
@@ -634,7 +709,48 @@ exports.main = async (event, context) => {
       };
     });
 
-    const { contractId, serialFormatted, finalFields, notifyData } = txResult;
+    const { contractId, driverId, serialFormatted, finalFields, notifyData } = txResult;
+
+    // ===== 司机证件照搬移（事务外）=====
+    // 放在 DOCX 渲染之前：渲染可能耗时 15s+ 甚至超时，必须保证文件先落位。
+    // 搬移失败不中断合同主流程（记录回退指向 temp 文件，仍可查看）。
+    if (Object.keys(driverDocUploads).length > 0 && driverId) {
+      try {
+        const moveResults = await moveDriverDocFiles({
+          cityCode,
+          clientId: finalFields.clientId,
+          uploads: driverDocUploads
+        });
+        const nowDoc = db.serverDate();
+        for (const key of Object.keys(moveResults)) {
+          const r = moveResults[key];
+          // 1) 更新司机档案（最新版，按 key 局部合并，绝不整体覆盖）
+          try {
+            await COL_DRIVERS.doc(driverId).update({
+              data: {
+                [`documents.${key}`]: { fileID: r.fileID, uploadedAt: nowDoc, uploadedBy: creatorName || '' },
+                updatedAt: nowDoc
+              }
+            });
+          } catch (e) {
+            console.error(`[ContractV2] update driver.documents.${key} failed:`, e && e.message);
+          }
+          // 2) 更新合同快照（签约时点，含本次新传）
+          try {
+            await COL_CONTRACTS.doc(contractId).update({
+              data: {
+                [`driverDocs.${key}`]: r.fileID,
+                updatedAt: nowDoc
+              }
+            });
+          } catch (e) {
+            console.error(`[ContractV2] update contract.driverDocs.${key} failed:`, e && e.message);
+          }
+        }
+      } catch (e) {
+        console.error('[ContractV2] driver docs move failed (contract creation continues):', e && e.message);
+      }
+    }
 
     // 飞书推送通知（事务外，不影响业务流程）
     if (notifyData) await notifyFeishu(notifyData);

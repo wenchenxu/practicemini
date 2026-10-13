@@ -1,9 +1,20 @@
 // pages/contract-detail/index.js
 const db = wx.cloud.database();
 
+// 司机证件照 key → 展示名
+const DRIVER_DOC_LABELS = {
+  idCardFront: '身份证 人像面',
+  idCardBack: '身份证 国徽面',
+  licenseFront: '驾驶证 正页',
+  licenseBack: '驾驶证 副页'
+};
+const DRIVER_DOC_KEYS = Object.keys(DRIVER_DOC_LABELS);
+
 Page({
   data: {
     contract: null,
+    driverDocImages: [], // [{key, label, fileID, url}]
+    driverDocsLoaded: false,
     giftDays: '', // 默认为空字符串，方便显示 placeholder
     giftDaysNotes: '',
     contractRealEndDate: '',
@@ -101,12 +112,75 @@ Page({
         this._calcDate(displayData.giftDays, displayData.contractValidPeriodEnd);
       }*/
 
+      // 加载司机证件照（异步，不阻塞主信息渲染）
+      this.loadDriverDocs(displayData);
+
     } catch (e) {
       console.error(e);
       wx.showToast({ title: '加载失败', icon: 'none' });
     } finally {
       wx.hideLoading();
     }
+  },
+
+  // ===== 司机证件照查看 =====
+  // 合并规则：合同快照 driverDocs（签约时点）优先，缺失的 key 回退读司机档案 documents（最新版）。
+  // 老合同（无快照）自动回退到司机最新证件。
+  async loadDriverDocs(displayData) {
+    try {
+      const clientId = (displayData.clientId || '').trim();
+
+      // 1) 司机档案（最新版）
+      let docsMap = {};
+      if (clientId) {
+        const drvRes = await db.collection('drivers').where({ clientId }).limit(1).get();
+        const docs = drvRes.data && drvRes.data[0] && drvRes.data[0].documents;
+        if (docs) {
+          for (const k of DRIVER_DOC_KEYS) {
+            if (docs[k] && docs[k].fileID) docsMap[k] = docs[k].fileID;
+          }
+        }
+      }
+
+      // 2) 合同快照覆盖（签约时点优先）
+      const snapshot = displayData.driverDocs || {};
+      for (const k of DRIVER_DOC_KEYS) {
+        if (snapshot[k]) docsMap[k] = snapshot[k];
+      }
+
+      const list = DRIVER_DOC_KEYS
+        .filter(k => docsMap[k])
+        .map(k => ({ key: k, label: DRIVER_DOC_LABELS[k], fileID: docsMap[k], url: '' }));
+
+      this.setData({ driverDocImages: list, driverDocsLoaded: true });
+
+      // 3) 换取临时链接用于展示/预览
+      if (list.length > 0) {
+        const t = await wx.cloud.getTempFileURL({ fileList: list.map(x => x.fileID) });
+        const urlMap = {};
+        (t.fileList || []).forEach(f => {
+          if (f.fileID && f.tempFileURL) urlMap[f.fileID] = f.tempFileURL;
+        });
+        this.setData({
+          driverDocImages: list.map(x => ({ ...x, url: urlMap[x.fileID] || '' }))
+        });
+      }
+    } catch (e) {
+      console.error('[loadDriverDocs]', e);
+      this.setData({ driverDocImages: [], driverDocsLoaded: true });
+    }
+  },
+
+  // 点击证件缩略图 → 全屏预览（可双指缩放、长按保存）
+  onPreviewDriverDocImage(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const img = this.data.driverDocImages[idx];
+    if (!img) return;
+    if (!img.url) {
+      return wx.showToast({ title: '图片链接获取中，请稍候再试', icon: 'none' });
+    }
+    const urls = this.data.driverDocImages.filter(x => x.url).map(x => x.url);
+    wx.previewImage({ current: img.url, urls });
   },
 
   // --- 核心逻辑：日期计算 (纯函数，不依赖 this.data) ---

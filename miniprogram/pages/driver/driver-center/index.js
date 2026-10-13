@@ -45,8 +45,16 @@ Page({
         .orderBy('name', 'asc')  // 没有 name 字段的话可改成 createdAt
         .get();
 
+      // 计算证件照数量（0-4），用于列表展示
+      const DOC_KEYS = ['idCardFront', 'idCardBack', 'licenseFront', 'licenseBack'];
+      const list = (res.data || []).map(d => {
+        const docs = d.documents || {};
+        const docCount = DOC_KEYS.filter(k => docs[k] && docs[k].fileID).length;
+        return { ...d, docCount };
+      });
+
       this.setData({
-        drivers: res.data || [],
+        drivers: list,
         loading: false
       });
     } catch (e) {

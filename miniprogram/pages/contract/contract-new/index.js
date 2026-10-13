@@ -151,6 +151,14 @@ Page({
     },
     visibleFields: [],
     saving: false,
+
+    // ===== 司机证件照（选填）：仅存本地临时路径，点提交时才上传 =====
+    driverDocSlots: [
+      { key: 'idCardFront',   label: '身份证 人像面', localPath: '' },
+      { key: 'idCardBack',    label: '身份证 国徽面', localPath: '' },
+      { key: 'licenseFront',  label: '驾驶证 正页',   localPath: '' },
+      { key: 'licenseBack',   label: '驾驶证 副页',   localPath: '' }
+    ],
   },
 
   onLoad(options) {
@@ -322,6 +330,52 @@ Page({
       return true;
     });
     this.setData({ visibleFields: visible });
+  },
+
+  // ===== 司机证件照（选填）=====
+
+  // 拍照 / 相册选择（每卡位单张，压缩）
+  onChooseDriverDoc(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const slot = this.data.driverDocSlots[idx];
+    if (!slot) return;
+
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      camera: 'back',
+      success: (res) => {
+        const f = res.tempFiles && res.tempFiles[0];
+        if (!f) return;
+        if (f.size > 4 * 1024 * 1024) {
+          return wx.showToast({ title: '图片过大（>4MB），请重新拍摄', icon: 'none' });
+        }
+        this.setData({ [`driverDocSlots[${idx}].localPath`]: f.tempFilePath });
+      },
+      fail: (err) => {
+        // 用户取消不提示，其余提示
+        if (err && err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+          console.warn('[onChooseDriverDoc]', err);
+        }
+      }
+    });
+  },
+
+  // 删除某卡位的照片（此时尚未上传云端，仅清本地路径）
+  onRemoveDriverDoc(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    this.setData({ [`driverDocSlots[${idx}].localPath`]: '' });
+  },
+
+  // 预览本地照片
+  onPreviewDriverDoc(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const slot = this.data.driverDocSlots[idx];
+    if (slot && slot.localPath) {
+      wx.previewImage({ current: slot.localPath, urls: [slot.localPath] });
+    }
   },
 
   // 合同类型选择
@@ -666,6 +720,40 @@ Page({
 
       if (mode === 'create') {
         this.setData({ saving: true });
+
+        // ===== 司机证件照（选填）：提交时才上传 temp 目录 =====
+        // 成功后所有权移交云函数（搬移+删除）；失败/异常时前端立即回滚删除，不留孤儿文件
+        this._uploadedDriverDocTemps = [];
+        let driverDocs = [];
+        const chosenSlots = (this.data.driverDocSlots || []).filter(s => s.localPath);
+        if (chosenSlots.length > 0) {
+          try {
+            for (let i = 0; i < chosenSlots.length; i++) {
+              wx.showLoading({ title: `证件照上传中 ${i + 1}/${chosenSlots.length}`, mask: true });
+              const extMatch = chosenSlots[i].localPath.match(/\.([a-zA-Z0-9]{1,5})$/);
+              const cloudPath = `temp-driver-docs/${Date.now()}-${Math.floor(Math.random() * 1000000)}.${extMatch ? extMatch[1] : 'jpg'}`;
+              const upRes = await wx.cloud.uploadFile({
+                cloudPath,
+                filePath: chosenSlots[i].localPath
+              });
+              this._uploadedDriverDocTemps.push(upRes.fileID);
+              driverDocs.push({
+                key: chosenSlots[i].key,
+                tempFileID: upRes.fileID,
+                ext: extMatch ? extMatch[1] : 'jpg'
+              });
+            }
+          } catch (upErr) {
+            console.error('[onSubmit] driver doc upload failed', upErr);
+            if (this._uploadedDriverDocTemps.length) {
+              try { await wx.cloud.deleteFile({ fileList: this._uploadedDriverDocTemps }); } catch (delErr) { /* ignore */ }
+              this._uploadedDriverDocTemps = [];
+            }
+            wx.showToast({ title: '证件照上传失败，请重试', icon: 'none', duration: 3000 });
+            return;
+          }
+        }
+
         wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
         const res = await wx.cloud.callFunction({
           name: 'contractV2',
@@ -677,11 +765,32 @@ Page({
             contractType: selectedTypeCode,
             contractTypeName: selectedTypeName,
             isRenewal: this.data.isRenewal || false, // 传递续约标志
-            payload
+            payload,
+            driverDocs // 选填：本次上传的司机证件照 temp 文件
           }
         });
 
         const result = res?.result || {};
+
+        // 合同创建失败（如 vehicle-not-available）：回滚删除证件 temp 文件
+        if (result.ok === false) {
+          if (this._uploadedDriverDocTemps.length) {
+            try { await wx.cloud.deleteFile({ fileList: this._uploadedDriverDocTemps }); } catch (delErr) { /* ignore */ }
+            this._uploadedDriverDocTemps = [];
+          }
+          const ERR_MSGS = {
+            'vehicle-not-available': '该车辆当前不可租（已被租出）',
+            'vehicle-not-found': '未找到该车辆，请重新选择',
+            'driver-clientId-required': '缺少司机身份证号',
+            'cityCode-required': '缺少城市参数'
+          };
+          wx.showToast({ title: ERR_MSGS[result.error] || result.error || '合同创建失败', icon: 'none', duration: 3000 });
+          return;
+        }
+
+        // 创建成功：证件 temp 文件所有权已移交云函数，前端不再回滚
+        this._uploadedDriverDocTemps = [];
+
         const fileID = result.fileID || '';
         const contractId = result.id || result._id || '';
         wx.showToast({ title: '合同已生成', icon: 'success', duration: 2000 });
@@ -730,6 +839,12 @@ Page({
     } catch (e) {
       console.error(e);
       wx.hideLoading();
+      // 网络等异常：回滚删除本次上传、但未被云函数成功接管的证件 temp 文件
+      // （若云函数已完成搬移，temp 已被其删除，此处删除是幂等无害的）
+      if (this._uploadedDriverDocTemps && this._uploadedDriverDocTemps.length) {
+        try { await wx.cloud.deleteFile({ fileList: this._uploadedDriverDocTemps }); } catch (delErr) { /* ignore */ }
+        this._uploadedDriverDocTemps = [];
+      }
       wx.showToast({ title: '保存失败', icon: 'none', duration: 3000 });
     } finally {
       wx.hideLoading();

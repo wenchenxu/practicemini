@@ -18,6 +18,18 @@
   <view wx:else>暂无司机数据</view>
 </view>
 
+<!-- 司机证件照 -->
+<view class="section">
+  <view class="section-title">司机证件</view>
+  <view wx:if="{{driverDocImages.length === 0}}" class="docs-empty">暂无证件照片</view>
+  <view wx:else class="docs-grid">
+    <view class="docs-cell" wx:for="{{driverDocImages}}" wx:key="key" data-index="{{index}}" bindtap="onPreviewDriverDocImage">
+      <image class="docs-img" src="{{item.url}}" mode="aspectFill" />
+      <view class="docs-label">{{item.label}}</view>
+    </view>
+  </view>
+</view>
+
 <view class="section">
   <view class="section-title">最近一份合同</view>
   <view wx:if="{{latestContract}}">

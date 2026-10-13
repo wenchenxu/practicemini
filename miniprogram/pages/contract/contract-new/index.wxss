@@ -205,3 +205,78 @@ page {
 .paste-btn--hover {
     opacity: 0.6;
 }
+
+/* === 司机证件照上传（选填） === */
+.doc-tip {
+    font-size: 24rpx;
+    color: #999;
+    line-height: 1.5;
+    margin: -8rpx 0 20rpx;
+}
+
+.doc-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20rpx;
+}
+
+.doc-slot {
+    width: calc(50% - 10rpx);
+    box-sizing: border-box;
+    position: relative;
+}
+
+.doc-img {
+    width: 100%;
+    height: 200rpx;
+    border-radius: 12rpx;
+    background: #f7f8fa;
+    display: block;
+}
+
+.doc-del {
+    position: absolute;
+    top: -12rpx;
+    right: -12rpx;
+    width: 44rpx;
+    height: 44rpx;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 30rpx;
+    line-height: 42rpx;
+    text-align: center;
+    z-index: 2;
+}
+
+.doc-add {
+    width: 100%;
+    height: 200rpx;
+    border-radius: 12rpx;
+    background: #f7f8fa;
+    border: 2rpx dashed #d9d9d9;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.doc-add-icon {
+    color: #bbb;
+    font-size: 56rpx;
+    line-height: 1;
+}
+
+.doc-add-text {
+    color: #bbb;
+    font-size: 22rpx;
+    margin-top: 8rpx;
+}
+
+.doc-label {
+    font-size: 24rpx;
+    color: #666;
+    text-align: center;
+    margin-top: 10rpx;
+}

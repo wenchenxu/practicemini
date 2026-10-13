@@ -5,6 +5,15 @@ const COL_DRIVERS   = db.collection('drivers');
 const COL_CONTRACTS = db.collection('contracts');
 const COL_VEHICLES  = db.collection('vehicles');
 
+// 司机证件照 key → 展示名
+const DRIVER_DOC_LABELS = {
+  idCardFront: '身份证 人像面',
+  idCardBack: '身份证 国徽面',
+  licenseFront: '驾驶证 正页',
+  licenseBack: '驾驶证 副页'
+};
+const DRIVER_DOC_KEYS = Object.keys(DRIVER_DOC_LABELS);
+
 Page({
   data: {
     clientId: '',
@@ -13,7 +22,9 @@ Page({
 
     driver: null,
     latestContract: null,
-    currentVehicle: null
+    currentVehicle: null,
+
+    driverDocImages: [] // [{key, label, fileID, url}]
   },
 
   onLoad(options) {
@@ -68,11 +79,53 @@ Page({
         latestContract,
         currentVehicle
       });
+
+      // 加载证件照（异步，不阻塞主信息）
+      this.loadDriverDocs(driver);
     } catch (e) {
       console.error('[driver-detail] loadAll error', e);
       wx.showToast({ title: '加载失败', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }
+  },
+
+  // ===== 司机证件照查看（最新版，来自 driver.documents）=====
+  async loadDriverDocs(driver) {
+    try {
+      const docs = (driver && driver.documents) || {};
+      const list = [];
+      for (const k of DRIVER_DOC_KEYS) {
+        if (docs[k] && docs[k].fileID) {
+          list.push({ key: k, label: DRIVER_DOC_LABELS[k], fileID: docs[k].fileID, url: '' });
+        }
+      }
+      this.setData({ driverDocImages: list });
+
+      if (list.length === 0) return;
+
+      const t = await wx.cloud.getTempFileURL({ fileList: list.map(x => x.fileID) });
+      const urlMap = {};
+      (t.fileList || []).forEach(f => {
+        if (f.fileID && f.tempFileURL) urlMap[f.fileID] = f.tempFileURL;
+      });
+      this.setData({
+        driverDocImages: list.map(x => ({ ...x, url: urlMap[x.fileID] || '' }))
+      });
+    } catch (e) {
+      console.error('[driver-detail] loadDriverDocs error', e);
+    }
+  },
+
+  // 点击证件缩略图 → 全屏预览
+  onPreviewDriverDocImage(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const img = this.data.driverDocImages[idx];
+    if (!img) return;
+    if (!img.url) {
+      return wx.showToast({ title: '图片链接获取中，请稍候再试', icon: 'none' });
+    }
+    const urls = this.data.driverDocImages.filter(x => x.url).map(x => x.url);
+    wx.previewImage({ current: img.url, urls });
   }
 });
