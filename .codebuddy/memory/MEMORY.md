@@ -11,8 +11,9 @@
 
 ## 飞书通知系统（已完成）
 - 4 个云函数（vehicleOps / contractV2 / contractOps / dailyReport）在写 vehicle_history 后推送飞书卡片。
-- 每个云函数目录有自己的 `.env`（已被 .gitignore 排除），存 `FEISHU_WEBHOOK_URL`，用 `dotenv` 读取。
+- 飞书 webhook 现改为**控制台环境变量**按环境配置（不再放 .env）：生产环境 4 个函数各设 `FEISHU_WEBHOOK_URL=<真实地址>`；dev 环境不设（空=跳过推送）。`.env` 里不留 webhook 行。其余 .env 里的密钥仍用 `dotenv` 读取。
 - 三个业务云函数的 `notifyFeishu` 使用 Node 内置 https 模块（零额外依赖）；需本地 `npm install dotenv` 后用「上传并部署：所有文件」部署（.env 和 node_modules 一起上传）。
+- **重大教训（2026-10-14）**：微信云函数运行时**无法获取"当前环境 ID"字符串**——`TENCENTCLOUD_NAMESPACE` 不在官方环境变量表，`DYNAMIC_CURRENT_ENV` 是 Symbol 非字符串，`getWXContext()` 只返回 OPENID/APPID/UNIONID。因此**禁止用代码判断环境来选配置**；按环境区分配置只能靠①控制台环境变量（推荐，天然按环境隔离，重传代码不清除）或②部署时换 .env。曾误用 `process.env.TENCENTCLOUD_NAMESPACE === prodEnvId` 做判断，导致 IS_PROD 恒 false、生产飞书静默约 6 天（reports 照常写库但飞书收不到）。修复：4 个函数改回单 key `process.env.FEISHU_WEBHOOK_URL`，值由控制台按环境注入。
 - 2026-09 修复：车辆数据普遍只有 `cityCode` 没有 `cityName`，推送卡片缺城市名。已加 `CITY_NAMES` 三级降级（cityName → CITY_NAMES[cityCode] → cityCode）。dailyReport 的 buildVehicleCityMap 本就有降级，计数不受影响。
 
 ## dailyReport 云函数（定时报告）
@@ -28,4 +29,5 @@
 - 用户 npm 全局配置代理 `http://127.0.0.1:7890`（Clash，写在 ~/.npmrc 和系统环境变量），代理未运行时 npm 安装会失败。绕过方法：`$env:HTTP_PROXY=$null; $env:HTTPS_PROXY=$null; npm install --userconfig=无代理npmrc`。
 - 用户明确不需要 tcb CLI 方案（未完成安装，已忽略）。
 - ECS：Ubuntu + Node/Express + Nginx，域名 api.tusifu.cn（法大大代理），可作为飞书事件回调服务器。
-- 生产云环境 `cloudbase-9gvp1n95af42e30d`，开发环境 `dev-4gzrr3qf9d8c8caa`；小程序 appid `wx69a2de4846371ca1`。
+- 生产云环境 `cloudbase-9gvp1n95af42e30d`，开发环境 `dev-d0gkbgouhfab4a5c2`（旧的 `dev-4gzrr3qf9d8c8caa` 已停用销毁、数据不可恢复）；小程序 appid `wx69a2de4846371ca1`。
+- 2026-10 新 dev 环境重建清单：手动建 7 个集合（vehicles/drivers/contracts/vehicle_history/reports/whitelist/whitelist_setting）；其中 vehicles/drivers/contracts/vehicle_history 权限设"所有用户可读"（前端直读）；部署 9 个云函数（所有文件）；whitelist 手动加自己的 admin openid（先 callFunction auth-service action:getOpenid 拿 openid）；从生产导出测试数据导入；dev 环境不上传定时触发器（避免和 prod 重复推飞书/自动还车）。

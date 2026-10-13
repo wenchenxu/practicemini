@@ -18,14 +18,12 @@ function deriveStatus(rentStatus, maintenanceStatus) {
 }
 
 // ===== 飞书推送通知 =====
-// Webhook 从 .env 读取（不入 Git），按运行环境自动选择：
-// 生产环境用 FEISHU_WEBHOOK_URL_PROD，其他环境（dev）用 FEISHU_WEBHOOK_URL_DEV（留空=不推送）
-const ENV_ID = process.env.TENCENTCLOUD_NAMESPACE || '';
-const IS_PROD = ENV_ID === 'cloudbase-9gvp1n95af42e30d';
-const FEISHU_WEBHOOK_URL = (IS_PROD
-  ? process.env.FEISHU_WEBHOOK_URL_PROD
-  : process.env.FEISHU_WEBHOOK_URL_DEV) || '';
-console.log(`[飞书推送] 环境: ${ENV_ID || '未知'} (${IS_PROD ? '生产' : '非生产'})，推送${FEISHU_WEBHOOK_URL ? '已启用' : '未配置，将跳过'}`);
+// Webhook 从环境变量 FEISHU_WEBHOOK_URL 读取。
+// ⚠️ wx-server-sdk 无法在运行时获取“当前环境 ID”字符串，因此不靠代码判断环境，
+//    而是靠「云开发控制台 → 云函数 → 配置 → 环境变量」按环境分别设置该变量：
+//    生产环境填真实飞书机器人地址；dev 环境不设置（留空=自动跳过推送）。
+const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL || '';
+console.log('[飞书推送] ' + (FEISHU_WEBHOOK_URL ? 'webhook 已配置，将推送' : 'webhook 未配置，将跳过'));
 
 const CITY_NAMES = {
   guangzhou: '广州', suzhou: '苏州', foshan: '佛山', huizhou: '惠州',
