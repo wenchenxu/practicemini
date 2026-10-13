@@ -10,6 +10,10 @@ const db = cloud.database();
 const COL = db.collection('contracts');
 const DRIVERS = db.collection('drivers');
 
+// 到期提醒窗口（天）：合同到期日距今 <= 此值的进入"到期提醒"。
+// 改这里后重新部署云函数即生效，无需小程序重新审核。
+const EXPIRING_WINDOW_DAYS = 30;
+
 // —— 公用工具 ——
 function pad(n, width = 2) { return String(n).padStart(width, '0'); }
 
@@ -352,6 +356,16 @@ async function notifyFeishu(record) {
 exports.main = async (event, context) => {
   const { action } = event || {};
   try {
+    // 轻量配置读取：返回前端可调参数，避免小程序发版
+    if (action === 'getConfig') {
+      return {
+        ok: true,
+        data: {
+          expiringWindowDays: EXPIRING_WINDOW_DAYS
+        }
+      };
+    }
+
     if (action === 'update') {
       const { id, fields } = event;
       if (!id || !fields) return { ok: false, error: 'missing-id-or-fields' };

@@ -4,8 +4,9 @@ const COL = db.collection('contracts');
 const PAGE_SIZE = 20;
 const { ensureAccess } = require('../../../utils/guard');
 
-// 到期提醒窗口（天）：到期日距今 <= 30 天的合同进入"到期提醒"
-const EXPIRING_WINDOW_DAYS = 30;
+// 到期提醒窗口（天）兜底默认值；实际以云函数 contractOps getConfig 返回为准。
+// （云函数侧修改后重新部署即生效，无需小程序重新审核）
+const DEFAULT_EXPIRING_WINDOW_DAYS = 30;
 
 const SIGN_TASK_STATUS_TEXT = {
   task_created: '任务创建中',
@@ -55,6 +56,7 @@ Page({
     searchKeyword: '',
     selectedMonth: '', // 格式 'YYYY-MM'
     lastEnd: '',       // 到期提醒 Tab 的游标（按到期日升序翻页）
+    expiringWindowDays: DEFAULT_EXPIRING_WINDOW_DAYS, // 到期提醒窗口（天），onLoad 从云函数拉取
     // 为了调试
     lastEsignUrl: ''
   },
@@ -63,7 +65,7 @@ Page({
 
   onLoad(query) {
     const app = getApp();
-    const init = () => {
+    const init = async () => {
       if (!ensureAccess()) return;
       const cityCode = decodeURIComponent(query.cityCode || '');
       const city = decodeURIComponent(query.city || '');
@@ -72,10 +74,27 @@ Page({
       this.setData({ cityCode, city, branchCode, branchName });
       const displayTitle = branchName ? branchName : city;
       wx.setNavigationBarTitle({ title: `${displayTitle} - 合同历史` });
+      await this.loadExpiringWindow(); // 先拉取到期窗口配置，再加载列表
       this.refresh();
     };
     if (app.globalData.initialized) init();
     else app.$whenReady(init);
+  },
+
+  // 从云函数拉取到期提醒窗口天数（失败则沿用前端兜底默认值 30）
+  async loadExpiringWindow() {
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'contractOps',
+        data: { action: 'getConfig' }
+      });
+      const days = result && result.data && result.data.expiringWindowDays;
+      if (days && Number.isFinite(Number(days)) && Number(days) > 0) {
+        this.setData({ expiringWindowDays: Number(days) });
+      }
+    } catch (e) {
+      console.warn('[loadExpiringWindow] 拉取失败，使用默认值', e);
+    }
   },
 
   onShow() {
@@ -125,7 +144,7 @@ Page({
       const { cityCode, branchCode, searchKeyword, selectedMonth, filter, lastCreatedAt, lastEnd, lastId } = this.data;
 
       const todayStr = getYmd(new Date());
-      const thresholdStr = addDaysYmd(todayStr, EXPIRING_WINDOW_DAYS);
+      const thresholdStr = addDaysYmd(todayStr, this.data.expiringWindowDays);
 
       // 1. 基础条件：城市 + 未删除
       let whereBase = { cityCode: cityCode, deleted: _.neq(true) };
@@ -949,7 +968,7 @@ Page({
           expireBadge = { text: `已过期 ${-diffDays} 天`, type: 'over' };
         } else if (diffDays === 0) {
           expireBadge = { text: '今天到期', type: 'over' };
-        } else if (diffDays <= EXPIRING_WINDOW_DAYS) {
+        } else if (diffDays <= this.data.expiringWindowDays) {
           expireBadge = { text: `剩 ${diffDays} 天`, type: 'soon' };
         }
       }
