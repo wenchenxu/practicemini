@@ -12,7 +12,7 @@ const DRIVERS = db.collection('drivers');
 
 // 到期提醒窗口（天）：合同到期日距今 <= 此值的进入"到期提醒"。
 // 改这里后重新部署云函数即生效，无需小程序重新审核。
-const EXPIRING_WINDOW_DAYS = 30;
+const EXPIRING_WINDOW_DAYS = 15;
 
 // —— 公用工具 ——
 function pad(n, width = 2) { return String(n).padStart(width, '0'); }
