@@ -392,8 +392,100 @@ function getViolationFileId(payload) {
 }
 
 
+// ===== 签署状态自动同步 =====
+// 解决"用户不点刷新 → signTaskStatus 长期失真"问题（真逾期被当待签 / 真已签也显示待签）。
+// 主力：每天 07:30 定时触发器（syncSignTasks）；辅助：前端进合同中心时带 cityCode 调用。
+// 只同步"当前合同"（contractStatus 为 active/expired/无值）——已结束合同的签署状态无业务意义。
+const SIGN_STATUS_TERMINAL = ['task_finished', 'task_terminated', 'revoked', 'expired', 'abolishing'];
+
+async function syncPendingSignTasks(payload = {}) {
+  const db = cloud.database();
+  const _ = db.command;
+  const COL = db.collection('contracts');
+  const { cityCode } = payload || {};
+
+  // 1. 找所有"有签署任务且状态非终态"的当前合同（分页拉全）
+  let pending = [];
+  let skip = 0;
+  while (true) {
+    let where = _.and([
+      { deleted: _.neq(true) },
+      { 'esign.signTaskId': _.exists(true) },
+      _.or([
+        { 'esign.signTaskStatus': _.exists(false) },
+        { 'esign.signTaskStatus': null },
+        { 'esign.signTaskStatus': _.nin(SIGN_STATUS_TERMINAL) }
+      ]),
+      _.or([
+        { contractStatus: _.exists(false) },
+        { contractStatus: null },
+        { contractStatus: 'active' },
+        { contractStatus: 'expired' }
+      ])
+    ]);
+    if (cityCode) where = _.and([where, { cityCode }]);
+
+    const res = await COL.where(where).skip(skip).limit(100).get();
+    if (!res.data || res.data.length === 0) break;
+    pending = pending.concat(res.data);
+    skip += 100;
+    if (res.data.length < 100) break;
+    if (pending.length >= 500) break; // 防御上限
+  }
+
+  // 2. 逐个向法大大查询真实状态并回写（有变化才写库）
+  let updated = 0, unchanged = 0, failed = 0;
+  const changes = [];
+  for (const c of pending) {
+    try {
+      const resp = await post('/api/esign/getSignTaskDetail', { signTaskId: c.esign.signTaskId });
+      const status =
+        resp?.raw?.data?.signTaskStatus ||
+        resp?.detail?.signTaskStatus ||
+        null;
+      if (!status) { failed++; continue; }
+
+      if (status === (c.esign.signTaskStatus || null)) {
+        unchanged++;
+        continue;
+      }
+
+      await COL.doc(c._id).update({
+        data: {
+          'esign.signTaskStatus': status,
+          'esign.updatedAt': db.serverDate(),
+          'esign.lastSyncedAt': db.serverDate(),
+          updatedAt: db.serverDate()
+        }
+      });
+      updated++;
+      if (changes.length < 50) {
+        changes.push({
+          contractId: c._id,
+          plate: c.fields?.carPlate || '',
+          clientName: c.fields?.clientName || '',
+          from: c.esign.signTaskStatus || null,
+          to: status
+        });
+      }
+    } catch (e) {
+      failed++;
+      console.error('[syncSignTasks] one contract failed:', c._id, e?.message || e);
+    }
+  }
+
+  console.log(`[syncSignTasks] done. scanned=${pending.length} updated=${updated} unchanged=${unchanged} failed=${failed}${cityCode ? ` city=${cityCode}` : ' city=all'}`);
+  return { ok: true, scanned: pending.length, updated, unchanged, failed, changes };
+}
+
+
 exports.main = async (event, context) => {
   try {
+    // 定时触发器拦截：每天 07:30 全量同步（晚于 AutoReturn 00:05，见 AGENTS.md 时序说明）
+    if (event.Type === 'Timer' && event.TriggerName === 'syncSignTasks') {
+      return await syncPendingSignTasks({});
+    }
+
     const { action, payload = {} } = event || {};
     switch (action) {
       // 签合同最简流程
@@ -408,6 +500,9 @@ exports.main = async (event, context) => {
         return { success: true, data: await post('/api/esign/getActorUrl', payload) };
       case 'getSignTaskDetail':
         return { success: true, data: await post('/api/esign/getSignTaskDetail', payload) };
+      case 'syncPendingSignTasks':
+        // 签署状态批量同步（前端入口刷新用，传 cityCode 限定范围；定时器走 Timer 拦截）
+        return await syncPendingSignTasks(payload);
       case 'getActorList':
         return { success: true, data: await post('/api/esign/getActorList', payload) };
       case 'saveContractEsign':

@@ -712,9 +712,9 @@ exports.main = async (event, context) => {
     // ===== 事务外：续租/重租时终结同车牌旧合同 =====
     // 新合同生效后，该车的旧合同（active / expired / 未标记）生命周期结束：
     //   - 同一司机续签 → 'renewed'（已续租）
-    //   - 换司机重租   → 'terminated'（旧合同随车辆重新出租而结束）
+    //   - 换司机重租   → 'superseded'（被新合同替代，含起草重做）
     // 否则旧合同会永远停留在"到期提醒"栏。失败仅记日志，不影响主流程
-    // （残留的重复生效合同可用 dev 工具"清理重复生效合同"补扫）。
+    // （残留的重复生效合同可用 vehicleOps rebuildContractStatus 补扫）。
     try {
       const _cmd = db.command;
       const plate = finalFields.carPlate;
@@ -737,13 +737,13 @@ exports.main = async (event, context) => {
             stale.fields.clientId === finalFields.clientId;
           await COL_CONTRACTS.doc(stale._id).update({
             data: {
-              contractStatus: sameDriver ? 'renewed' : 'terminated',
+              contractStatus: sameDriver ? 'renewed' : 'superseded',
               terminatedAt: db.serverDate(),
               replacedByContractId: contractId,
               updatedAt: db.serverDate()
             }
           });
-          console.log(`[ContractV2] Closed stale contract ${stale._id} -> ${sameDriver ? 'renewed' : 'terminated'} (plate: ${plate})`);
+          console.log(`[ContractV2] Closed stale contract ${stale._id} -> ${sameDriver ? 'renewed' : 'superseded'} (plate: ${plate})`);
         }
       }
     } catch (staleErr) {

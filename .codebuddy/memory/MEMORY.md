@@ -1,12 +1,14 @@
 # 项目长期记忆
 
-## 合同到期提醒系统（2026-10 完成，待部署云函数）
-- 合同中心 Tab 改为合同状态轴：生效中 / 到期提醒 / 已结束 / 全部；签署状态改列表项角标（待签红/已签绿/异常橙），不再做独立 Tab。
+## 合同到期提醒系统（2026-10 完成）
+- 合同中心 Tab 改为合同状态轴：生效中 / 到期提醒 / 已结束 / 全部；签署状态改列表项角标（三色：已签绿/未发起灰/待签红/逾期异常橙），不再做独立 Tab。
 - "到期提醒"= 到期日 ≤30 天 + 已过期未终结；服务端查询（修复客户端过滤分页陷阱）；按到期日升序 → 已过期自动置顶；倒计时标签 `已过期X天`/`今天到期`/`剩X天`。
-- contractStatus 状态机：无/active(生效中) → expired(AutoReturn 00:05 自动回库标记) → terminated(手动退租解绑/人工确认收车) / renewed(续租时旧合同标记)。`长期有效`合同不进提醒栏。
-- **关键数据层修复**：contractV2 新增"新合同创建后终结同车牌旧合同"逻辑（同司机→renewed，换司机→terminated，写 replacedByContractId），否则续租后旧合同永远留在提醒栏。
-- contractOps 新增 `terminate` action（仅允许 expired/动态过期状态终止，车辆仍在租的拒绝）。
-- 改动：contract-list 的 js/wxml/wxss + contractOps + contractV2 + AGENTS.md(3.1 状态机)。两个云函数需「上传并部署：所有文件」重新部署。
+- **核心不变式（2026-10-15 确立）：一车一当前合同**——每车牌 createdAt 最新非软删合同=当前合同，其余一律终态。判断用 createdAt（非起始日期，表单字段可编辑不可信）。
+- contractStatus 状态机 v2：无/active(生效中) → expired(AutoReturn 00:05 自动回库标记) → terminated(真实退租/确认收车) / renewed(同司机新合同替代) / superseded(换司机替代或起草重做，文案"已替代/已作废")。
+- 不变式三重保障：①contractV2 创建后终结同车牌旧合同；②AutoReturn 扫 rented 车时自愈终结旧合同；③vehicleOps `rebuildContractStatus`（手动云端测试调用，dryRun 预览，幂等）存量清洗。
+- **AutoReturn 选合同以 contractStatus 轴为准**（原 esign.signTaskStatus 挑选是"脏字段做决策"反模式）；与签署同步定时器（07:30）零耦合。
+- 签署状态同步：api-fadada `syncPendingSignTasks`（Timer 07:30 全量 + 前端入口静默同步 30min 节流 lastContractSignSyncTs），只同步当前合同，终态=task_finished/task_terminated/revoked/expired/abolishing。
+- 到期窗口天数在 contractOps getConfig（EXPIRING_WINDOW_DAYS 常量），前端兜底 30，改云函数即可调，无需小程序发版。
 - 按钮样式：`.tab` 上下 padding 18rpx（字体 24rpx 不变）。
 
 ## 飞书通知系统（已完成）

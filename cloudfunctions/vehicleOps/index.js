@@ -144,6 +144,8 @@ exports.main = async (event, context) => {
         return await dev_fixDuplicateContracts(payload);
       case 'revertDuplicateFix':
         return await dev_revertDuplicateFix();
+      case 'rebuildContractStatus':
+        return await dev_rebuildContractStatus(payload);
       default:
         return { ok: false, error: 'unknown-action' };
     }
@@ -1186,17 +1188,20 @@ async function dev_autoReturnExpired() {
       if (!veh.plate) continue;
       processedCount++;
 
-      // 2. 找到该车辆【最新】且【有效】的合同
-      // 排除已经被软删除 (deleted: true) 或者被作废/异常终止的合同
+      // 2. 找到该车辆【最新】的当前合同（contractStatus 生命周期轴为权威依据）
+      // 注意：不再用 esign.signTaskStatus 挑合同——签署状态依赖人工刷新，
+      // 可能长期失真（真逾期被当待签），用它做回库决策不可靠。
+      // 包含 expired 以保证幂等（重复执行不会漏）。
       const _ = db.command;
       const contractRes = await collectionContracts
         .where(_.and([
           { 'fields.carPlate': veh.plate },
           { deleted: _.neq(true) }, // 必须未被删除
-          _.or([ // E-sign 状态必须不是作废或终止，或者根本没有 E-sign
-            { 'esign.signTaskStatus': _.exists(false) },
-            { 'esign.signTaskStatus': null },
-            { 'esign.signTaskStatus': _.nin(['revoked', 'task_terminated', 'abolishing']) }
+          _.or([
+            { contractStatus: _.exists(false) },
+            { contractStatus: null },
+            { contractStatus: 'active' },
+            { contractStatus: 'expired' }
           ])
         ]))
         .orderBy('createdAt', 'desc')
@@ -1206,6 +1211,42 @@ async function dev_autoReturnExpired() {
       if (!contractRes.data || contractRes.data.length === 0) continue;
 
       const latestContract = contractRes.data[0];
+
+      // 2.5 不变式自愈：终结该车其他非终态旧合同（一车一当前合同）
+      // 同司机续签 → renewed；换司机/起草重做 → superseded。
+      // 防御性双保险：即使某条创建路径漏了终结（如 contractV2 事务外失败），这里每天兜底。
+      try {
+        const staleRes = await collectionContracts.where(_.and([
+          { 'fields.carPlate': veh.plate },
+          { deleted: _.neq(true) },
+          { _id: _.neq(latestContract._id) },
+          _.or([
+            { contractStatus: _.exists(false) },
+            { contractStatus: null },
+            { contractStatus: 'active' },
+            { contractStatus: 'expired' }
+          ])
+        ])).limit(20).get();
+
+        for (const stale of (staleRes.data || [])) {
+          const sameDriver =
+            stale.fields && stale.fields.clientId &&
+            stale.fields.clientId === (latestContract.fields && latestContract.fields.clientId);
+          await collectionContracts.doc(stale._id).update({
+            data: {
+              contractStatus: sameDriver ? 'renewed' : 'superseded',
+              terminatedAt: db.serverDate(),
+              replacedByContractId: latestContract._id,
+              updatedAt: db.serverDate()
+            }
+          });
+          console.log(`[AutoReturn] Closed stale contract ${stale._id} -> ${sameDriver ? 'renewed' : 'superseded'} (plate: ${veh.plate})`);
+        }
+      } catch (staleErr) {
+        console.error(`[AutoReturn] Failed to close stale contracts for ${veh.plate}:`, staleErr);
+        // 不影响主流程
+      }
+
       const endDateStr = latestContract.fields?.contractValidPeriodEnd; // e.g. '2025-10-15'
 
       if (!endDateStr) continue;
@@ -1553,5 +1594,138 @@ async function dev_revertDuplicateFix() {
   } catch (e) {
     console.error('[revertDuplicateFix] failed', e);
     return { ok: false, error: e.message };
+  }
+}
+
+// ==========================================
+// 维护工具：按"一车一当前合同"不变式重建合同状态（存量清洗）
+// 仅手动调用（云开发控制台-云端测试）：
+//   预览：{ action: 'rebuildContractStatus', payload: { dryRun: true } }
+//   执行：{ action: 'rebuildContractStatus', payload: { dryRun: false } }
+// 幂等，可重复执行。规则（按 fields.carPlate 分组，createdAt 最新 = 当前合同）：
+//   1. 当前合同：无值/active 且已过到期日（06:00 UTC+8 规则，与 AutoReturn 一致）→ expired
+//   2. 其余旧合同（无值/active/expired）：同司机 → renewed，换司机/起草重做 → superseded
+//   3. 已是终态（terminated/renewed/superseded）不动
+// ==========================================
+async function dev_rebuildContractStatus(payload = {}) {
+  const _ = db.command;
+  const dryRun = !!(payload && payload.dryRun);
+  const COL = db.collection('contracts');
+
+  try {
+    // 1. 分页拉取全部非软删合同
+    let all = [];
+    let skip = 0;
+    while (true) {
+      const res = await COL.where({ deleted: _.neq(true) }).skip(skip).limit(100).get();
+      if (!res.data || res.data.length === 0) break;
+      all = all.concat(res.data);
+      skip += 100;
+      if (res.data.length < 100) break;
+    }
+
+    // 2. 按车牌分组
+    const groups = {};
+    let noPlate = 0;
+    for (const c of all) {
+      const plate = c.fields && c.fields.carPlate;
+      if (!plate) { noPlate++; continue; }
+      if (!groups[plate]) groups[plate] = [];
+      groups[plate].push(c);
+    }
+
+    const now = db.serverDate();
+    const nowMs = Date.now();
+    const changes = [];
+    let currentCount = 0, expiredRecheck = 0, staleClosed = 0, alreadyTerminal = 0;
+
+    // 3. 逐组处理
+    for (const plate of Object.keys(groups)) {
+      // createdAt 新 → 旧（与 AutoReturn / contractV2 的"最新合同"判定一致）
+      const list = groups[plate].slice().sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+
+      const current = list[0];
+      currentCount++;
+
+      // 3.1 当前合同：无值/active 且已过到期日 → expired（进入"到期提醒"栏等待人工处理）
+      const cs = current.contractStatus;
+      const endStr = current.fields && current.fields.contractValidPeriodEnd;
+      if ((!cs || cs === 'active') && endStr && /^\d{4}-\d{2}-\d{2}$/.test(endStr)) {
+        const expireTimeMs = new Date(`${endStr}T06:00:00+08:00`).getTime();
+        if (!isNaN(expireTimeMs) && nowMs >= expireTimeMs) {
+          expiredRecheck++;
+          changes.push({
+            plate,
+            serial: (current.fields && current.fields.contractSerialNumberFormatted) || current._id,
+            clientName: (current.fields && current.fields.clientName) || '',
+            from: cs || null,
+            to: 'expired',
+            kind: '当前合同已到期(进提醒栏)'
+          });
+          if (!dryRun) {
+            await COL.doc(current._id).update({
+              data: { contractStatus: 'expired', expiredAt: now, updatedAt: now }
+            });
+          }
+        }
+      }
+
+      // 3.2 其余旧合同：非终态 → renewed / superseded
+      for (let i = 1; i < list.length; i++) {
+        const stale = list[i];
+        const scs = stale.contractStatus;
+        if (scs === 'terminated' || scs === 'renewed' || scs === 'superseded') {
+          alreadyTerminal++;
+          continue;
+        }
+        const sameDriver =
+          stale.fields && stale.fields.clientId &&
+          current.fields && stale.fields.clientId === current.fields.clientId;
+        const to = sameDriver ? 'renewed' : 'superseded';
+        staleClosed++;
+        if (changes.length < 200) {
+          changes.push({
+            plate,
+            serial: (stale.fields && stale.fields.contractSerialNumberFormatted) || stale._id,
+            clientName: (stale.fields && stale.fields.clientName) || '',
+            from: scs || null,
+            to,
+            kind: sameDriver ? '旧合同-被续租替代' : '旧合同-被新合同替代/起草重做'
+          });
+        }
+        if (!dryRun) {
+          await COL.doc(stale._id).update({
+            data: {
+              contractStatus: to,
+              terminatedAt: now,
+              replacedByContractId: current._id,
+              updatedAt: now
+            }
+          });
+        }
+      }
+    }
+
+    console.log(`[rebuildContractStatus] dryRun=${dryRun} scanned=${all.length} groups=${Object.keys(groups).length} expiredRecheck=${expiredRecheck} staleClosed=${staleClosed}`);
+    return {
+      ok: true,
+      dryRun,
+      scanned: all.length,
+      noPlate,
+      groups: Object.keys(groups).length,
+      currentCount,
+      expiredRecheck,
+      staleClosed,
+      alreadyTerminal,
+      changesTotal: expiredRecheck + staleClosed,
+      changesPreview: changes.slice(0, 100)
+    };
+  } catch (err) {
+    console.error('[rebuildContractStatus] error', err);
+    return { ok: false, error: err.message };
   }
 }

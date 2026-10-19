@@ -30,14 +30,30 @@ Nginx 反向代理（api.tusifu.cn / api-stg.tusifu.cn）
 3.1 contracts（合同）
 合同创建时自动更新：driver + vehicle
 
-contractStatus 状态机（合同生命周期轴，2026-10 起）：
+**核心不变式：一车一当前合同** —— 每辆车（按 fields.carPlate）createdAt 最新的非软删合同即"当前合同"，其余合同一律处于终态。
+
+contractStatus 状态机 v2（合同生命周期轴）：
 - 无值 / 'active'   → 生效中（旧数据无值，按 contractValidPeriodEnd 动态判断是否过期）
 - 'expired'         → 已到期：AutoReturn 定时器（每天 00:05）自动回库时标记，车辆 rentStatus 已变 available，但合同仍在"到期提醒"栏等待业务员人工处理（续租或确认收车）
-- 'terminated'      → 退租：车辆中心"退租解绑"（vehicleOps rent_end）标记；或 contractOps terminate（人工确认收车）
-- 'renewed'         → 已续租：contractV2 创建新合同时，自动终结同车牌旧合同（同司机 renewed / 换司机 terminated），并写 replacedByContractId
+- 'terminated'      → 真实结束租赁：车辆中心"退租解绑"（vehicleOps rent_end）；或 contractOps terminate（人工确认收车）
+- 'renewed'         → 已续租：被同司机的新合同替代
+- 'superseded'      → 已替代/已作废：被换司机的新合同替代，或起草重做后废弃
 
-合同中心 Tab（服务端筛选）：生效中 | 到期提醒（30 天窗口 + 已过期置顶，按到期日升序）| 已结束 | 全部。
-签署状态（esign.signTaskStatus）以列表项角标展示（待签红 / 已签绿 / 异常橙），不再是独立 Tab。
+不变式的维护路径（三重保障）：
+1. contractV2 创建新合同后（事务外）终结同车牌旧合同：同司机→renewed，换司机→superseded
+2. vehicleOps AutoReturn 每天扫描 rented 车辆时自愈：终结该车其他非终态旧合同
+3. vehicleOps rebuildContractStatus（手动维护工具，云端测试调用）按不变式全量重建，支持 dryRun 预览
+
+注意：AutoReturn 挑选"当前合同"以 contractStatus 轴为准（active/expired/无值取最新），**不要**用 esign.signTaskStatus（该字段依赖同步，可能失真）。
+
+签署状态同步（esign.signTaskStatus）：
+- 每日 07:30 定时器（api-fadada syncSignTasks，晚于 AutoReturn 的 00:05，时序详见对话记录）全量同步非终态签署任务
+- 前端进入合同中心时后台静默同步当前城市（30 分钟节流，storage key: lastContractSignSyncTs）
+- 只同步当前合同（contractStatus 为 active/expired/无值）
+- 角标三色：已签(绿) / 未发起(灰，无 signTaskId) / 待签(红) / 已逾期·签署异常·作废(橙)
+
+合同中心 Tab（服务端筛选）：生效中 | 到期提醒（30 天窗口 + 已过期置顶，按到期日升序；窗口天数在 contractOps getConfig，前端兜底 30）| 已结束（terminated/renewed/superseded）| 全部。
+签署状态（esign.signTaskStatus）以列表项角标展示，不再是独立 Tab。
 
 3.2 drivers（司机）
 唯一约束：clientId（身份证号）

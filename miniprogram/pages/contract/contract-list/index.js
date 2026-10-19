@@ -23,11 +23,11 @@ const SIGN_TASK_STATUS_TEXT = {
 };
 
 // 签署角标：异常类状态显示具体文案（角标要短，不用 SIGN_TASK_STATUS_TEXT 的长文本）
+// 'expired'（签署逾期）在 decorateContractItem 单独处理为"已逾期"
 const SIGN_BADGE_WARN = {
   task_terminated: '签署异常',
   abolishing: '作废中',
-  revoked: '已作废',
-  expired: '签署逾期'
+  revoked: '已作废'
 };
 
 // —— 日期工具 ——
@@ -76,6 +76,7 @@ Page({
       wx.setNavigationBarTitle({ title: `${displayTitle} - 合同历史` });
       await this.loadExpiringWindow(); // 先拉取到期窗口配置，再加载列表
       this.refresh();
+      this.syncSignStatuses(); // 后台静默同步签署状态（节流），不阻塞首屏
     };
     if (app.globalData.initialized) init();
     else app.$whenReady(init);
@@ -94,6 +95,27 @@ Page({
       }
     } catch (e) {
       console.warn('[loadExpiringWindow] 拉取失败，使用默认值', e);
+    }
+  },
+
+  // 入口后台同步签署状态（30 分钟节流，静默执行，有变化才刷新列表）
+  // 与每天 07:30 的定时器互补：白天司机签完，业务员打开页面即可见最新角标
+  async syncSignStatuses() {
+    const THROTTLE_MS = 30 * 60 * 1000;
+    const last = wx.getStorageSync('lastContractSignSyncTs') || 0;
+    if (Date.now() - last < THROTTLE_MS) return;
+    if (!this.data.cityCode) return;
+    wx.setStorageSync('lastContractSignSyncTs', Date.now());
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'api-fadada',
+        data: { action: 'syncPendingSignTasks', payload: { cityCode: this.data.cityCode } }
+      });
+      if (result && result.updated > 0) {
+        this.refresh(); // 静默刷新列表
+      }
+    } catch (e) {
+      console.warn('[syncSignStatuses] 同步失败（不影响列表展示）', e);
     }
   },
 
@@ -224,12 +246,13 @@ Page({
           { 'fields.contractValidPeriodEnd': _.and([_.lte(thresholdStr), _.neq(''), _.neq(null)]) }
         ]);
       } else if (filter === 'ended') {
-        // 已结束：退租 或 已续租（被后续合同替代）
+        // 已结束：退租 / 已续租 / 被新合同替代（含起草重做）
         whereBase = _.and([
           whereBase,
           _.or([
             { contractStatus: 'terminated' },
-            { contractStatus: 'renewed' }
+            { contractStatus: 'renewed' },
+            { contractStatus: 'superseded' }
           ])
         ]);
       }
@@ -941,6 +964,9 @@ Page({
     } else if (persisted === 'renewed') {
       statusLabel = '已续租';
       statusClass = 'renewed';
+    } else if (persisted === 'superseded') {
+      statusLabel = '已替代/已作废';
+      statusClass = 'superseded';
     } else if (persisted === 'expired') {
       statusLabel = '已到期';
       statusClass = 'expired';
@@ -974,13 +1000,19 @@ Page({
       }
     }
 
-    // —— 签署状态角标（线下合同无电子签，不显示）——
+    // —— 签署状态角标（三色区分，线下合同无电子签不显示）——
+    // 已签(绿) / 未发起(灰，起草了没发链接) / 待签(红，链接已发未签完) / 已逾期·异常(橙)
     let signBadge = null;
     if (!item.isOffline) {
-      if (this.isSignTaskFinished(signTaskStatus)) {
+      const esign = item.esign || {};
+      if (this.isSignTaskFinished(esign.signTaskStatus)) {
         signBadge = { text: '已签', type: 'signed' };
-      } else if (SIGN_BADGE_WARN[signTaskStatus]) {
-        signBadge = { text: SIGN_BADGE_WARN[signTaskStatus], type: 'warn' };
+      } else if (!esign.signTaskId) {
+        signBadge = { text: '未发起', type: 'none' };
+      } else if (esign.signTaskStatus === 'expired') {
+        signBadge = { text: '已逾期', type: 'warn' };
+      } else if (SIGN_BADGE_WARN[esign.signTaskStatus]) {
+        signBadge = { text: SIGN_BADGE_WARN[esign.signTaskStatus], type: 'warn' };
       } else {
         signBadge = { text: '待签', type: 'unsigned' };
       }

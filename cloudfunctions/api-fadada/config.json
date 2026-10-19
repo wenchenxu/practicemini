@@ -2,5 +2,13 @@
   "permissions": {
     "openapi": [
     ]
-  }
+  },
+  "timeout": 60,
+  "triggers": [
+    {
+      "name": "syncSignTasks",
+      "type": "Timer",
+      "config": "0 30 7 * * * *"
+    }
+  ]
 }
