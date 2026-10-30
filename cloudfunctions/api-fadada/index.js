@@ -396,6 +396,9 @@ function getViolationFileId(payload) {
 // 解决"用户不点刷新 → signTaskStatus 长期失真"问题（真逾期被当待签 / 真已签也显示待签）。
 // 主力：每天 07:30 定时触发器（syncSignTasks）；辅助：前端进合同中心时带 cityCode 调用。
 // 只同步"当前合同"（contractStatus 为 active/expired/无值）——已结束合同的签署状态无业务意义。
+// 单次有处理上限（默认 100，手动最大 200）+ 并发 8 + 45s 时间预算，确保 60s 超时内必定返回；
+// 按 lastSyncedAt 升序取数：未同步过的优先、已同步的轮转排队，卡住的合同不会饿死新合同。
+// 手动清理积压：反复调用 { action:'syncPendingSignTasks', payload:{ limit:200 } } 直到 remaining=0。
 const SIGN_STATUS_TERMINAL = ['task_finished', 'task_terminated', 'revoked', 'expired', 'abolishing'];
 
 async function syncPendingSignTasks(payload = {}) {
@@ -404,78 +407,99 @@ async function syncPendingSignTasks(payload = {}) {
   const COL = db.collection('contracts');
   const { cityCode } = payload || {};
 
-  // 1. 找所有"有签署任务且状态非终态"的当前合同（分页拉全）
-  let pending = [];
-  let skip = 0;
-  while (true) {
-    let where = _.and([
-      { deleted: _.neq(true) },
-      { 'esign.signTaskId': _.exists(true) },
-      _.or([
-        { 'esign.signTaskStatus': _.exists(false) },
-        { 'esign.signTaskStatus': null },
-        { 'esign.signTaskStatus': _.nin(SIGN_STATUS_TERMINAL) }
-      ]),
-      _.or([
-        { contractStatus: _.exists(false) },
-        { contractStatus: null },
-        { contractStatus: 'active' },
-        { contractStatus: 'expired' }
-      ])
-    ]);
-    if (cityCode) where = _.and([where, { cityCode }]);
+  const limit = Math.min(Math.max(Number(payload.limit) || 100, 1), 200);
+  const CONCURRENCY = 8;
+  const TIME_BUDGET_MS = 40000; // 预留冷启动/查询/最后一个并发批的时间余量
 
-    const res = await COL.where(where).skip(skip).limit(100).get();
-    if (!res.data || res.data.length === 0) break;
-    pending = pending.concat(res.data);
-    skip += 100;
-    if (res.data.length < 100) break;
-    if (pending.length >= 500) break; // 防御上限
-  }
+  // 1. 找"有签署任务且状态非终态"的当前合同（lastSyncedAt 升序 → 最久未同步的优先）
+  let where = _.and([
+    { deleted: _.neq(true) },
+    { 'esign.signTaskId': _.exists(true) },
+    _.or([
+      { 'esign.signTaskStatus': _.exists(false) },
+      { 'esign.signTaskStatus': null },
+      { 'esign.signTaskStatus': _.nin(SIGN_STATUS_TERMINAL) }
+    ]),
+    _.or([
+      { contractStatus: _.exists(false) },
+      { contractStatus: null },
+      { contractStatus: 'active' },
+      { contractStatus: 'expired' }
+    ])
+  ]);
+  if (cityCode) where = _.and([where, { cityCode }]);
 
-  // 2. 逐个向法大大查询真实状态并回写（有变化才写库）
-  let updated = 0, unchanged = 0, failed = 0;
+  const res = await COL.where(where)
+    .orderBy('esign.lastSyncedAt', 'asc')
+    .limit(limit)
+    .get();
+  const pending = res.data || [];
+
+  // 2. 并发同步（8 个一批）；逐份提交，中断不丢进度
+  let updated = 0, unchanged = 0, failed = 0, processed = 0;
   const changes = [];
-  for (const c of pending) {
+  const startTime = Date.now();
+
+  const syncOne = async (c) => {
     try {
       const resp = await post('/api/esign/getSignTaskDetail', { signTaskId: c.esign.signTaskId });
       const status =
         resp?.raw?.data?.signTaskStatus ||
         resp?.detail?.signTaskStatus ||
         null;
-      if (!status) { failed++; continue; }
+      if (!status) { failed++; return; }
 
-      if (status === (c.esign.signTaskStatus || null)) {
-        unchanged++;
-        continue;
+      const changed = status !== (c.esign.signTaskStatus || null);
+      const data = {
+        'esign.lastSyncedAt': db.serverDate(), // 无变化也写，让该合同排到队尾
+        'esign.updatedAt': db.serverDate()
+      };
+      if (changed) {
+        data['esign.signTaskStatus'] = status;
+        data['updatedAt'] = db.serverDate();
       }
+      await COL.doc(c._id).update({ data });
 
-      await COL.doc(c._id).update({
-        data: {
-          'esign.signTaskStatus': status,
-          'esign.updatedAt': db.serverDate(),
-          'esign.lastSyncedAt': db.serverDate(),
-          updatedAt: db.serverDate()
+      if (changed) {
+        updated++;
+        if (changes.length < 50) {
+          changes.push({
+            contractId: c._id,
+            plate: c.fields?.carPlate || '',
+            clientName: c.fields?.clientName || '',
+            from: c.esign.signTaskStatus || null,
+            to: status
+          });
         }
-      });
-      updated++;
-      if (changes.length < 50) {
-        changes.push({
-          contractId: c._id,
-          plate: c.fields?.carPlate || '',
-          clientName: c.fields?.clientName || '',
-          from: c.esign.signTaskStatus || null,
-          to: status
-        });
+      } else {
+        unchanged++;
       }
     } catch (e) {
       failed++;
       console.error('[syncSignTasks] one contract failed:', c._id, e?.message || e);
     }
+  };
+
+  for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    if (Date.now() - startTime > TIME_BUDGET_MS) break; // 时间到即收工，剩余留给下次
+    const chunk = pending.slice(i, i + CONCURRENCY);
+    await Promise.all(chunk.map(syncOne));
+    processed += chunk.length;
   }
 
-  console.log(`[syncSignTasks] done. scanned=${pending.length} updated=${updated} unchanged=${unchanged} failed=${failed}${cityCode ? ` city=${cityCode}` : ' city=all'}`);
-  return { ok: true, scanned: pending.length, updated, unchanged, failed, changes };
+  const remaining = pending.length - processed;
+  console.log(`[syncSignTasks] done. scanned=${pending.length} processed=${processed} updated=${updated} unchanged=${unchanged} failed=${failed} remaining=${remaining}${cityCode ? ` city=${cityCode}` : ' city=all'}`);
+  return {
+    ok: true,
+    scanned: pending.length,
+    processed,
+    updated,
+    unchanged,
+    failed,
+    remaining,
+    changes,
+    hint: remaining > 0 ? `本次处理 ${processed} 份，剩余 ${remaining} 份（按最久未同步优先排队），请再次调用继续` : '本批次已全部处理完'
+  };
 }
 
 

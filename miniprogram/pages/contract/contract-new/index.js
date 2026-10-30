@@ -332,9 +332,13 @@ Page({
     this.setData({ visibleFields: visible });
   },
 
-  // ===== 司机证件照（选填）=====
-
-  // 拍照 / 相册选择（每卡位单张，压缩）
+  /* ================================================================
+     [司机证件照模块 - 暂时下线 2026-10-23]
+     原因：微信审核要求身份证收集需声明用户隐私保护指引并征求用户同意。
+     恢复方法：删除本段块注释的开始符和结束符即可（代码原样保留）。
+     前置条件：恢复前请先在小程序后台完成《用户隐私保护指引》申报，
+     并同步恢复 index.wxml 中被注释的上传卡位。
+     ================================================================
   onChooseDriverDoc(e) {
     const idx = Number(e.currentTarget.dataset.index);
     const slot = this.data.driverDocSlots[idx];
@@ -377,6 +381,7 @@ Page({
       wx.previewImage({ current: slot.localPath, urls: [slot.localPath] });
     }
   },
+  ================================================================ */
 
   // 合同类型选择
   onPickType(e) {
@@ -722,9 +727,11 @@ Page({
         this.setData({ saving: true });
 
         // ===== 司机证件照（选填）：提交时才上传 temp 目录 =====
-        // 成功后所有权移交云函数（搬移+删除）；失败/异常时前端立即回滚删除，不留孤儿文件
+        // [暂时下线 2026-10-23] 上传逻辑整体注释，恢复时删除本块注释符。
+        // 注意保留 driverDocs / _uploadedDriverDocTemps 的初始化（下方回滚逻辑引用了它们）
         this._uploadedDriverDocTemps = [];
         let driverDocs = [];
+        /*
         const chosenSlots = (this.data.driverDocSlots || []).filter(s => s.localPath);
         if (chosenSlots.length > 0) {
           try {
@@ -746,13 +753,15 @@ Page({
           } catch (upErr) {
             console.error('[onSubmit] driver doc upload failed', upErr);
             if (this._uploadedDriverDocTemps.length) {
-              try { await wx.cloud.deleteFile({ fileList: this._uploadedDriverDocTemps }); } catch (delErr) { /* ignore */ }
+              // ignore 删除失败
+              try { await wx.cloud.deleteFile({ fileList: this._uploadedDriverDocTemps }); } catch (delErr) { console.warn(delErr); }
               this._uploadedDriverDocTemps = [];
             }
             wx.showToast({ title: '证件照上传失败，请重试', icon: 'none', duration: 3000 });
             return;
           }
         }
+        */
 
         wx.showLoading({ title: '生成中，约15秒，请稍候…', mask: true });
         const res = await wx.cloud.callFunction({

@@ -148,7 +148,9 @@
       </view>
     </view>
 
-    <!-- 司机证件照 -->
+    <!-- [司机证件照模块 - 暂时下线 2026-10-23]
+         原因：微信审核要求身份证收集需声明用户隐私保护指引。
+         恢复方法：删除下方注释的开始和结束注释符即可。
     <view class="edit-card">
       <view class="card-header-row">
         <view class="section-title" style="margin-bottom:0; border:none; padding:0;">司机证件</view>
@@ -162,6 +164,7 @@
         </view>
       </view>
     </view>
+    -->
 
 
     <view class="edit-card">

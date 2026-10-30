@@ -112,8 +112,8 @@ Page({
         this._calcDate(displayData.giftDays, displayData.contractValidPeriodEnd);
       }*/
 
-      // 加载司机证件照（异步，不阻塞主信息渲染）
-      this.loadDriverDocs(displayData);
+      // [司机证件照模块 - 暂时下线 2026-10-23] 恢复时取消下行注释
+      // this.loadDriverDocs(displayData);
 
     } catch (e) {
       console.error(e);

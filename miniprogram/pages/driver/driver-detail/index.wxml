@@ -18,7 +18,9 @@
   <view wx:else>暂无司机数据</view>
 </view>
 
-<!-- 司机证件照 -->
+<!-- [司机证件照模块 - 暂时下线 2026-10-23]
+     原因：微信审核要求身份证收集需声明用户隐私保护指引。
+     恢复方法：删除下方注释的开始和结束注释符即可。
 <view class="section">
   <view class="section-title">司机证件</view>
   <view wx:if="{{driverDocImages.length === 0}}" class="docs-empty">暂无证件照片</view>
@@ -29,6 +31,7 @@
     </view>
   </view>
 </view>
+-->
 
 <view class="section">
   <view class="section-title">最近一份合同</view>

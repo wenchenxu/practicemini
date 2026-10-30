@@ -80,8 +80,8 @@ Page({
         currentVehicle
       });
 
-      // 加载证件照（异步，不阻塞主信息）
-      this.loadDriverDocs(driver);
+      // [司机证件照模块 - 暂时下线 2026-10-23] 恢复时取消下行注释
+      // this.loadDriverDocs(driver);
     } catch (e) {
       console.error('[driver-detail] loadAll error', e);
       wx.showToast({ title: '加载失败', icon: 'none' });
