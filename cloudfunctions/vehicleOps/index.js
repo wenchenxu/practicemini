@@ -30,6 +30,16 @@ const CITY_NAMES = {
   jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
 };
 
+// 修复乱码：部分历史数据/前端路径把中文以 URL 编码（%XX）形式传入
+// （如 %E5%B9%BF%E5%B7%9E = 广州），仅当纯可打印 ASCII 且含 %XX 特征时解码
+function safeDecodeUrl(str) {
+  if (typeof str !== 'string' || !str) return str;
+  if (/^[\x21-\x7E]+$/.test(str) && /%[0-9A-Fa-f]{2}/.test(str)) {
+    try { return decodeURIComponent(str); } catch (e) { return str; }
+  }
+  return str;
+}
+
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
   'rent_end':           { label: '🟠 退租',          color: 'orange' },
@@ -52,7 +62,8 @@ async function notifyFeishu(record) {
     const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
     const lines = [];
-    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    const displayCity = safeDecodeUrl(record.cityName);
+    if (displayCity) lines.push(`**城市**：${displayCity}`);
     lines.push(`**车牌**：${record.plate || '未知'}`);
     lines.push(`**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
     );
@@ -132,6 +143,12 @@ exports.main = async (event, context) => {
         return await listAvailable(payload);
       case 'exportCsv':
         return await dev_exportVehiclesToCsv(payload);
+      case 'listNoBranch':
+        return await dev_listVehiclesWithoutBranch(payload);
+      case 'deleteJunkVehicles':
+        return await dev_deleteJunkVehicles(payload);
+      case 'fixEncodedCityNames':
+        return await dev_fixEncodedCityNames(payload);
       case 'renamePlate':
         return await dev_renamePlate(payload);
       case 'migrateBranches':
@@ -1367,6 +1384,278 @@ async function dev_exportVehiclesToCsv(payload) {
   if (!url) throw new Error('Cannot acquire download URL');
 
   return { ok: true, url, total: allVehicles.length };
+}
+
+// ==========================================
+// 后门工具：列出某城市下未归入任何分公司的车辆
+// 用途：周报/月报快照中出现「城市·」行时，用此功能直接定位这些车辆
+// 调用方式（云控制台测试面板）：
+//   { "action": "listNoBranch", "payload": { "cityCode": "guangzhou" } }
+// ==========================================
+async function dev_listVehiclesWithoutBranch(payload) {
+  const { cityCode } = payload || {};
+  if (!cityCode) throw new Error('cityCode required');
+
+  const _ = db.command;
+  const res = await db.collection('vehicles').where(_.and([
+    { cityCode },
+    _.or([
+      { branchCode: _.eq('') },
+      { branchCode: _.eq(null) },
+      { branchCode: _.exists(false) }
+    ])
+  ])).field({
+    _id: true,
+    plate: true, model: true, color: true, vin: true,
+    rentStatus: true, maintenanceStatus: true, retired: true,
+    currentDriverName: true, currentDriverId: true,
+    branchCode: true, branchName: true,
+    cityCode: true, cityName: true,
+    createdAt: true, updatedAt: true
+  }).limit(1000).get();
+
+  // 注意：这里不排除 retired 的车（报告快照会排除），
+  // 如返回数量多于报告中的数字，多出来的是已报废车辆，看 retired 字段区分
+  return {
+    ok: true,
+    cityCode,
+    count: res.data.length,
+    list: res.data
+  };
+}
+
+// ==========================================
+// 后门工具：安全删除垃圾车辆（非本公司车辆误录入等）
+// 两阶段设计：
+//   第一阶段（预检，默认，只读不删）：
+//     { "action": "deleteJunkVehicles", "payload": { "plates": ["粤A11111", "..."] } }
+//     → 返回每辆车的状态、关联合同数、历史记录数，供人工确认
+//   第二阶段（确认后执行）：
+//     { "action": "deleteJunkVehicles", "payload": { "plates": [...], "dryRun": false, "deleteHistory": true } }
+// 护栏：
+//   - dryRun 默认 true，不显式传 false 绝不删除
+//   - 车辆已租 且 存在有效合同时拒绝删除（确认无风险可加 force: true）
+//   - 历史记录默认不删（deleteHistory: true 才删）
+//   - 关联合同默认不处理（deleteContracts: true 时软删除标记）
+// ==========================================
+async function dev_deleteJunkVehicles(payload) {
+  const {
+    plates = [],
+    dryRun = true,
+    deleteHistory = false,
+    deleteContracts = false,
+    force = false
+  } = payload || {};
+
+  if (!Array.isArray(plates) || plates.length === 0) {
+    return { ok: false, error: 'plates 必填，字符串数组' };
+  }
+  if (plates.length > 50) {
+    return { ok: false, error: '单次最多处理 50 辆，请分批' };
+  }
+
+  const _ = db.command;
+  const results = [];
+
+  for (const rawPlate of plates) {
+    const cleanPlate = String(rawPlate || '').trim();
+    if (!cleanPlate) continue;
+
+    const entry = { plate: cleanPlate };
+
+    // 1) 找车（车牌在库里已去重，唯一）
+    const vehRes = await db.collection('vehicles').where({ plate: cleanPlate }).limit(1).get();
+    if (!vehRes.data || vehRes.data.length === 0) {
+      entry.status = 'not-found';
+      results.push(entry);
+      continue;
+    }
+    const veh = vehRes.data[0];
+    entry.vehicleId = veh._id;
+    entry.cityCode = veh.cityCode || '';
+    entry.rentStatus = veh.rentStatus || '';
+    entry.currentDriverName = veh.currentDriverName || '';
+    entry.retired = !!veh.retired;
+
+    // 2) 查关联合同（按车牌）
+    const contractRes = await db.collection('contracts')
+      .where({ 'fields.carPlate': cleanPlate }).limit(100).get();
+    const contracts = contractRes.data || [];
+    entry.contractCount = contracts.length;
+    entry.activeContracts = contracts.filter(c =>
+      !c.deleted && (c.contractStatus === 'active' || c.contractStatus === undefined || c.contractStatus === null)
+    ).length;
+
+    // 3) 查车辆历史记录数
+    const histCnt = await db.collection('vehicle_history')
+      .where({ vehicleId: veh._id }).count();
+    entry.historyCount = histCnt.total;
+
+    // ★ 护栏：已租 + 有有效合同 → 拒绝
+    if (veh.rentStatus === 'rented' && entry.activeContracts > 0 && !force) {
+      entry.status = 'refused';
+      entry.reason = '车辆为已租状态且存在有效合同，请先人工核实（确认无风险可加 force: true）';
+      results.push(entry);
+      continue;
+    }
+
+    // 预检模式：到此为止，只报告不删除
+    if (dryRun) {
+      entry.status = 'ready-to-delete';
+      results.push(entry);
+      continue;
+    }
+
+    // ===== 执行删除 =====
+    try {
+      // 4) 删除车辆记录
+      await db.collection('vehicles').doc(veh._id).remove();
+      entry.deleted = true;
+
+      // 5) 按需删除该车的 vehicle_history（分批）
+      if (deleteHistory && entry.historyCount > 0) {
+        let deletedHist = 0;
+        while (true) {
+          const batch = await db.collection('vehicle_history')
+            .where({ vehicleId: veh._id }).limit(100).get();
+          if (!batch.data || batch.data.length === 0) break;
+          const ids = batch.data.map(h => h._id);
+          await db.collection('vehicle_history')
+            .where({ _id: _.in(ids) }).remove();
+          deletedHist += ids.length;
+        }
+        entry.historyDeleted = deletedHist;
+      }
+
+      // 6) 按需软删除关联合同（标记 deleted: true，与系统惯例一致，不物理删除）
+      if (deleteContracts && contracts.length > 0) {
+        for (const c of contracts) {
+          await db.collection('contracts').doc(c._id).update({
+            data: {
+              deleted: true,
+              deletedAt: db.serverDate(),
+              deletedReason: 'junk-vehicle-cleanup'
+            }
+          });
+        }
+        entry.contractsSoftDeleted = contracts.length;
+      }
+
+      entry.status = 'deleted';
+    } catch (e) {
+      entry.status = 'error';
+      entry.error = e.message;
+    }
+    results.push(entry);
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    total: results.length,
+    notFound: results.filter(r => r.status === 'not-found').length,
+    refused: results.filter(r => r.status === 'refused').length,
+    deleted: results.filter(r => r.status === 'deleted').length,
+    errors: results.filter(r => r.status === 'error').length,
+    results
+  };
+}
+
+// ==========================================
+// 后门工具：修复 URL 编码乱码的存量数据
+// 背景：部分历史合同/司机/车辆记录的城市名以 %E5%B9%BF%E5%B7%9E 形式入库，
+//       并通过「合同详情页续约 → encodeURIComponent(库中乱码值) → 页面解码一次」
+//       的链路自我传播（双重编码只解一次仍为乱码）。
+// 用法：
+//   预检（只读，默认）：{ "action": "fixEncodedCityNames", "payload": {} }
+//   执行修复：{ "action": "fixEncodedCityNames", "payload": { "dryRun": false } }
+// 范围：contracts(cityName/branchName)、drivers(cityName)、vehicles(cityName/branchName)
+// ==========================================
+async function dev_fixEncodedCityNames(payload) {
+  const { dryRun = true } = payload || {};
+
+  const _ = db.command;
+  // 纯可打印 ASCII 且至少含一个 %XX（URL 编码特征）
+  const ENCODED_RE = /^[\x21-\x7E]*%[0-9A-Fa-f]{2}[\x21-\x7E]*$/;
+
+  const tryDecode = (s) => {
+    if (typeof s !== 'string' || !ENCODED_RE.test(s)) return null;
+    try {
+      const d = decodeURIComponent(s);
+      return d !== s ? d : null;
+    } catch (e) { return null; }
+  };
+
+  const summary = { dryRun, contracts: [], drivers: [], vehicles: [] };
+
+  // 通用处理：收集匹配文档 → 逐条解码修复（先收集后更新，避免边翻页边改导致漏扫）
+  async function scanAndFix(colName, orConditions, fields) {
+    const col = db.collection(colName);
+    let matched = [];
+    let page = 0;
+    const LIMIT = 100;
+    while (true) {
+      const res = await col.where(_.or(orConditions))
+        .skip(page * LIMIT).limit(LIMIT)
+        .field(fields).get();
+      if (!res.data || res.data.length === 0) break;
+      matched = matched.concat(res.data);
+      page++;
+      if (res.data.length < LIMIT) break;
+    }
+
+    const items = [];
+    for (const doc of matched) {
+      const item = { id: doc._id };
+      const updates = {};
+      for (const f of Object.keys(fields)) {
+        if (f === '_id') continue;
+        const decoded = tryDecode(doc[f]);
+        if (decoded) {
+          item[f] = doc[f];
+          item[f + '_fixed'] = decoded;
+          updates[f] = decoded;
+        }
+      }
+      if (Object.keys(updates).length === 0) continue;
+
+      if (!dryRun) {
+        updates.updatedAt = db.serverDate();
+        try {
+          await col.doc(doc._id).update({ data: updates });
+          item.fixed = true;
+        } catch (e) {
+          item.fixed = false;
+          item.error = e.message;
+        }
+      }
+      items.push(item);
+    }
+    return items;
+  }
+
+  summary.contracts = await scanAndFix('contracts',
+    [{ cityName: ENCODED_RE }, { branchName: ENCODED_RE }],
+    { _id: true, cityName: true, branchName: true });
+
+  summary.drivers = await scanAndFix('drivers',
+    [{ cityName: ENCODED_RE }],
+    { _id: true, cityName: true });
+
+  summary.vehicles = await scanAndFix('vehicles',
+    [{ cityName: ENCODED_RE }, { branchName: ENCODED_RE }],
+    { _id: true, cityName: true, branchName: true });
+
+  return {
+    ok: true,
+    dryRun,
+    counts: {
+      contracts: summary.contracts.length,
+      drivers: summary.drivers.length,
+      vehicles: summary.vehicles.length
+    },
+    ...summary
+  };
 }
 
 async function dev_renamePlate(payload) {

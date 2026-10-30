@@ -13,6 +13,15 @@ const CITY_NAMES = {
   jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
 };
 
+// 修复乱码：部分历史数据把中文以 URL 编码（%XX）形式入库（如 %E5%B9%BF%E5%B7%9E = 广州）
+function safeDecodeUrl(str) {
+  if (typeof str !== 'string' || !str) return str;
+  if (/^[\x21-\x7E]+$/.test(str) && /%[0-9A-Fa-f]{2}/.test(str)) {
+    try { return decodeURIComponent(str); } catch (e) { return str; }
+  }
+  return str;
+}
+
 // ===== 事件类型 =====
 const EVENT_TYPES = [
   { key: 'rent_start',         label: '新签' },
@@ -253,7 +262,7 @@ async function fetchAllVehicles() {
 function buildVehicleCityMap(vehicles) {
   const map = {};
   for (const v of vehicles) {
-    const cityName = v.cityName || CITY_NAMES[v.cityCode] || v.cityCode || '未知';
+    const cityName = safeDecodeUrl(v.cityName) || CITY_NAMES[v.cityCode] || v.cityCode || '未知';
     map[v._id] = cityName;
   }
   return map;

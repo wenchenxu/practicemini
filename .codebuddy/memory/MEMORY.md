@@ -26,6 +26,9 @@
 - 关键坑：改触发器后必须单独「上传触发器」，否则云端不生效。
 - 2026-10-08 重大修复：周报/月报长期缺失的根因是 isSunday/isLastDayOfMonth 依赖 en-CA locale 文本（`weekday === 'Sun'`），云函数 Node 16 的老 ICU 中 en-CA 输出 "Sun."（带句点）导致判断恒 false。已改为纯数值计算（getUTCDay + 当月天数比较）。**教训：云函数里任何日期/星期逻辑禁止依赖 locale 文本，一律数值化。**
 - `action:'test'` 支持 `force: 'weekly'|'monthly'|'all'`，可随时强制验证周报/月报完整链路（生成→存库→推飞书）。
+- 2026-10-30 新增 vehicleOps 后门 action `listNoBranch`（查某城市无 branchCode 的车辆，用于排查快照「城市·」行）。另：`exportCsv` 后端支持仅传 cityCode 导出全城车辆（前端 UI 才强制选分公司）。
+- 2026-10-30 新增 vehicleOps 后门 action `deleteJunkVehicles`（两阶段安全删车：dryRun 预检→护栏校验→可选删历史/软删合同）和 `fixEncodedCityNames`（修复 URL 编码乱码存量数据，dryRun 默认 true）。
+- 2026-10-30 乱码根因：合同 cityName 被编码入库后，经「contract-detail 续约 → encodeURIComponent → 页面解码一次」链路自我传播。已三层防御修复：contractV2 入口解码 + notifyFeishu 显示解码（4 个云函数均有 safeDecodeUrl）+ dailyReport 兜底。**教训：前端跳转编码 + 页面解码 + 库中被污染值二次编码 = 乱码传播循环，云函数入口必须做解码防御。**
 
 ## 环境/工具备忘
 - 用户 npm 全局配置代理 `http://127.0.0.1:7890`（Clash，写在 ~/.npmrc 和系统环境变量），代理未运行时 npm 安装会失败。绕过方法：`$env:HTTP_PROXY=$null; $env:HTTPS_PROXY=$null; npm install --userconfig=无代理npmrc`。

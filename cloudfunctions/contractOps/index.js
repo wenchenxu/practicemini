@@ -285,6 +285,15 @@ const CITY_NAMES = {
   jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
 };
 
+// 修复乱码：部分历史数据把中文以 URL 编码（%XX）形式入库（如 %E5%B9%BF%E5%B7%9E = 广州）
+function safeDecodeUrl(str) {
+  if (typeof str !== 'string' || !str) return str;
+  if (/^[\x21-\x7E]+$/.test(str) && /%[0-9A-Fa-f]{2}/.test(str)) {
+    try { return decodeURIComponent(str); } catch (e) { return str; }
+  }
+  return str;
+}
+
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
   'rent_end':           { label: '🟠 退租',          color: 'orange' },
@@ -307,7 +316,8 @@ async function notifyFeishu(record) {
     const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
     const lines = [];
-    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    const displayCity = safeDecodeUrl(record.cityName);
+    if (displayCity) lines.push(`**城市**：${displayCity}`);
     lines.push(`**车牌**：${record.plate || '未知'}`);
     lines.push(`**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
     );

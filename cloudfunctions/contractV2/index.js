@@ -342,6 +342,16 @@ const CITY_NAMES = {
   jiaxing: '嘉兴', shaoxing: '绍兴', changzhou: '常州', nantong: '南通'
 };
 
+// 修复乱码：部分前端路径把中文以 URL 编码（%XX）传入（如 %E5%B9%BF%E5%B7%9E = 广州）
+// 仅当字符串为纯可打印 ASCII 且含 %XX 编码特征时才解码，正常中文不受影响
+function safeDecodeUrl(str) {
+  if (typeof str !== 'string' || !str) return str;
+  if (/^[\x21-\x7E]+$/.test(str) && /%[0-9A-Fa-f]{2}/.test(str)) {
+    try { return decodeURIComponent(str); } catch (e) { return str; }
+  }
+  return str;
+}
+
 const EVENT_LABELS = {
   'rent_start':         { label: '🟢 新签起租',      color: 'green' },
   'rent_end':           { label: '🟠 退租',          color: 'orange' },
@@ -364,7 +374,8 @@ async function notifyFeishu(record) {
     const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
     const lines = [];
-    if (record.cityName) lines.push(`**城市**：${record.cityName}`);
+    const displayCity = safeDecodeUrl(record.cityName);
+    if (displayCity) lines.push(`**城市**：${displayCity}`);
     lines.push(`**车牌**：${record.plate || '未知'}`);
     lines.push(`**状态变化**：${record.fromStatus || '?'} → ${record.toStatus || '?'}`
     );
@@ -415,14 +426,20 @@ exports.main = async (event, context) => {
   try {
     const {
       cityCode,
-      cityName = '',
+      cityName: rawCityName = '',
       branchCode = null,
-      branchName = '',
+      branchName: rawBranchName = '',
       contractType = 'rent_std',
       contractTypeName = '纯租租赁',
       isOffline = false,
       payload = {}
     } = event || {};
+
+    // 修复乱码：cityName/branchName 可能被前端以 URL 编码形式传入
+    // （续约链路会从被污染的库记录二次编码，见 contract-detail 跳转），
+    // 统一解码后再入库 / 推送 / 渲染 DOCX，阻断传播
+    const cityName = safeDecodeUrl(rawCityName);
+    const branchName = safeDecodeUrl(rawBranchName);
 
     if (!cityCode) {
       return { ok: false, error: 'cityCode-required' };
